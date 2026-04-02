@@ -1,0 +1,113 @@
+Here is the combined technical reference document from our previous discussions, formatted as a **XeLaTeX source document** for your testing and implementation purposes. 
+
+This document integrates the mathematical logic, recursive algorithms, and theoretical context derived from the 20-page **ENEL445 Term Test** source material.
+
+```latex
+\documentclass[11pt]{article}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{amsmath, amssymb}
+\usepackage{fontspec}
+\usepackage{listings}
+\usepackage{hyperref}
+
+\setmainfont{Libertinus Serif} % Standard for XeLaTeX
+
+\title{Technical Reference: Applied Engineering Optimisation (ENEL445)}
+\author{Consolidated Study Guide}
+\date{April 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Mathematical Foundations}
+
+\subsection{Vector Calculus and Norms}
+For a column vector $\mathbf{x} \in \mathbb{R}^{n \times 1}$ and a matrix $\mathbf{A} \in \mathbb{R}^{n \times n}$, the vector derivative of the objective function $f(\mathbf{x}) = \mathbf{x}^T \mathbf{A} \mathbf{x}$ with respect to $\mathbf{x}$ is defined as:
+\begin{equation}
+\frac{\partial f}{\partial \mathbf{x}} = (\mathbf{A} + \mathbf{A}^T)\mathbf{x} \quad
+\end{equation}
+
+The \textbf{infinity norm} of an $n \times 1$ vector is the maximum absolute value of its entries:
+\begin{equation}
+||\mathbf{x}||_\infty = \max_{i} |x_i| \quad
+\end{equation}
+
+\subsection{Taylor Series Expansion}
+The second-order multivariate Taylor series expansion for a function $f(\mathbf{x})$ around point $\mathbf{c}$ is:
+\begin{equation}
+f(\mathbf{x}) \approx f(\mathbf{c}) + \nabla f(\mathbf{c})^T (\mathbf{x} - \mathbf{c}) + \frac{1}{2}(\mathbf{x} - \mathbf{c})^T \mathbf{H}(\mathbf{c}) (\mathbf{x} - \mathbf{c}) \quad
+\end{equation}
+Where $\mathbf{H}(\mathbf{c})$ is the \textbf{Hessian matrix}.
+
+\section{Optimality Conditions}
+
+\subsection{Hessian and Positive Semi-Definiteness}
+A matrix is \textbf{positive semi-definite} if $\mathbf{x}^T \mathbf{A} \mathbf{x} \geq 0$ for all $\mathbf{x}$. In optimisation, the Hessian must be positive semi-definite at a local minimum to ensure the function curves upward in all directions.
+
+\subsection{First-Order Necessary Condition (FONC)}
+For a point $\mathbf{c}$ to be a local minimum of $f(\mathbf{x})$, the directional gradient along an arbitrary direction vector $\mathbf{p}$ must satisfy:
+\begin{equation}
+\nabla f(\mathbf{c})^T \mathbf{p} = 0 \quad
+\end{equation}
+
+\section{Unconstrained Optimisation Logic}
+
+\subsection{Exact Line Search for Quadratic Functions}
+Given $f(\mathbf{x}) = \frac{1}{2}\mathbf{x}^T \mathbf{A} \mathbf{x} + \mathbf{b}^T \mathbf{x}$, the optimal step size $\mu^*$ along direction $\mathbf{p}$ from point $\mathbf{c}$ is found by solving the unconstrained problem where $\mu$ is the design variable. 
+The logic follows:
+\begin{enumerate}
+    \item Substitute $\mathbf{x} = \mathbf{c} + \mu\mathbf{p}$ into $f(\mathbf{x})$.
+    \item Derive the gradient with respect to $\mu$.
+    \item Solve $\frac{d}{d\mu}f(\mathbf{c} + \mu\mathbf{p}) = 0$ for $\mu^*$.
+\end{enumerate}
+
+\subsection{Nonlinear Least Squares (Sensor Location)}
+For an object $\mathbf{u}$ and sensors $\mathbf{s}_i$, the objective is to minimise:
+\begin{equation}
+\min_{\mathbf{u}} ||\mathbf{r}(\mathbf{u}) - \mathbf{d}||_2^2 \quad
+\end{equation}
+Where $\mathbf{r}(\mathbf{u}) = [r_1(\mathbf{u}), r_2(\mathbf{u}), r_3(\mathbf{u})]^T$ are the true distances $r_i(\mathbf{u}) = ||\mathbf{u} - \mathbf{s}_i||_2$. The \textbf{Jacobian} $\mathbf{J}(\mathbf{u})$ is the matrix of distance gradients.
+
+\section{Constrained Optimisation}
+
+\subsection{Lagrangian and KKT Conditions}
+For $\min f(\mathbf{x})$ subject to $g(\mathbf{x}) = 0$, the \textbf{Lagrangian function} is $\mathcal{L}(\mathbf{x}, \lambda) = f(\mathbf{x}) + \lambda g(\mathbf{x})$. 
+Optimality requires:
+\begin{itemize}
+    \item \textbf{Stationarity}: $\nabla_{\mathbf{x}} \mathcal{L} = 0$.
+    \item \textbf{Primal Feasibility}: $g(\mathbf{x}) = 0$.
+\end{itemize}
+
+\subsection{Duality and SQP}
+\begin{itemize}
+    \item \textbf{Lagrangian Dual}: $q(\lambda) = \min_{\mathbf{x}} \mathcal{L}(\mathbf{x}, \lambda)$. 
+    \item \textbf{Duality Gap}: The difference between primal and dual optima.
+    \item \textbf{SQP Logic}: Sequential Quadratic Programming handles the \textbf{combinatorial problem} of determining which inequality constraints are \textbf{active} using slack variables.
+\end{itemize}
+
+\section{Control and Sequential Decision Making}
+
+\subsection{Dynamic Programming Logic}
+Recursive Bellman logic for discrete systems $x_{k+1} = u_k$:
+\begin{lstlisting}[language=Python]
+# Penultimate Step Calculation
+J_{h-1}(x_{h-1}) = min_u [cost(x_{h-1}, u) + J_h(x_h)]
+# Reference terminal cost J_h(x_h) = 1
+\end{lstlisting}
+
+\subsection{Model Predictive Control (MPC)}
+For system $x_{k+1} = 0.9x_k + 0.1u_k$ and reference trajectory $\mathbf{r}$:
+\begin{itemize}
+    \item \textbf{Horizon}: Determined by the length of $\mathbf{r}$ (length 5).
+    \item \textbf{Formulation}: $\min ||\mathbf{y} - \mathbf{r}||_2^2 + ||\mathbf{u}||_2^2$ subject to dynamics and constraints $|u| \leq 1$.
+\end{itemize}
+
+\section{Reinforcement Learning}
+In Q-Learning, $\epsilon$-greedy exploration manages the trade-off between \textbf{exploitation} (current best) and \textbf{exploration} (random actions).
+
+\end{document}
+```
+
+**Implementation Note:** As previously noted, specific algorithms like *Nelder-Mead* or test functions like *Rosenbrock* were not present in the 20-page exam source and were therefore omitted to ensure the technical document is strictly evidence-based. If you wish to include those, I can provide general implementations from outside the sources, but you would need to verify them independently.

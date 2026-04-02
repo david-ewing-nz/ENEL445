@@ -1,0 +1,270 @@
+
+% !TEX TS-program = xelatex
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=25mm]{geometry}
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Heros}
+\renewcommand{\familydefault}{\sfdefault}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{enumitem}
+\usepackage{hyperref}
+
+\setlist[itemize]{leftmargin=*}
+\setlist[enumerate]{leftmargin=*}
+
+\title{ENEL445 --- Structured Problem-Solving Notes \\ Lecture 1 and Week 1 Lecture 2}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{How to Use These Notes}
+
+These notes are ordered to follow:
+
+\begin{itemize}
+\item Lecture 1 (Foundations of Optimisation)
+\item Week 1 Lecture 2 (Duality and Structure)
+\end{itemize}
+
+Each section includes a reference tag so you can map directly back to the PDF:
+
+\begin{itemize}
+\item [L1-x] refers to Lecture 1 section x
+\item [W1L2-x] refers to Week 1 Lecture 2 section x
+\end{itemize}
+
+The focus is strictly on what you must know to solve problems like those shown in the sample questions.
+
+\newpage
+
+% ============================================================
+\section*{[L1-1] Optimisation Problem Structure}
+
+\subsection*{Standard Form}
+
+A general constrained optimisation problem:
+
+\begin{align*}
+\min_{x \in \mathbb{R}^n} \quad & f(x) \\
+\text{s.t.} \quad & g_i(x) \le 0, \quad i=1,\dots,m \\
+& h_j(x) = 0, \quad j=1,\dots,p
+\end{align*}
+
+\subsection*{Skills Required}
+
+You must be able to:
+
+\begin{itemize}
+\item Rewrite constraints into standard form $g(x)\le0$
+\item Identify decision variables
+\item Identify convex vs non-convex structure
+\end{itemize}
+
+\subsection*{Common Exam Move}
+
+Turn inequalities like $x_1 \ge 1$ into $1 - x_1 \le 0$.
+
+\newpage
+
+% ============================================================
+\section*{[L1-2] Convexity}
+
+\subsection*{Definition}
+
+A function $f$ is convex if:
+
+\[
+f(\theta x + (1-\theta)y) \le \theta f(x) + (1-\theta)f(y)
+\]
+
+\subsection*{Second Derivative Test}
+
+If twice differentiable:
+
+\[
+\nabla^2 f(x) \succeq 0 \quad \Rightarrow \quad f \text{ convex}
+\]
+
+\subsection*{Convex Sets}
+
+A set is convex if the line segment between any two points lies in the set.
+
+\subsection*{Exam Skills}
+
+\begin{itemize}
+\item Show quadratic forms are convex via positive semidefinite matrices
+\item Recognise epigraphs
+\item Recognise half-spaces as convex sets
+\end{itemize}
+
+\newpage
+
+% ============================================================
+\section*{[L1-3] Lagrangian and KKT Conditions}
+
+\subsection*{Lagrangian Construction}
+
+For inequality constraints:
+
+\[
+\mathcal{L}(x,\lambda) = f(x) + \sum_i \lambda_i g_i(x)
+\]
+
+with $\lambda_i \ge 0$.
+
+\subsection*{KKT Conditions}
+
+\begin{enumerate}
+\item Stationarity: $\nabla_x \mathcal{L} = 0$
+\item Primal feasibility: $g_i(x)\le0$
+\item Dual feasibility: $\lambda_i \ge 0$
+\item Complementary slackness: $\lambda_i g_i(x)=0$
+\end{enumerate}
+
+\subsection*{Problem-Solving Order}
+
+\begin{enumerate}
+\item Write constraints in standard form
+\item Build Lagrangian
+\item Compute gradients
+\item Apply complementary slackness carefully
+\item Check feasibility
+\end{enumerate}
+
+This is heavily examined.
+
+\newpage
+
+% ============================================================
+\section*{[L1-4] Interior-Point and Barrier Concepts}
+
+\subsection*{Barrier Form}
+
+Replace constraint $g(x)\le0$ with:
+
+\[
+f(x) - \mu \sum_i \log(-g_i(x))
+\]
+
+\subsection*{Key Understanding}
+
+\begin{itemize}
+\item $\mu \downarrow 0$ drives solution toward boundary
+\item Newton steps solve resulting unconstrained problem
+\item Works well for convex problems
+\end{itemize}
+
+You must explain why it works conceptually.
+
+\newpage
+
+% ============================================================
+\section*{[W1L2-1] Dual Function}
+
+\subsection*{Definition}
+
+\[
+q(\lambda) = \inf_x \mathcal{L}(x,\lambda)
+\]
+
+Dual problem:
+
+\[
+\max_{\lambda \ge 0} q(\lambda)
+\]
+
+\subsection*{Weak Duality}
+
+\[
+q(\lambda) \le p^\star
+\]
+
+Always true.
+
+\subsection*{Strong Duality}
+
+If convex and Slater’s condition holds:
+
+\[
+d^\star = p^\star
+\]
+
+\subsection*{Exam Skill}
+
+Know how to:
+
+\begin{itemize}
+\item Compute infimum analytically
+\item Detect when dual becomes $-\infty$
+\item Interpret multipliers
+\end{itemize}
+
+\newpage
+
+% ============================================================
+\section*{[W1L2-2] Slater’s Condition}
+
+If problem is convex and there exists strictly feasible point:
+
+\[
+g_i(x) < 0
+\]
+
+Then strong duality holds.
+
+You may need to state this precisely.
+
+\newpage
+
+% ============================================================
+\section*{[W1L2-3] Dual Interpretation}
+
+Multipliers often represent:
+
+\begin{itemize}
+\item Shadow prices
+\item Sensitivity of objective to constraint tightening
+\end{itemize}
+
+Interpretation questions are common.
+
+\newpage
+
+% ============================================================
+\section*{Problem-Solving Checklist}
+
+When given a constrained optimisation problem:
+
+\begin{enumerate}
+\item Is the objective convex?
+\item Is the feasible set convex?
+\item Write constraints in standard form
+\item Form Lagrangian
+\item Compute gradients
+\item Apply KKT conditions
+\item Solve systematically
+\item Check feasibility
+\item If convex, conclude global optimality
+\item Optionally construct dual
+\end{enumerate}
+
+\newpage
+
+% ============================================================
+\section*{Mathematical Skills You Must Be Comfortable With}
+
+\begin{itemize}
+\item Multivariable differentiation
+\item Matrix algebra
+\item Inequality reasoning
+\item Logical implication chains
+\item Structured equation solving
+\end{itemize}
+
+These two lectures are foundational. If you are precise here, later topics (MPC, DP, RL) become structured extensions rather than new mathematics.
+
+\end{document}

@@ -1,0 +1,370 @@
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[british]{babel}
+\usepackage{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{hyperref}
+\usepackage[normalem]{ulem}
+% Page layout
+\geometry{
+  left=2.5cm,
+  right=2.5cm,
+  top=1.5cm,
+  bottom=2.5cm,
+  includeheadfoot
+}
+
+% Remove section numbering
+\setcounter{secnumdepth}{0}
+
+% Title information
+\title{Constrained and Unconstrained Optimisation Approaches to Variational Inference: Using ENEL445 Techniques to Address Posterior Under-Dispersion\footnote{ChatGPT was used to proofread this document and make recommendations to its content/format}}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Motivation and Fit with Engineering Optimisation}
+
+Many Bayesian models yield posterior distributions that are analytically intractable. Variational Inference (VI) addresses this by approximating the true posterior with a simpler, tractable distribution selected from a chosen parametric family. The approximation is found by solving an optimisation problem: identify the member of this family that minimises the Kullback–Leibler divergence\footnote{\url{https://en.wikipedia.org/wiki/Kullback_Leibler_divergence}} to the true posterior, which is equivalent to maximising the Evidence Lower Bound (ELBO)\footnote{\url{https://en.wikipedia.org/wiki/Evidence_lower_bound}}. Common choices for the variational family include Gaussian distributions for continuous parameters—regardless of whether the data likelihood is Gaussian or belongs to broader exponential families such as Bernoulli (logistic regression), Poisson (count data), or other generalised linear model distributions.
+
+Whilst the choice of approximating family restricts the solution space, the search for optimal parameters within that family is formulated as an optimisation problem—typically unconstrained for the variational parameters themselves.  This aligns naturally with my understanding of ENEL445's treatment of intractable problems through principled approximations: balancing computational feasibility (via surrogate models) with solution quality (accurate estimates and quantified uncertainty).
+
+Standard VI—especially mean-field approximations that assume independence between parameters—often produce under-dispersed (overconfident) posteriors. The variational approximation underestimates uncertainty, particularly for variance components and hyperparameters in hierarchical models. In engineering terms, the optimiser may successfully maximise the ELBO objective, yielding a solution that appears numerically satisfactory, yet the resulting uncertainty estimates are poorly calibrated for decision-making and inference.
+
+This project treats those limitations as an optimisation design challenge. Rather than accepting under-dispersion as an inevitable consequence of the variational approximation, we apply constrained and unconstrained optimisation techniques from ENEL445 to directly address calibration quality. The approach is two-fold: first, compare different optimisation algorithms (gradient methods, Newton's method, quasi-Newton, trust regions) to understand whether optimiser choice affects dispersion quality; second, introduce explicit constraints or penalty terms that prevent variance collapse, using penalty methods, barrier functions, and augmented Lagrangian approaches to explore minimum dispersion requirements whilst maintaining VI's computational efficiency.
+
+\section{Research Questions}
+
+\begin{enumerate}[nosep]
+\item When does standard ELBO optimisation lead to under-dispersion in common models used for regression and hierarchical modelling?
+
+\item Can constrained or unconstrained optimisation techniques from ENEL445---including penalty methods, barrier functions, augmented Lagrangian approaches, and trust region methods---improve posterior dispersion and predictive calibration without losing the computational advantages of VI? Can these techniques prevent variance collapse and maintain calibrated uncertainty?
+
+\item Do second-order optimisation methods that use Hessian information (Newton's method, quasi-Newton/BFGS\footnote{\url{https://en.wikipedia.org/wiki/Broyden–-Fletcher-–Goldfarb–-Shanno_algorithm}}, natural gradient, or Gauss--Newton-like approximations) improve convergence speed and stability compared with first-order gradient methods?
+\end{enumerate}
+
+\section{Proposed Approach}
+
+I will organise the project around controlled experiments in which the ground truth is known or can be approximated sufficiently well to evaluate VI quality. For conjugate models, this means analytical posteriors; for non-conjugate settings, it means high-quality MCMC baselines.
+
+\subsection{Models and Data}
+
+The strategy follows a deliberate progression from simple to complex. I'll start with simple Bayesian linear regression (the conjugate case) to validate the derivations and establish clean baselines. This allows me to verify implementations against analytical posteriors before moving on to harder problems. Next comes a hierarchical linear model — still mostly conjugate —but this is where factorisation assumptions begin to affect uncertainty estimates. The real test will be extending to a non-conjugate setting, such as logistic regression, where closed-form coordinate ascent updates no longer apply and the choice of optimiser becomes genuinely important.
+
+For each model, I'll generate synthetic data with known true parameter values. This matters because it provides definitive ground truth for evaluating VI quality. Sample sizes of 100, 500, and 1000 observations will test robustness to data scale — smaller samples tend to make under-dispersion more pronounced, whereas larger samples provide a stronger signal. Predictive evaluations will use an 80/20 train-test split, with results averaged over multiple random splits to ensure the findings aren't artefacts of a particular data realisation.
+
+\subsection{Methods to Compare}
+
+\subsubsection*{Baseline Implementations}
+
+I will build on established VB and MCMC implementations developed by Dr John Holmes (Lecturer, Mathematics and Statistics, University of Canterbury). His approaches include two key innovations:
+\newpage
+The mean-field VB implementation uses coordinate ascent with trace corrections that account for variance uncertainty when updating the precision parameters. Standard mean-field VB would collapse even faster without these corrections. The Gibbs sampler updates regression coefficients and random effects jointly rather than alternating between them — this blocked sampling substantially improves mixing when the parameters are correlated.
+
+These baseline methods are critical because they represent current best practice for hierarchical models. The question is whether adding explicit optimisation constraints can further improve calibration quality.
+
+\subsubsection*{Unconstrained Optimisation Variants}
+
+For the unconstrained baseline, I will compare gradient ascent with quasi-Newton methods (BFGS) and, where tractable, full Newton's method. Trust region methods may also be worth testing if step size control becomes an issue.
+
+\subsubsection*{Constrained Optimisation for Dispersion Control}
+
+The core idea is to augment the ELBO with terms that explicitly prevent variance collapse. Penalty methods impose a penalty on distributions whose entropy falls below a threshold. Barrier methods use logarithmic barriers to enforce minimum dispersion constraints. Augmented Lagrangian methods formulate explicit variance constraints and handle them via Lagrange multipliers. Which approach works best will depend on how tightly the constraints need to be enforced---penalties are softer, barriers are harder.
+
+\subsubsection*{Natural Gradient}
+
+Natural gradient methods exploit the geometry of the variational family using the Fisher information metric\footnote{\url{https://en.wikipedia.org/wiki/Fisher_information_metric}}. This connects directly to ENEL445 material on curvature-aware optimisation and may improve convergence in cases where standard gradients struggle.
+
+\subsection{Optimisation Framework}
+
+The project will frame variational inference explicitly as an optimisation problem:
+
+\textbf{Standard VI (unconstrained):}
+\[
+\max_{\lambda} \text{ELBO}(\lambda)
+\]
+where $\lambda$ are the variational parameters.
+
+\textbf{Constrained VI formulation:}
+\[
+\begin{aligned}
+\max_{\lambda} \quad & \text{ELBO}(\lambda) \\
+\text{subject to:} \quad & g(\lambda) \geq 0
+\end{aligned}
+\]
+where $g(\lambda)$ represents constraints such as minimum variance requirements (e.g., $\text{Var}[q(\theta)] \geq \sigma^2_{\text{min}}$) to prevent under-dispersion.
+
+Several ENEL445 techniques connect naturally to this formulation:
+\begin{itemize}[nosep]
+\item Penalty methods add $\rho \cdot \text{penalty}(g(\lambda))$ to the objective
+\item Barrier methods use $-\mu \log(g(\lambda))$ to keep solutions feasible
+\item Augmented Lagrangian approaches combine penalties with Lagrange multipliers
+\item Trust region methods bound the step size $\|\lambda_{k+1} - \lambda_k\|$ to ensure stable updates
+\end{itemize}
+
+\textbf{Why constrained optimisation for this problem?}
+
+\uline{The under-dispersion issue arises because ELBO maximisation has no built-in incentive to maintain adequate posterior variance.} Whilst the ELBO balances likelihood fit against KL divergence to the prior, both terms can lead to arbitrarily narrow posteriors if the data fit is sufficient. Mean-field VI exacerbates this: the factorisation assumption eliminates parameter correlations, often driving the optimiser toward collapsed variance components.
+
+The key insight here is that under-dispersion doesn't have to be inevitable. Instead of relying on the ELBO to produce well-calibrated posteriors, make calibration an explicit requirement—either through hard constraints (barrier methods) or soft penalties. The reformulation is: find the most data-consistent posterior while maintaining adequate uncertainty. This aligns with standard engineering practice for robust design under uncertainty.
+
+\section{Evaluation Criteria}
+
+This will be treated as an engineering optimisation comparison, with respect to solution quality, computational cost, and robustness.
+
+\subsubsection*{Solution Quality}
+
+Predictive performance on held-out data provides the primary quality measure: log predictive density and related scores indicate how well the fitted model predicts new observations. But the more critical question is uncertainty calibration: do the credible intervals have the right coverage rates? Is the posterior dispersion comparable to what Gibbs sampling produces? Variance ratios (VB variance divided by MCMC variance) quantify under-dispersion directly, with ratios below 1 indicating the problem we're trying to fix.
+
+\subsubsection*{Optimisation Performance}
+
+Convergence behaviour matters as much as final objective values. I'll track the number of iterations each optimiser requires to reach stable parameter estimates, monitoring ELBO traces for monotonicity and stability. For constrained methods, feasibility throughout optimisation is essential — violations of constraints during intermediate iterations indicate that the approach needs refinement. Sensitivity to initialisation will be tested by running each method from multiple random starting points to check whether different seeds produce consistent results.
+
+\subsubsection*{Sensitivity and Robustness}
+
+Constrained methods introduce hyperparameters that need careful tuning. How sensitive are the results to minimum variance thresholds, penalty weights, and barrier parameters? Do small changes in these settings dramatically alter the posterior, or is performance reasonably stable? Robustness across different sample sizes and data dimensions tests whether the approach generalises beyond the specific test cases.
+
+\subsubsection*{Computational Efficiency}
+
+For timing analysis, I'll instrument the code to record runtime per iteration for each optimiser, tracking both the computational cost of individual steps and total runtime to convergence. The key question: Does second-order information justify the extra computational cost per iteration through faster convergence? Scaling behaviour with data size and parameter dimension will be measured empirically by running experiments at different problem scales. Memory profiling of second-order methods will determine whether Hessian storage or matrix factorisations are the bottleneck.
+
+\section{Deliverables}
+
+The main deliverable will be a written report suitable for submission to an engineering optimisation project. This report will frame the problem as an optimisation problem (unconstrained and constrained ELBO formulations), describe the ENEL445 algorithms applied (first-order, second-order, and penalty/barrier/Lagrangian methods), and provide formal convergence analyses comparing the optimisers. The experimental results will demonstrate which techniques reduce under-dispersion, and diagnostic analyses will explain the mechanisms at play. Critically, the report will interpret when and why constrained methods succeed or fail, and provide practical recommendations on when these approaches are appropriate for VI.
+
+The code deliverable (in Python) will include working implementations of trace-corrected mean-field VB and blocked Gibbs sampling (adapted from reference implementations), along with multiple optimiser variants applied to baseline VB. The constrained VI variants (penalty, barrier, augmented Lagrangian) will be fully implemented and tested. An optimiser comparison harness will generate convergence traces and timing results. All scripts needed to reproduce figures and tables will be included, ensuring the results are fully reproducible.
+
+\section{Practical Plan and Scope Control}
+
+To keep the scope realistic, the project will proceed in stages:
+
+\textbf{Stage 0: Optimiser Baseline (Conjugate Model)}
+
+Start by implementing ELBO optimisation for a simple Bayesian linear regression model. This stage tests gradient ascent, BFGS, and Newton's method to establish baseline convergence rates. Because the conjugate case has analytical posteriors, I can verify implementations are correct before tackling harder problems.
+
+\textbf{Stage 1: Constrained Optimisation for Dispersion}
+
+This is the critical stage. Add explicit dispersion constraints using penalty methods, barrier functions, and augmented Lagrangian approaches. If these constraints can eliminate under-dispersion compared to unconstrained VI, the approach is viable. If not, the project pivots to understanding why not.
+
+\textbf{Stage 2: Hierarchical Model Extension}
+
+Scale the constrained optimisation framework to hierarchical linear models where under-dispersion is more pronounced. This is where mean-field VI typically struggles most, making it the natural test case for whether constraints actually help. Constrained VI will be compared against blocked Gibbs sampling baselines.
+
+\textbf{Stage 3: Non-Conjugate Setting (Optional)}
+
+Extend to hierarchical logistic regression where closed-form updates are unavailable and optimiser choice becomes critical. This stage is optional and will be attempted only if earlier stages succeed and time permits.
+
+If the non-conjugate extension introduces too much risk or time constraints prevent completion, the project can stand on its own on Stages 0--2, provided the optimisation comparison and calibration analysis are conducted thoroughly with formal convergence results. If time allows, hierarchical logistic regression will be attempted to demonstrate the techniques in a challenging non-conjugate setting where under-dispersion is particularly severe.
+
+\section{Technical Challenges}
+
+I will adapt and extend reference implementations that use blocked Gibbs sampling and trace-corrected mean-field VB, preserving the methodological innovations (joint $(\beta, u)$ updates, variance trace corrections) whilst implementing constrained optimisation extensions. This provides a validated baseline for evaluating whether additional optimisation constraints improve calibration.
+
+Stage 1 — implementing and tuning the constrained optimisation methods — will be the most technically demanding. The biggest challenges:
+
+\textbf{Constraint design:} What exactly should $g(\lambda)$ be? ``Minimum variance requirements'' sounds straightforward, but practical implementation raises immediate questions. Should all parameter variances be constrained, or only variance components and hyperparameters? What threshold values make sense? How should constraints be expressed mathematically for variational parameters that typically come in mean-variance pairs?
+
+\textbf{Implementation complexity:} Penalty methods, barrier functions, and augmented Lagrangian approaches are not standard VI techniques, so implementation will likely require building from scratch or heavily adapting existing optimisation toolboxes. Barrier methods need careful step-size control near constraint boundaries; augmented Lagrangian methods need dual variable updates alongside primal optimisation.
+
+\textbf{Hyperparameter tuning and trade-offs:} Each constrained method introduces hyperparameters ($\rho$ for penalties, $\mu$ for barriers, annealing schedules). Getting these right matters: constraints that are too weak fail to prevent under-dispersion, whilst constraints that are too strong compromise ELBO maximisation or prevent convergence. Characterising this trade-off space will require extensive sensitivity analysis.
+
+\textbf{Numerical stability:} Constraints can destabilise optimisation, particularly when combined with second-order methods. Barrier methods become ill-conditioned near constraint boundaries, and trust region methods can conflict with constraint satisfaction. Robust convergence monitoring will be essential.
+
+\textbf{Uncertain effectiveness:} The constrained optimisation approach is experimental. It might not eliminate under-dispersion as hoped, particularly in hierarchical models where the factorisation assumption is fundamental. If constraints don't work as expected, understanding why becomes the primary deliverable — potentially just as valuable for future work.
+
+Relative to other stages, Stage 0 (unconstrained optimisers) is comparatively straightforward, as standard toolboxes exist for BFGS, Newton's method, and gradient ascent. Stage 2 (hierarchical models) represents an incremental extension. Stage 3 (logistic regression) is marked optional precisely because non-conjugate models introduce substantial additional complexity. The constrained optimisation framework in Stage 1 represents both the novel contribution and the highest-risk technical component of the project.
+
+\end{document}
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[british]{babel}
+\usepackage{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{hyperref}
+\usepackage[normalem]{ulem}
+% Page layout
+\geometry{
+  left=2.5cm,
+  right=2.5cm,
+  top=1.5cm,
+  bottom=2.5cm,
+  includeheadfoot
+}
+
+% Remove section numbering
+\setcounter{secnumdepth}{0}
+
+% Title information
+\title{Constrained and Unconstrained Optimisation Approaches to Variational Inference: Using ENEL445 Techniques to Address Posterior Under-Dispersion\footnote{ChatGPT was used to proofread this document and make recommendations to its content/format}}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Motivation and Fit with Engineering Optimisation}
+
+Many Bayesian models yield posterior distributions that are analytically intractable. Variational Inference (VI) addresses this by approximating the true posterior with a simpler, tractable distribution selected from a chosen parametric family. The approximation is found by solving an optimisation problem: identify the member of this family that minimises the Kullback–Leibler divergence\footnote{\url{https://en.wikipedia.org/wiki/Kullback_Leibler_divergence}} to the true posterior, which is equivalent to maximising the Evidence Lower Bound (ELBO)\footnote{\url{https://en.wikipedia.org/wiki/Evidence_lower_bound}}. Common choices for the variational family include Gaussian distributions for continuous parameters—regardless of whether the data likelihood is Gaussian or belongs to broader exponential families such as Bernoulli (logistic regression), Poisson (count data), or other generalised linear model distributions.
+
+Whilst the choice of approximating family restricts the solution space, the search for optimal parameters within that family is formulated as an optimisation problem—typically unconstrained for the variational parameters themselves.  This aligns naturally with my understanding of ENEL445's treatment of intractable problems through principled approximations: balancing computational feasibility (via surrogate models) with solution quality (accurate estimates and quantified uncertainty).
+
+Standard VI—especially mean-field approximations that assume independence between parameters—often produce under-dispersed (overconfident) posteriors. The variational approximation underestimates uncertainty, particularly for variance components and hyperparameters in hierarchical models. In engineering terms, the optimiser may successfully maximise the ELBO objective, yielding a solution that appears numerically satisfactory, yet the resulting uncertainty estimates are poorly calibrated for decision-making and inference.
+
+This project treats those limitations as an optimisation design challenge. Rather than accepting under-dispersion as an inevitable consequence of the variational approximation, we apply constrained and unconstrained optimisation techniques from ENEL445 to directly address calibration quality. The approach is two-fold: first, compare different optimisation algorithms (gradient methods, Newton's method, quasi-Newton, trust regions) to understand whether optimiser choice affects dispersion quality; second, introduce explicit constraints or penalty terms that prevent variance collapse, using penalty methods, barrier functions, and augmented Lagrangian approaches to explore minimum dispersion requirements whilst maintaining VI's computational efficiency.
+
+\section{Research Questions}
+
+\begin{enumerate}[nosep]
+\item When does standard ELBO optimisation lead to under-dispersion in common models used for regression and hierarchical modelling?
+
+\item Can constrained or unconstrained optimisation techniques from ENEL445---including penalty methods, barrier functions, augmented Lagrangian approaches, and trust region methods---improve posterior dispersion and predictive calibration without losing the computational advantages of VI? Can these techniques prevent variance collapse and maintain calibrated uncertainty?
+
+\item Do second-order optimisation methods that use Hessian information (Newton's method, quasi-Newton/BFGS\footnote{\url{https://en.wikipedia.org/wiki/Broyden–-Fletcher-–Goldfarb–-Shanno_algorithm}}, natural gradient, or Gauss--Newton-like approximations) improve convergence speed and stability compared with first-order gradient methods?
+\end{enumerate}
+
+\section{Proposed Approach}
+
+I will organise the project around controlled experiments in which the ground truth is known or can be approximated sufficiently well to evaluate VI quality. For conjugate models, this means analytical posteriors; for non-conjugate settings, it means high-quality MCMC baselines.
+
+\subsection{Models and Data}
+
+The strategy follows a deliberate progression from simple to complex. I'll start with simple Bayesian linear regression (the conjugate case) to validate the derivations and establish clean baselines. This allows me to verify implementations against analytical posteriors before moving on to harder problems. Next comes a hierarchical linear model — still mostly conjugate —but this is where factorisation assumptions begin to affect uncertainty estimates. The real test will be extending to a non-conjugate setting, such as logistic regression, where closed-form coordinate ascent updates no longer apply and the choice of optimiser becomes genuinely important.
+
+For each model, I'll generate synthetic data with known true parameter values. This matters because it provides definitive ground truth for evaluating VI quality. Sample sizes of 100, 500, and 1000 observations will test robustness to data scale — smaller samples tend to make under-dispersion more pronounced, whereas larger samples provide a stronger signal. Predictive evaluations will use an 80/20 train-test split, with results averaged over multiple random splits to ensure the findings aren't artefacts of a particular data realisation.
+
+\subsection{Methods to Compare}
+
+\subsubsection*{Baseline Implementations}
+
+I will build on established VB and MCMC implementations developed by Dr John Holmes (Lecturer, Mathematics and Statistics, University of Canterbury). His approaches include two key innovations:
+\newpage
+The mean-field VB implementation uses coordinate ascent with trace corrections that account for variance uncertainty when updating the precision parameters. Standard mean-field VB would collapse even faster without these corrections. The Gibbs sampler updates regression coefficients and random effects jointly rather than alternating between them — this blocked sampling substantially improves mixing when the parameters are correlated.
+
+These baseline methods are critical because they represent current best practice for hierarchical models. The question is whether adding explicit optimisation constraints can further improve calibration quality.
+
+\subsubsection*{Unconstrained Optimisation Variants}
+
+For the unconstrained baseline, I will compare gradient ascent with quasi-Newton methods (BFGS) and, where tractable, full Newton's method. Trust region methods may also be worth testing if step size control becomes an issue.
+
+\subsubsection*{Constrained Optimisation for Dispersion Control}
+
+The core idea is to augment the ELBO with terms that explicitly prevent variance collapse. Penalty methods impose a penalty on distributions whose entropy falls below a threshold. Barrier methods use logarithmic barriers to enforce minimum dispersion constraints. Augmented Lagrangian methods formulate explicit variance constraints and handle them via Lagrange multipliers. Which approach works best will depend on how tightly the constraints need to be enforced---penalties are softer, barriers are harder.
+
+\subsubsection*{Natural Gradient}
+
+Natural gradient methods exploit the geometry of the variational family using the Fisher information metric\footnote{\url{https://en.wikipedia.org/wiki/Fisher_information_metric}}. This connects directly to ENEL445 material on curvature-aware optimisation and may improve convergence in cases where standard gradients struggle.
+
+\subsection{Optimisation Framework}
+
+The project will frame variational inference explicitly as an optimisation problem:
+
+\textbf{Standard VI (unconstrained):}
+\[
+\max_{\lambda} \text{ELBO}(\lambda)
+\]
+where $\lambda$ are the variational parameters.
+
+\textbf{Constrained VI formulation:}
+\[
+\begin{aligned}
+\max_{\lambda} \quad & \text{ELBO}(\lambda) \\
+\text{subject to:} \quad & g(\lambda) \geq 0
+\end{aligned}
+\]
+where $g(\lambda)$ represents constraints such as minimum variance requirements (e.g., $\text{Var}[q(\theta)] \geq \sigma^2_{\text{min}}$) to prevent under-dispersion.
+
+Several ENEL445 techniques connect naturally to this formulation:
+\begin{itemize}[nosep]
+\item Penalty methods add $\rho \cdot \text{penalty}(g(\lambda))$ to the objective
+\item Barrier methods use $-\mu \log(g(\lambda))$ to keep solutions feasible
+\item Augmented Lagrangian approaches combine penalties with Lagrange multipliers
+\item Trust region methods bound the step size $\|\lambda_{k+1} - \lambda_k\|$ to ensure stable updates
+\end{itemize}
+
+\textbf{Why constrained optimisation for this problem?}
+
+\uline{The under-dispersion issue arises because ELBO maximisation has no built-in incentive to maintain adequate posterior variance.} Whilst the ELBO balances likelihood fit against KL divergence to the prior, both terms can lead to arbitrarily narrow posteriors if the data fit is sufficient. Mean-field VI exacerbates this: the factorisation assumption eliminates parameter correlations, often driving the optimiser toward collapsed variance components.
+
+The key insight here is that under-dispersion doesn't have to be inevitable. Instead of relying on the ELBO to produce well-calibrated posteriors, make calibration an explicit requirement—either through hard constraints (barrier methods) or soft penalties. The reformulation is: find the most data-consistent posterior while maintaining adequate uncertainty. This aligns with standard engineering practice for robust design under uncertainty.
+
+\section{Evaluation Criteria}
+
+This will be treated as an engineering optimisation comparison, with respect to solution quality, computational cost, and robustness.
+
+\subsubsection*{Solution Quality}
+
+Predictive performance on held-out data provides the primary quality measure: log predictive density and related scores indicate how well the fitted model predicts new observations. But the more critical question is uncertainty calibration: do the credible intervals have the right coverage rates? Is the posterior dispersion comparable to what Gibbs sampling produces? Variance ratios (VB variance divided by MCMC variance) quantify under-dispersion directly, with ratios below 1 indicating the problem we're trying to fix.
+
+\subsubsection*{Optimisation Performance}
+
+Convergence behaviour matters as much as final objective values. I'll track the number of iterations each optimiser requires to reach stable parameter estimates, monitoring ELBO traces for monotonicity and stability. For constrained methods, feasibility throughout optimisation is essential — violations of constraints during intermediate iterations indicate that the approach needs refinement. Sensitivity to initialisation will be tested by running each method from multiple random starting points to check whether different seeds produce consistent results.
+
+\subsubsection*{Sensitivity and Robustness}
+
+Constrained methods introduce hyperparameters that need careful tuning. How sensitive are the results to minimum variance thresholds, penalty weights, and barrier parameters? Do small changes in these settings dramatically alter the posterior, or is performance reasonably stable? Robustness across different sample sizes and data dimensions tests whether the approach generalises beyond the specific test cases.
+
+\subsubsection*{Computational Efficiency}
+
+For timing analysis, I'll instrument the code to record runtime per iteration for each optimiser, tracking both the computational cost of individual steps and total runtime to convergence. The key question: Does second-order information justify the extra computational cost per iteration through faster convergence? Scaling behaviour with data size and parameter dimension will be measured empirically by running experiments at different problem scales. Memory profiling of second-order methods will determine whether Hessian storage or matrix factorisations are the bottleneck.
+
+\section{Deliverables}
+
+The main deliverable will be a written report suitable for submission to an engineering optimisation project. This report will frame the problem as an optimisation problem (unconstrained and constrained ELBO formulations), describe the ENEL445 algorithms applied (first-order, second-order, and penalty/barrier/Lagrangian methods), and provide formal convergence analyses comparing the optimisers. The experimental results will demonstrate which techniques reduce under-dispersion, and diagnostic analyses will explain the mechanisms at play. Critically, the report will interpret when and why constrained methods succeed or fail, and provide practical recommendations on when these approaches are appropriate for VI.
+
+The code deliverable (in Python) will include working implementations of trace-corrected mean-field VB and blocked Gibbs sampling (adapted from reference implementations), along with multiple optimiser variants applied to baseline VB. The constrained VI variants (penalty, barrier, augmented Lagrangian) will be fully implemented and tested. An optimiser comparison harness will generate convergence traces and timing results. All scripts needed to reproduce figures and tables will be included, ensuring the results are fully reproducible.
+
+\section{Practical Plan and Scope Control}
+
+To keep the scope realistic, the project will proceed in stages:
+
+\textbf{Stage 0: Optimiser Baseline (Conjugate Model)}
+
+Start by implementing ELBO optimisation for a simple Bayesian linear regression model. This stage tests gradient ascent, BFGS, and Newton's method to establish baseline convergence rates. Because the conjugate case has analytical posteriors, I can verify implementations are correct before tackling harder problems.
+
+\textbf{Stage 1: Constrained Optimisation for Dispersion}
+
+This is the critical stage. Add explicit dispersion constraints using penalty methods, barrier functions, and augmented Lagrangian approaches. If these constraints can eliminate under-dispersion compared to unconstrained VI, the approach is viable. If not, the project pivots to understanding why not.
+
+\textbf{Stage 2: Hierarchical Model Extension}
+
+Scale the constrained optimisation framework to hierarchical linear models where under-dispersion is more pronounced. This is where mean-field VI typically struggles most, making it the natural test case for whether constraints actually help. Constrained VI will be compared against blocked Gibbs sampling baselines.
+
+\textbf{Stage 3: Non-Conjugate Setting (Optional)}
+
+Extend to hierarchical logistic regression where closed-form updates are unavailable and optimiser choice becomes critical. This stage is optional and will be attempted only if earlier stages succeed and time permits.
+
+If the non-conjugate extension introduces too much risk or time constraints prevent completion, the project can stand on its own on Stages 0--2, provided the optimisation comparison and calibration analysis are conducted thoroughly with formal convergence results. If time allows, hierarchical logistic regression will be attempted to demonstrate the techniques in a challenging non-conjugate setting where under-dispersion is particularly severe.
+
+\section{Technical Challenges}
+
+I will adapt and extend reference implementations that use blocked Gibbs sampling and trace-corrected mean-field VB, preserving the methodological innovations (joint $(\beta, u)$ updates, variance trace corrections) whilst implementing constrained optimisation extensions. This provides a validated baseline for evaluating whether additional optimisation constraints improve calibration.
+
+Stage 1 — implementing and tuning the constrained optimisation methods — will be the most technically demanding. The biggest challenges:
+
+\textbf{Constraint design:} What exactly should $g(\lambda)$ be? ``Minimum variance requirements'' sounds straightforward, but practical implementation raises immediate questions. Should all parameter variances be constrained, or only variance components and hyperparameters? What threshold values make sense? How should constraints be expressed mathematically for variational parameters that typically come in mean-variance pairs?
+
+\textbf{Implementation complexity:} Penalty methods, barrier functions, and augmented Lagrangian approaches are not standard VI techniques, so implementation will likely require building from scratch or heavily adapting existing optimisation toolboxes. Barrier methods need careful step-size control near constraint boundaries; augmented Lagrangian methods need dual variable updates alongside primal optimisation.
+
+\textbf{Hyperparameter tuning and trade-offs:} Each constrained method introduces hyperparameters ($\rho$ for penalties, $\mu$ for barriers, annealing schedules). Getting these right matters: constraints that are too weak fail to prevent under-dispersion, whilst constraints that are too strong compromise ELBO maximisation or prevent convergence. Characterising this trade-off space will require extensive sensitivity analysis.
+
+\textbf{Numerical stability:} Constraints can destabilise optimisation, particularly when combined with second-order methods. Barrier methods become ill-conditioned near constraint boundaries, and trust region methods can conflict with constraint satisfaction. Robust convergence monitoring will be essential.
+
+\textbf{Uncertain effectiveness:} The constrained optimisation approach is experimental. It might not eliminate under-dispersion as hoped, particularly in hierarchical models where the factorisation assumption is fundamental. If constraints don't work as expected, understanding why becomes the primary deliverable — potentially just as valuable for future work.
+
+Relative to other stages, Stage 0 (unconstrained optimisers) is comparatively straightforward, as standard toolboxes exist for BFGS, Newton's method, and gradient ascent. Stage 2 (hierarchical models) represents an incremental extension. Stage 3 (logistic regression) is marked optional precisely because non-conjugate models introduce substantial additional complexity. The constrained optimisation framework in Stage 1 represents both the novel contribution and the highest-risk technical component of the project.
+
+\end{document}

@@ -1,0 +1,655 @@
+\documentclass[11pt]{article}
+
+% Packages for XeLaTeX
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\geometry{margin=1in}
+
+% Font settings for XeLaTeX (optional - uses default if not specified)
+% \setmainfont{Latin Modern Roman}
+
+% Custom commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\KL}{\text{KL}}
+\newcommand{\ELBO}{\text{ELBO}}
+\newcommand{\tr}{\text{tr}}
+\newcommand{\diag}{\text{diag}}
+
+\title{Optimisation Methods for Variational Inference:\\
+Mathematical Solutions and Derivations}
+\author{David Ewing (82171165)\\
+ENEL445 -- Applied Engineering Optimisation\\
+University of Canterbury}
+\date{March 17, 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This document presents the complete mathematical solution for applying gradient-based optimisation methods to Variational Inference (VI) in Bayesian linear regression. We derive the Evidence Lower Bound (ELBO), present the baseline Coordinate Ascent VI (CAVI) solution, and develop gradient and Hessian expressions for advanced optimisation methods including gradient ascent, Newton's method, and BFGS. The formulation demonstrates how VI can serve as a realistic optimisation testbed for comparing methods from ENEL445.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Problem Formulation}
+
+\subsection{Bayesian Linear Regression Model}
+
+Consider the standard linear regression model:
+\begin{equation}
+y_i = \bm{x}_i^T \bm{\beta} + \epsilon_i, \quad \epsilon_i \sim \N(0, \tau_e^{-1}), \quad i = 1,\ldots,n
+\end{equation}
+
+where:
+\begin{itemize}
+\item $\bm{y} \in \R^n$ is the response vector
+\item $\bm{X} \in \R^{n \times p}$ is the design matrix with rows $\bm{x}_i^T$
+\item $\bm{\beta} \in \R^p$ are regression coefficients
+\item $\tau_e > 0$ is the precision (inverse variance) of residuals
+\end{itemize}
+
+In vector form:
+\begin{equation}
+\bm{y} \sim \N(\bm{X}\bm{\beta}, \tau_e^{-1} \bm{I}_n)
+\end{equation}
+
+\subsection{Prior Distributions}
+
+We use conjugate Normal-Gamma priors:
+\begin{align}
+p(\bm{\beta}) &= \N(\bm{\beta} \mid \bm{0}, \lambda_\beta^{-1} \bm{I}_p) \label{eq:prior_beta}\\
+p(\tau_e) &= \text{Gamma}(\tau_e \mid \alpha_e, \gamma_e) \label{eq:prior_tau}
+\end{align}
+
+For flat (improper) priors, we set $\lambda_\beta \to 0$, $\alpha_e = \gamma_e = 0$.
+
+\subsection{Posterior Distribution}
+
+The joint posterior distribution is:
+\begin{equation}
+p(\bm{\beta}, \tau_e \mid \bm{y}) = \frac{p(\bm{y} \mid \bm{\beta}, \tau_e) p(\bm{\beta}) p(\tau_e)}{p(\bm{y})}
+\end{equation}
+
+The normalizing constant $p(\bm{y}) = \int \int p(\bm{y}, \bm{\beta}, \tau_e) \, d\bm{\beta} \, d\tau_e$ is analytically tractable for this conjugate model, but we treat it as intractable to demonstrate VI methodology.
+
+\section{Variational Inference Framework}
+
+\subsection{Mean-Field Approximation}
+
+Variational Inference approximates the posterior with a simpler distribution $q(\bm{\beta}, \tau_e)$ from a tractable family. We use the mean-field factorization:
+\begin{equation}
+q(\bm{\beta}, \tau_e) = q(\bm{\beta}) \, q(\tau_e)
+\end{equation}
+
+with Gaussian and Gamma factors:
+\begin{align}
+q(\bm{\beta}) &= \N(\bm{\beta} \mid \bm{\mu}_\beta, \bm{\Sigma}_\beta) \label{eq:q_beta}\\
+q(\tau_e) &= \text{Gamma}(\tau_e \mid a_e, b_e) \label{eq:q_tau}
+\end{align}
+
+\subsection{Variational Parameters}
+
+The design variables (in ENEL445 terminology) are the variational parameters:
+\begin{equation}
+\bm{\phi} = (\bm{\mu}_\beta, \bm{\Sigma}_\beta, a_e, b_e)
+\end{equation}
+
+Dimension count for $p$ predictors:
+\begin{itemize}
+\item $\bm{\mu}_\beta$: $p$ parameters
+\item $\bm{\Sigma}_\beta$: $p(p+1)/2$ parameters (symmetric matrix)
+\item $a_e, b_e$: 2 parameters
+\item \textbf{Total}: $d = p + \frac{p(p+1)}{2} + 2 = \frac{p(p+3)}{2} + 2$
+\end{itemize}
+
+For $p=3$: $d = 11$ dimensions.
+
+\subsection{Evidence Lower Bound (ELBO)}
+
+The optimisation objective is the Evidence Lower Bound:
+\begin{equation}
+\ELBO(\bm{\phi}) = \E_{q}[\log p(\bm{y}, \bm{\beta}, \tau_e)] - \E_{q}[\log q(\bm{\beta}, \tau_e)]
+\label{eq:elbo_def}
+\end{equation}
+
+The ELBO is a lower bound on the log marginal likelihood:
+\begin{equation}
+\log p(\bm{y}) = \ELBO(\bm{\phi}) + \KL(q \| p) \geq \ELBO(\bm{\phi})
+\end{equation}
+
+since $\KL(q \| p) \geq 0$. Maximizing the ELBO minimizes the reverse KL divergence $\KL(q \| p)$.
+
+\section{ELBO Derivation}
+
+\subsection{Joint Log-Likelihood Expansion}
+
+The expected joint log-likelihood decomposes as:
+\begin{align}
+\E_{q}[\log p(\bm{y}, \bm{\beta}, \tau_e)] &= \E_{q}[\log p(\bm{y} \mid \bm{\beta}, \tau_e)] + \E_{q}[\log p(\bm{\beta})] + \E_{q}[\log p(\tau_e)]
+\end{align}
+
+\subsection{Likelihood Term}
+
+The log-likelihood is:
+\begin{align}
+\log p(\bm{y} \mid \bm{\beta}, \tau_e) &= -\frac{n}{2}\log(2\pi) + \frac{n}{2}\log \tau_e - \frac{\tau_e}{2} \|\bm{y} - \bm{X}\bm{\beta}\|^2
+\end{align}
+
+Taking expectations under $q$:
+\begin{align}
+\E_{q}[\log p(\bm{y} \mid \bm{\beta}, \tau_e)] &= -\frac{n}{2}\log(2\pi) + \frac{n}{2}\E_q[\log \tau_e] \nonumber\\
+&\quad - \frac{1}{2}\E_q[\tau_e] \E_q[\|\bm{y} - \bm{X}\bm{\beta}\|^2]
+\end{align}
+
+Using the mean-field factorization:
+\begin{align}
+\E_q[\|\bm{y} - \bm{X}\bm{\beta}\|^2] &= \E_q[(\bm{y} - \bm{X}\bm{\beta})^T(\bm{y} - \bm{X}\bm{\beta})] \nonumber\\
+&= \|\bm{y} - \bm{X}\bm{\mu}_\beta\|^2 + \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)
+\end{align}
+
+For Gamma$(a_e, b_e)$:
+\begin{align}
+\E_q[\tau_e] &= \frac{a_e}{b_e}\\
+\E_q[\log \tau_e] &= \psi(a_e) - \log b_e
+\end{align}
+
+where $\psi(\cdot)$ is the digamma function.
+
+Therefore:
+\begin{align}
+\E_{q}[\log p(\bm{y} \mid \bm{\beta}, \tau_e)] &= -\frac{n}{2}\log(2\pi) + \frac{n}{2}(\psi(a_e) - \log b_e) \nonumber\\
+&\quad - \frac{a_e}{2b_e} \left[\|\bm{y} - \bm{X}\bm{\mu}_\beta\|^2 + \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)\right]
+\label{eq:exp_likelihood}
+\end{align}
+
+\subsection{Prior Terms}
+
+For the beta prior (assuming flat prior $\lambda_\beta = 0$):
+\begin{equation}
+\E_{q}[\log p(\bm{\beta})] = \text{constant}
+\end{equation}
+
+For the Gamma prior:
+\begin{align}
+\E_{q}[\log p(\tau_e)] &= (\alpha_e - 1)\E_q[\log \tau_e] - \gamma_e \E_q[\tau_e] + \alpha_e \log \gamma_e - \log \Gamma(\alpha_e) \nonumber\\
+&= (\alpha_e - 1)(\psi(a_e) - \log b_e) - \gamma_e \frac{a_e}{b_e} + C
+\label{eq:exp_prior_tau}
+\end{align}
+
+\subsection{Entropy Terms}
+
+The entropy of the variational distribution:
+\begin{align}
+H[q] &= -\E_q[\log q(\bm{\beta}, \tau_e)] = H[q(\bm{\beta})] + H[q(\tau_e)]
+\end{align}
+
+For $q(\bm{\beta}) = \N(\bm{\mu}_\beta, \bm{\Sigma}_\beta)$:
+\begin{equation}
+H[q(\bm{\beta})] = \frac{p}{2}(1 + \log 2\pi) + \frac{1}{2}\log |\bm{\Sigma}_\beta|
+\label{eq:entropy_beta}
+\end{equation}
+
+For $q(\tau_e) = \text{Gamma}(a_e, b_e)$:
+\begin{equation}
+H[q(\tau_e)] = a_e - \log b_e + \log \Gamma(a_e) + (1-a_e)\psi(a_e)
+\label{eq:entropy_tau}
+\end{equation}
+
+\subsection{Complete ELBO Expression}
+
+Combining all terms:
+\begin{align}
+\ELBO(\bm{\phi}) &= -\frac{n}{2}\log(2\pi) + \frac{n}{2}(\psi(a_e) - \log b_e) \nonumber\\
+&\quad - \frac{a_e}{2b_e} \left[\|\bm{y} - \bm{X}\bm{\mu}_\beta\|^2 + \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)\right] \nonumber\\
+&\quad + (\alpha_e - 1)(\psi(a_e) - \log b_e) - \gamma_e \frac{a_e}{b_e} \nonumber\\
+&\quad + \frac{p}{2}(1 + \log 2\pi) + \frac{1}{2}\log |\bm{\Sigma}_\beta| \nonumber\\
+&\quad + a_e - \log b_e + \log \Gamma(a_e) + (1-a_e)\psi(a_e) + C
+\label{eq:elbo_full}
+\end{align}
+
+\section{Coordinate Ascent Variational Inference (CAVI)}
+
+\subsection{Algorithm Overview}
+
+CAVI updates each variational parameter (or block) while holding others fixed, cycling until convergence. This is analogous to block coordinate descent/ascent in ENEL445 Chapter 4.
+
+\begin{algorithm}
+\caption{Coordinate Ascent VI}
+\begin{algorithmic}[1]
+ \State Initialise $\bm{\mu}_\beta^{(0)}, \bm{\Sigma}_\beta^{(0)}, a_e^{(0)}, b_e^{(0)}$
+\For{$t = 0, 1, 2, \ldots$ until convergence}
+    \State Update $q(\bm{\beta})$ given current $q(\tau_e)$
+    \State Update $q(\tau_e)$ given current $q(\bm{\beta})$
+    \State Check convergence: $\max_i |\phi_i^{(t+1)} - \phi_i^{(t)}| / |\phi_i^{(t+1)}| < \epsilon$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Update for \texorpdfstring{$q(\bm{\beta})$}{q(beta)}}
+
+Taking functional derivative of ELBO with respect to $q(\bm{\beta})$ and setting to zero:
+\begin{equation}
+\log q^*(\bm{\beta}) = \E_{q(\tau_e)}[\log p(\bm{y}, \bm{\beta}, \tau_e)] + \text{const}
+\end{equation}
+
+This yields a Gaussian distribution:
+\begin{align}
+q^*(\bm{\beta}) &= \N(\bm{\beta} \mid \bm{\mu}_\beta, \bm{\Sigma}_\beta)\\
+\bm{\Sigma}_\beta &= \left(\lambda_\beta \bm{I} + \E_q[\tau_e] \bm{X}^T\bm{X}\right)^{-1} = \left(\frac{a_e}{b_e} \bm{X}^T\bm{X}\right)^{-1} \label{eq:cavi_Sigma}\\
+\bm{\mu}_\beta &= \E_q[\tau_e] \bm{\Sigma}_\beta \bm{X}^T\bm{y} = \frac{a_e}{b_e} \bm{\Sigma}_\beta \bm{X}^T\bm{y} \label{eq:cavi_mu}
+\end{align}
+
+For flat prior ($\lambda_\beta = 0$).
+
+\subsection{Update for \texorpdfstring{$q(\tau_e)$}{q(tau_e)}}
+
+Similarly, taking functional derivative with respect to $q(\tau_e)$:
+\begin{equation}
+\log q^*(\tau_e) = \E_{q(\bm{\beta})}[\log p(\bm{y}, \bm{\beta}, \tau_e)] + \text{const}
+\end{equation}
+
+This yields a Gamma distribution:
+\begin{align}
+q^*(\tau_e) &= \text{Gamma}(\tau_e \mid a_e, b_e)\\
+a_e &= \alpha_e + \frac{n}{2} \label{eq:cavi_a}\\
+b_e &= \gamma_e + \frac{1}{2}\left[\|\bm{y} - \bm{X}\bm{\mu}_\beta\|^2 + \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)\right] \label{eq:cavi_b}
+\end{align}
+
+\subsection{CAVI Properties}
+
+\begin{itemize}
+\item \textbf{Monotonic convergence}: ELBO increases at each iteration
+\item \textbf{Linear convergence rate}: Error decreases geometrically
+\item \textbf{Computational cost}: $O(np^2)$ per iteration (dominated by $({\bm{X}^T\bm{X}})^{-1}$)
+\item \textbf{Limitation}: Does not exploit joint parameter updates; slow for coupled parameters
+\end{itemize}
+
+\section{Gradient-Based Optimisation}
+
+\subsection{Gradient Ascent with Line Search}
+
+Instead of coordinate updates, compute the full gradient $\nabla_{\bm{\phi}} \ELBO(\bm{\phi})$ and update jointly:
+\begin{equation}
+\bm{\phi}^{(t+1)} = \bm{\phi}^{(t)} + \alpha^{(t)} \nabla_{\bm{\phi}} \ELBO(\bm{\phi}^{(t)})
+\end{equation}
+
+where $\alpha^{(t)}$ is determined by backtracking line search satisfying Armijo condition:
+\begin{equation}
+\ELBO(\bm{\phi}^{(t)} + \alpha \bm{d}^{(t)}) \geq \ELBO(\bm{\phi}^{(t)}) + c_1 \alpha \nabla \ELBO(\bm{\phi}^{(t)})^T \bm{d}^{(t)}
+\end{equation}
+
+with $\bm{d}^{(t)} = \nabla \ELBO(\bm{\phi}^{(t)})$ and $c_1 = 10^{-4}$.
+
+\subsection{Gradient Derivations}
+
+We parameterize $\bm{\Sigma}_\beta$ via Cholesky decomposition $\bm{\Sigma}_\beta = \bm{L}\bm{L}^T$ to maintain positive definiteness, or work directly with precision $\bm{\Lambda}_\beta = \bm{\Sigma}_\beta^{-1}$.
+
+\subsubsection{Gradient w.r.t. \texorpdfstring{$\bm{\mu}_\beta$}{mu_beta}}
+
+From equation~\eqref{eq:elbo_full}, the terms depending on $\bm{\mu}_\beta$ are:
+\begin{equation}
+\ELBO \supset -\frac{a_e}{2b_e} \|\bm{y} - \bm{X}\bm{\mu}_\beta\|^2
+\end{equation}
+
+Taking the gradient:
+\begin{align}
+\nabla_{\bm{\mu}_\beta} \ELBO &= -\frac{a_e}{2b_e} \nabla_{\bm{\mu}_\beta} [(\bm{y} - \bm{X}\bm{\mu}_\beta)^T(\bm{y} - \bm{X}\bm{\mu}_\beta)] \nonumber\\
+&= -\frac{a_e}{2b_e} \cdot 2\bm{X}^T(\bm{X}\bm{\mu}_\beta - \bm{y}) \nonumber\\
+&= \frac{a_e}{b_e} \bm{X}^T(\bm{y} - \bm{X}\bm{\mu}_\beta)
+\label{eq:grad_mu}
+\end{align}
+
+This is $\E_q[\tau_e]$ times the negative gradient of least squares objective.
+
+\subsubsection{Gradient w.r.t. \texorpdfstring{$\bm{\Sigma}_\beta$}{Sigma_beta}}
+
+Terms depending on $\bm{\Sigma}_\beta$:
+\begin{equation}
+\ELBO \supset -\frac{a_e}{2b_e} \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta) + \frac{1}{2}\log |\bm{\Sigma}_\beta|
+\end{equation}
+
+Using matrix calculus identities:
+\begin{align}
+\nabla_{\bm{\Sigma}_\beta} \tr(\bm{A}\bm{\Sigma}_\beta) &= \bm{A}^T\\
+\nabla_{\bm{\Sigma}_\beta} \log |\bm{\Sigma}_\beta| &= \bm{\Sigma}_\beta^{-1}
+\end{align}
+
+Therefore:
+\begin{align}
+\nabla_{\bm{\Sigma}_\beta} \ELBO &= -\frac{a_e}{2b_e} \bm{X}^T\bm{X} + \frac{1}{2}\bm{\Sigma}_\beta^{-1} \nonumber\\
+&= \frac{1}{2}\left(\bm{\Sigma}_\beta^{-1} - \frac{a_e}{b_e} \bm{X}^T\bm{X}\right)
+\label{eq:grad_Sigma}
+\end{align}
+
+Note: Since $\bm{\Sigma}_\beta$ is symmetric, we account for this in implementation.
+
+\subsubsection{Gradient w.r.t. \texorpdfstring{$a_e$}{a_e}}
+
+Terms depending on $a_e$:
+\begin{align}
+\ELBO \supset &\frac{n}{2}\psi(a_e) - \frac{a_e}{2b_e}\left[\|\bm{y} - \bm{X}\bm{\mu}_\beta\|^2 + \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)\right] \nonumber\\
+&+ (\alpha_e - 1)\psi(a_e) - \gamma_e \frac{a_e}{b_e} + a_e + (1-a_e)\psi(a_e) + \log\Gamma(a_e)
+\end{align}
+
+Simplifying (using $\frac{d}{da}\log\Gamma(a) = \psi(a)$):
+\begin{align}
+\nabla_{a_e} \ELBO &= \frac{n}{2}\psi'(a_e) - \frac{1}{2b_e}\left[\|\bm{y} - \bm{X}\bm{\mu}_\beta\|^2 + \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)\right] \nonumber\\
+&\quad + (\alpha_e - 1)\psi'(a_e) - \frac{\gamma_e}{b_e} + 1 - \psi(a_e) + (1-a_e)\psi'(a_e) + \psi(a_e) \nonumber\\
+&= \left(\frac{n}{2} + \alpha_e - a_e\right)\psi'(a_e) - \frac{1}{2b_e}\left[\text{SSR} + \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)\right] - \frac{\gamma_e}{b_e} + 1
+\label{eq:grad_a}
+\end{align}
+
+where $\text{SSR} = \|\bm{y} - \bm{X}\bm{\mu}_\beta\|^2$ and $\psi'(\cdot)$ is the trigamma function.
+
+\subsubsection{Gradient w.r.t. \texorpdfstring{$b_e$}{b_e}}
+
+Terms depending on $b_e$:
+\begin{align}
+\ELBO \supset &-\frac{n}{2}\log b_e + \frac{a_e}{2b_e}\left[\|\bm{y} - \bm{X}\bm{\mu}_\beta\|^2 + \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)\right] \nonumber\\
+&- (\alpha_e - 1)\log b_e + \gamma_e \frac{a_e}{b_e} - \log b_e
+\end{align}
+
+Taking derivative:
+\begin{align}
+\nabla_{b_e} \ELBO &= -\frac{n}{2b_e} - \frac{a_e}{2b_e^2}\left[\text{SSR} + \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)\right] - \frac{\alpha_e - 1}{b_e} - \frac{\gamma_e a_e}{b_e^2} - \frac{1}{b_e} \nonumber\\
+&= -\frac{1}{b_e}\left(\frac{n}{2} + \alpha_e\right) - \frac{a_e}{b_e^2}\left(\frac{\text{SSR} + \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)}{2} + \gamma_e\right)
+\label{eq:grad_b}
+\end{align}
+
+\subsection{Gradient Ascent Properties}
+
+\begin{itemize}
+\item \textbf{Convergence rate}: Linear (geometric) for strongly convex objectives
+\item \textbf{Computational cost}: $O(np^2)$ per gradient evaluation + line search overhead
+\item \textbf{Advantage}: Exploits full gradient, can handle parameter coupling
+\item \textbf{Disadvantage}: May be slower than CAVI for conjugate models where updates are analytic
+\end{itemize}
+
+\section{Newton's Method}
+
+\subsection{Newton Update}
+
+Newton's method uses second-order information:
+\begin{equation}
+\bm{\phi}^{(t+1)} = \bm{\phi}^{(t)} - [\bm{H}(\bm{\phi}^{(t)})]^{-1} \nabla \ELBO(\bm{\phi}^{(t)})
+\end{equation}
+
+where $\bm{H} = \nabla^2 \ELBO$ is the Hessian matrix. For maximization, we use $-\bm{H}^{-1}$ to ascend.
+
+\subsection{Hessian Derivations}
+
+The full Hessian is a $(d \times d)$ matrix with blocks:
+\begin{equation}
+\bm{H} = \begin{bmatrix}
+\nabla^2_{\bm{\mu}_\beta, \bm{\mu}_\beta} & \nabla^2_{\bm{\mu}_\beta, \bm{\Sigma}_\beta} & \nabla^2_{\bm{\mu}_\beta, a_e} & \nabla^2_{\bm{\mu}_\beta, b_e} \\
+\nabla^2_{\bm{\Sigma}_\beta, \bm{\mu}_\beta} & \nabla^2_{\bm{\Sigma}_\beta, \bm{\Sigma}_\beta} & \nabla^2_{\bm{\Sigma}_\beta, a_e} & \nabla^2_{\bm{\Sigma}_\beta, b_e} \\
+\nabla^2_{a_e, \bm{\mu}_\beta} & \nabla^2_{a_e, \bm{\Sigma}_\beta} & \nabla^2_{a_e, a_e} & \nabla^2_{a_e, b_e} \\
+\nabla^2_{b_e, \bm{\mu}_\beta} & \nabla^2_{b_e, \bm{\Sigma}_\beta} & \nabla^2_{b_e, a_e} & \nabla^2_{b_e, b_e}
+\end{bmatrix}
+\end{equation}
+
+\subsubsection{Block: \texorpdfstring{$\nabla^2_{\bm{\mu}_\beta, \bm{\mu}_\beta}$}{Hessian mu-mu}}
+
+From equation~\eqref{eq:grad_mu}:
+\begin{align}
+\nabla^2_{\bm{\mu}_\beta, \bm{\mu}_\beta} \ELBO &= \nabla_{\bm{\mu}_\beta}\left[\frac{a_e}{b_e} \bm{X}^T(\bm{y} - \bm{X}\bm{\mu}_\beta)\right] \nonumber\\
+&= -\frac{a_e}{b_e} \bm{X}^T\bm{X}
+\label{eq:hess_mumu}
+\end{align}
+
+This is negative definite (since $\bm{X}^T\bm{X} \succ 0$ for full rank $\bm{X}$), indicating concavity in $\bm{\mu}_\beta$.
+
+\subsubsection{Block: \texorpdfstring{$\nabla^2_{\bm{\Sigma}_\beta, \bm{\Sigma}_\beta}$}{Hessian Sigma-Sigma}}
+
+From equation~\eqref{eq:grad_Sigma}, using vectorization:
+\begin{align}
+\nabla^2_{\bm{\Sigma}_\beta, \bm{\Sigma}_\beta} \ELBO &= -\frac{1}{2}(\bm{\Sigma}_\beta^{-1} \otimes \bm{\Sigma}_\beta^{-1})
+\end{align}
+
+where $\otimes$ denotes Kronecker product. This is negative definite on the symmetric matrix subspace.
+
+\subsubsection{Mixed Blocks}
+
+Cross-derivatives are generally non-zero, coupling the parameters:
+\begin{align}
+\nabla^2_{\bm{\mu}_\beta, b_e} \ELBO &= -\frac{a_e}{b_e^2} \bm{X}^T(\bm{y} - \bm{X}\bm{\mu}_\beta)\\
+\nabla^2_{\bm{\mu}_\beta, a_e} \ELBO &= \frac{1}{b_e} \bm{X}^T(\bm{y} - \bm{X}\bm{\mu}_\beta)\\
+\nabla^2_{a_e, a_e} \ELBO &= \left(\frac{n}{2} + \alpha_e - a_e\right)\psi''(a_e)\\
+\nabla^2_{b_e, b_e} \ELBO &= \frac{1}{b_e^2}\left(\frac{n}{2} + \alpha_e\right) + \frac{2a_e}{b_e^3}\left(\frac{\text{SSR} + \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)}{2} + \gamma_e\right)
+\end{align}
+
+where $\psi''(\cdot)$ is the second derivative of digamma (tetragamma).
+
+\subsection{Newton's Method Properties}
+
+\begin{itemize}
+\item \textbf{Convergence rate}: Quadratic near optimum ($\|\bm{\phi}^{(t+1)} - \bm{\phi}^*\| = O(\|\bm{\phi}^{(t)} - \bm{\phi}^*\|^2)$)
+\item \textbf{Computational cost}: $O(d^3)$ for Hessian inversion per iteration
+\item \textbf{Challenge}: Hessian may not be positive definite away from optimum
+\item \textbf{Safeguard}: Add regularization $\bm{H} + \lambda \bm{I}$ or use trust region
+\end{itemize}
+
+For $p=3$, $d=11$, Hessian inversion costs $\approx 1,300$ flops -- manageable.
+
+\section{BFGS Quasi-Newton Method}
+
+\subsection{BFGS Update}
+
+BFGS approximates the (inverse) Hessian using gradient differences:
+\begin{align}
+\bm{B}_{t+1} &= \bm{B}_t + \frac{\bm{y}_t \bm{y}_t^T}{\bm{y}_t^T \bm{s}_t} - \frac{\bm{B}_t \bm{s}_t \bm{s}_t^T \bm{B}_t}{\bm{s}_t^T \bm{B}_t \bm{s}_t}
+\end{align}
+
+where:
+\begin{align}
+\bm{s}_t &= \bm{\phi}^{(t+1)} - \bm{\phi}^{(t)} \quad \text{(step)}\\
+\bm{y}_t &= \nabla \ELBO(\bm{\phi}^{(t+1)}) - \nabla \ELBO(\bm{\phi}^{(t)}) \quad \text{(gradient change)}
+\end{align}
+
+and $\bm{B}_t \approx -\bm{H}^{-1}$ (inverse Hessian for maximization).
+
+\subsection{BFGS Search Direction}
+
+The search direction is:
+\begin{equation}
+\bm{d}^{(t)} = \bm{B}_t \nabla \ELBO(\bm{\phi}^{(t)})
+\end{equation}
+
+Step size $\alpha_t$ is determined by line search (Wolfe conditions).
+
+\subsection{BFGS Properties}
+
+\begin{itemize}
+\item \textbf{Convergence rate}: Superlinear (between linear and quadratic)
+\item \textbf{Computational cost}: $O(d^2)$ per iteration (vs $O(d^3)$ for Newton)
+\item \textbf{Advantage}: No Hessian computation, maintains positive definiteness automatically
+\item \textbf{Limitation}: Requires good line search, memory for storing $\bm{B}_t$ or history (L-BFGS variant)
+\end{itemize}
+
+BFGS is often the best general-purpose optimiser for smooth unconstrained problems.
+
+\section{Constrained Optimisation via Penalty Methods}
+
+\subsection{Constraint Formulation}
+
+To address variance collapse, impose minimum variance constraints:
+\begin{align}
+\text{maximize} \quad & \ELBO(\bm{\phi})\\
+\text{subject to} \quad & \sigma^2_{\beta_j} \geq \sigma^2_{\min}, \quad j = 1,\ldots,p\\
+& \tau_e^{-1} \geq \sigma^2_{e,\min}
+\end{align}
+
+where $\sigma^2_{\beta_j} = [\bm{\Sigma}_\beta]_{jj}$ are diagonal elements.
+
+\subsection{Quadratic Penalty Method}
+
+Convert to unconstrained problem:
+\begin{equation}
+\text{maximize} \quad \ELBO(\bm{\phi}) - \rho \sum_{j=1}^{p} \max(0, \sigma^2_{\min} - \sigma^2_{\beta_j})^2
+\end{equation}
+
+Solve sequence with increasing $\rho_k \to \infty$:
+\begin{algorithm}
+\caption{Penalty Method for Constrained VI}
+\begin{algorithmic}[1]
+\State Initialise $\bm{\phi}^{(0)}$, $\rho_0 > 0$, $\tau > 1$
+\For{$k = 0, 1, 2, \ldots$}
+    \State Solve unconstrained: $\bm{\phi}^{(k+1)} = \arg\max_{\bm{\phi}} \left[\ELBO(\bm{\phi}) - \rho_k P(\bm{\phi})\right]$
+    \State Update penalty: $\rho_{k+1} = \tau \rho_k$
+    \State Check feasibility and convergence
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Penalty Method Properties}
+
+\begin{itemize}
+\item \textbf{Advantage}: Converts constrained to unconstrained problem
+\item \textbf{Disadvantage}: Ill-conditioning as $\rho \to \infty$ (condition number $\kappa \sim O(\rho)$)
+\item \textbf{Alternative}: Augmented Lagrangian (better conditioning)
+\end{itemize}
+
+\section{Computational Complexity Summary}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lccc}
+\hline
+\textbf{Method} & \textbf{Per Iteration} & \textbf{Convergence Rate} & \textbf{Hessian?} \\
+\hline
+CAVI & $O(np^2)$ & Linear & No \\
+Gradient Ascent & $O(np^2) + $ line search & Linear & No \\
+Newton & $O(np^2 + d^3)$ & Quadratic & Yes \\
+BFGS & $O(np^2 + d^2)$ & Superlinear & Approx \\
+Penalty & (Inner loop cost) $\times K$ & Linear per subproblem & Depends \\
+\hline
+\end{tabular}
+\caption{Computational complexity comparison for VI optimisation methods. $n$ = sample size, $p$ = predictors, $d = p(p+3)/2 + 2$ = total variational parameters, $K$ = penalty iterations.}
+\end{table}
+
+\section{Summary and Recommendations}
+
+\subsection{Key Results}
+
+\begin{enumerate}
+\item \textbf{ELBO derivation}: Complete analytical expression for Bayesian linear regression VI
+\item \textbf{CAVI solution}: Closed-form coordinate ascent updates (equations~\ref{eq:cavi_Sigma}--\ref{eq:cavi_b})
+\item \textbf{Gradient expressions}: Full gradient for all variational parameters (equations~\ref{eq:grad_mu}--\ref{eq:grad_b})
+\item \textbf{Hessian blocks}: Second derivatives for Newton's method (equation~\ref{eq:hess_mumu} and subsequent)
+\item \textbf{BFGS formulation}: Quasi-Newton updates without explicit Hessian
+\item \textbf{Constrained VI}: Penalty method formulation for minimum variance constraints
+\end{enumerate}
+
+\subsection{Expected Performance}
+
+\begin{itemize}
+\item \textbf{CAVI}: Baseline -- stable, monotonic, but may be slow for coupled parameters
+\item \textbf{Gradient Ascent}: Better than CAVI if parameter coupling strong; requires good line search
+\item \textbf{Newton}: Fastest convergence near optimum but expensive per iteration and may need regularization
+\item \textbf{BFGS}: Best overall balance -- superlinear convergence without Hessian computation
+\item \textbf{Penalty}: Addresses under-dispersion but adds outer loop iterations
+\end{itemize}
+
+\subsection{Implementation Strategy}
+
+\begin{enumerate}
+\item Implement and validate CAVI against analytical posteriors
+\item Add gradient computation with numerical checks ($\|\nabla f - \nabla f_{\text{numerical}}\| < 10^{-6}$)
+\item Implement gradient ascent with backtracking line search
+\item Add full Hessian computation and Newton's method with regularization
+\item Implement BFGS using scipy.optimize.minimize or custom code
+\item Compare all methods on test problems varying $(n, p)$
+\item Extend to penalty method if time permits
+\end{enumerate}
+
+\subsection{Validation Checks}
+
+\begin{itemize}
+\item \textbf{ELBO monotonicity}: Should increase each iteration (for CAVI, may not hold for Newton without line search)
+\item \textbf{Gradient accuracy}: Numerical gradient check with finite differences
+\item \textbf{Hessian accuracy}: Test on analytical cases, check symmetry
+\item \textbf{Convergence to analytical posterior}: For conjugate model with flat priors
+\item \textbf{Posterior calibration}: Coverage probabilities for credible intervals
+\end{itemize}
+
+\section{Conclusion}
+
+This document provides the complete mathematical solution for applying ENEL445 optimisation methods to Variational Inference. The ELBO maximisation problem offers a realistic testbed with:
+\begin{itemize}
+\item Smooth, high-dimensional objective function
+\item Analytical gradient and Hessian computations
+\item Natural baseline (CAVI) for comparison
+\item Extension to constrained optimisation
+\item Validation against analytical posteriors
+\end{itemize}
+
+The derivations demonstrate that VI is fundamentally an optimisation problem suitable for systematic comparison of gradient-based methods, connecting Bayesian inference to engineering optimisation coursework.
+
+\appendix
+
+\section{Special Functions}
+
+\subsection{Digamma Function}
+\begin{equation}
+\psi(x) = \frac{d}{dx}\log \Gamma(x) = \frac{\Gamma'(x)}{\Gamma(x)}
+\end{equation}
+
+Series expansion for large $x$:
+\begin{equation}
+\psi(x) \approx \log x - \frac{1}{2x} - \frac{1}{12x^2} + O(x^{-4})
+\end{equation}
+
+\subsection{Trigamma Function}
+\begin{equation}
+\psi'(x) = \frac{d^2}{dx^2}\log \Gamma(x)
+\end{equation}
+
+Series expansion:
+\begin{equation}
+\psi'(x) \approx \frac{1}{x} + \frac{1}{2x^2} + \frac{1}{6x^3} + O(x^{-4})
+\end{equation}
+
+\section{Matrix Calculus Identities}
+
+\begin{align}
+\nabla_{\bm{x}} \bm{x}^T\bm{A}\bm{x} &= (\bm{A} + \bm{A}^T)\bm{x}\\
+\nabla_{\bm{X}} \tr(\bm{A}\bm{X}) &= \bm{A}^T\\
+\nabla_{\bm{X}} \log |\bm{X}| &= \bm{X}^{-T} = (\bm{X}^{-1})^T\\
+\nabla_{\bm{X}} \tr(\bm{X}^{-1}\bm{A}) &= -\bm{X}^{-T}\bm{A}\bm{X}^{-T}
+\end{align}
+
+For symmetric $\bm{X}$, account for off-diagonal elements appearing twice.
+
+\bibliographystyle{plain}
+\begin{thebibliography}{9}
+
+\bibitem{bishop2006}
+C. M. Bishop, \textit{Pattern Recognition and Machine Learning}, Springer, 2006.
+
+\bibitem{blei2017}
+D. M. Blei, A. Kucukelbir, and J. D. McAuliffe, ``Variational Inference: A Review for Statisticians,'' \textit{Journal of the American Statistical Association}, vol. 112, no. 518, pp. 859--877, 2017.
+
+\bibitem{martins2021}
+J. R. R. A. Martins and A. Ning, \textit{Engineering Design Optimisation}, Cambridge University Press, 2021.
+
+\bibitem{nocedal2006}
+J. Nocedal and S. J. Wright, \textit{Numerical Optimisation}, 2nd ed., Springer, 2006.
+
+\bibitem{gelman2013}
+A. Gelman et al., \textit{Bayesian Data Analysis}, 3rd ed., Chapman \& Hall/CRC, 2013.
+
+\end{thebibliography}
+
+\end{document}

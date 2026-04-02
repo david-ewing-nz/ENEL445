@@ -1,0 +1,619 @@
+\documentclass[11pt]{article}
+
+% Packages for XeLaTeX
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{framed}
+\usepackage{xcolor}
+
+\geometry{margin=1in}
+
+% Define a box for final answers
+\definecolor{answerbox}{RGB}{230,240,255}
+\newenvironment{answerbox}
+  {\begin{framed}\begin{center}\large\bfseries}
+  {\end{center}\end{framed}}
+
+\title{ENEL445 Exam Questions: Detailed Solutions}
+\author{David Ewing (82171165)}
+\date{March 17, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Question 1: Optimisation Terminology and Background}
+
+\subsection{Part (a): Write the generalised form for a minimisation problem}
+
+Okay, so the question asks for the standard way we write down an optimisation problem. Here's what it looks like:
+
+\vspace{1em}
+\begin{framed}
+\begin{align*}
+\min_{x \in \mathbb{R}^n} \quad & f(x) \\
+\text{subject to} \quad & h_i(x) = 0, \quad i = 1, \ldots, m_{eq} \\
+& g_j(x) \leq 0, \quad j = 1, \ldots, m_{ineq}
+\end{align*}
+\end{framed}
+
+where $x \in \mathbb{R}^n$ means x is a vector with n components (n design variables).
+
+\vspace{1em}
+
+Let me explain each part and why we need it:
+
+\textbf{1. The objective function $f(x)$:}
+
+This is the thing we're trying to minimise. It could be cost, time, error, energy consumption - basically whatever metric we care about. We need to include this because it tells us what "better" means. Without it, we wouldn't know what we're optimising for!
+
+Example: If we're designing a bridge, maybe $f(x)$ is the total cost of materials.
+
+\vspace{0.5em}
+
+\textbf{2. The design variables $x \in \mathbb{R}^n$:}
+
+These are the knobs we can turn - the things we have control over. They're what we adjust to find the best solution. The vector $x$ has $n$ components: $x = [x_1, x_2, \ldots, x_n]^T$, where each $x_i$ is one design variable.
+
+Example: For the bridge, if we have 3 design variables, then $n=3$ and $x$ might be:
+\begin{itemize}
+\item $x_1$ = thickness of steel beams (mm)
+\item $x_2$ = span length (m)  
+\item $x_3$ = number of support columns
+\end{itemize}
+
+\vspace{0.5em}
+
+\textbf{3. Equality constraints $h_i(x) = 0$:}
+
+These are requirements that MUST be satisfied exactly. No wiggle room here - they have to equal zero.
+
+Example: For a bridge, maybe we have a constraint that the total height must be exactly 20m to meet road clearance requirements: $h_1(x) = \text{height} - 20 = 0$
+
+Why do we need them? Because some things in engineering are non-negotiable. Physical laws (like conservation of mass) or strict specifications have to be met exactly.
+
+\vspace{0.5em}
+
+\textbf{4. Inequality constraints $g_j(x) \leq 0$:}
+
+These are limits - things that can't exceed certain values. We write them as "less than or equal to zero" by convention.
+
+Example: The stress in any beam can't exceed the material's yield strength: $g_1(x) = \text{stress} - \text{yield strength} \leq 0$
+
+Why do we need them? To make sure our solution is actually feasible and safe. We might find a mathematically "optimal" solution that violates physics or safety requirements without these.
+
+\vspace{1em}
+
+\textbf{Brief 1-sentence summary:} We need the objective to define what we're optimising, the variables as what we control, equality constraints for things that must be met exactly, and inequality constraints to keep the solution within safe/feasible limits.
+
+\subsection{Part (b): Adjust to a maximisation problem}
+
+This is actually really easy! If we want to maximise something instead of minimise it, we just add a negative sign to the objective.
+
+So if we had:
+\begin{equation*}
+\min \quad f(x)
+\end{equation*}
+
+We just write:
+\begin{equation*}
+\max \quad f(x)
+\end{equation*}
+
+That's it! The constraints stay exactly the same.
+
+\vspace{0.5em}
+
+\textit{Why does this work?} Because mathematically, maximising $f(x)$ is the same as minimising $-f(x)$. Think about it: if you want to find the highest point on a hill (maximise), you could flip the hill upside down and find the lowest point (minimise). Same location, just different perspective.
+
+\subsection{Part (c): Problem Classification}
+
+Now let's look at three optimisation problems and figure out what type they are, and whether they're convex or not.
+
+\subsubsection{Problem (i): $\min_{x \in \mathbb{R}^n} c^T x$ subject to $Ax \leq b$}
+
+where $x \in \mathbb{R}^n$ (x is an n-dimensional vector of design variables), $c \in \mathbb{R}^n$, $A$ is an $m \times n$ matrix, and $b \in \mathbb{R}^m$.
+
+\textbf{Step 1: What type of problem is this?}
+
+Let me look at the objective function: $f(x) = c^T x$
+
+This is just a linear combination of the variables. Like $f(x) = 3x_1 + 5x_2 - 2x_3$. No squares, no products, no crazy functions. Just linear.
+
+Now the constraints: $Ax \leq b$
+
+This is also linear. Each constraint looks like: $a_1 x_1 + a_2 x_2 + \ldots \leq b$. Again, no squares or anything fancy.
+
+\begin{answerbox}
+This is a \textbf{Linear Program (LP)}
+\end{answerbox}
+
+\vspace{0.5em}
+
+\textbf{Step 2: Is it convex?}
+
+For an LP, the answer is always YES because:
+
+\begin{enumerate}
+\item The objective $c^T x$ is linear. And here's a cool fact: any linear function is both convex AND concave. Think of it as a flat plane - it's not curving up or down.
+
+\item The constraints $Ax \leq b$ define a region that's basically the intersection of a bunch of half-spaces. This creates a polytope (think of a multidimensional polygon). 
+
+\item A polytope is always convex. Why? Because if you take any two points inside it and draw a straight line between them, that whole line stays inside the polytope.
+\end{enumerate}
+
+\begin{answerbox}
+\textbf{Convexity:} YES, this is CONVEX
+\end{answerbox}
+
+\vspace{1em}
+
+\subsubsection{Problem (ii): $\min_{x \in \mathbb{R}^n} (x^T Q x + c^T x)$ subject to $Ax \leq b$}
+
+where $x \in \mathbb{R}^n$, $Q$ is an $n \times n$ matrix, $c \in \mathbb{R}^n$, $A$ is $m \times n$, and $b \in \mathbb{R}^m$.
+
+\textbf{Step 1: What type is this?}
+
+The objective has $x^T Q x$ which is quadratic (like $x_1^2 + 2x_1 x_2 + x_2^2$) plus a linear term $c^T x$.
+
+Constraints are still linear: $Ax \leq b$
+
+\begin{answerbox}
+This is a \textbf{Quadratic Program (QP)}
+\end{answerbox}
+
+\vspace{0.5em}
+
+\textbf{Step 2: Is it convex?}
+
+This one's trickier! It depends on the matrix $Q$.
+
+Let me explain with an analogy: imagine the function $f(x) = x^2$. This curves upward - that's convex. Now imagine $f(x) = -x^2$. This curves downward - that's concave (not convex). The sign of the coefficient matters!
+
+In higher dimensions, whether $x^T Q x$ curves "up" everywhere depends on whether $Q$ has all positive eigenvalues (or zero).
+
+\textbf{If $Q$ is positive semidefinite (written $Q \succeq 0$):}
+\begin{itemize}
+\item The function $x^T Q x$ is like a bowl - it curves up (or is flat)
+\item This means it's CONVEX
+\item We can solve it efficiently with standard algorithms
+\end{itemize}
+
+\textbf{If $Q$ has negative eigenvalues:}
+\begin{itemize}
+\item The function has saddle points - like a potato chip shape
+\item This means it's NOT CONVEX
+\item Much harder to solve!
+\end{itemize}
+
+\begin{answerbox}
+\textbf{Convexity:} DEPENDS ON $Q$ \\
+$\bullet$ If $Q \succeq 0$ (positive semidefinite): \textbf{CONVEX} \\
+$\bullet$ If $Q$ has negative eigenvalues: \textbf{NON-CONVEX}
+\end{answerbox}
+
+\textit{Note:} The constraint set $Ax \leq b$ is always convex (it's linear), so convexity just depends on $Q$.
+
+\vspace{1em}
+
+\subsubsection{Problem (iii): $\min_{x \in \mathbb{Z}^n} c^T x$ subject to $Ax \leq b$}
+
+where $x \in \mathbb{Z}^n$ (x must have INTEGER values), $c \in \mathbb{R}^n$, $A$ is $m \times n$, and $b \in \mathbb{R}^m$.
+
+\textbf{Step 1: What type is this?}
+
+This looks similar to Problem (i), but there's a crucial difference: the variables must be integers!
+
+The objective $c^T x$ is still linear, and the constraints $Ax \leq b$ are still linear. But now we have the additional requirement that $x_1, x_2, \ldots, x_n$ must all be whole numbers (integers).
+
+Examples where you'd need integer variables:
+\begin{itemize}
+\item Number of machines to build (can't build 2.7 machines!)
+\item Number of workers to hire
+\item Binary decisions (yes/no, on/off) where $x_i \in \{0,1\}$
+\end{itemize}
+
+\begin{answerbox}
+This is an \textbf{Integer Linear Program (ILP)} or \textbf{Integer Program (IP)}
+\end{answerbox}
+
+\vspace{0.5em}
+
+\textbf{Step 2: Is it convex?}
+
+Here's where things get interesting. Even though the objective function is linear (which is convex) and the continuous relaxation of the constraints would be convex, the integer constraint $x \in \mathbb{Z}^n$ makes this problem \textbf{NOT CONVEX}.
+
+Why? Because the feasible set is no longer a continuous region - it's a discrete set of points (lattice points). You can't draw a line between two feasible integer points and have all points on that line be feasible.
+
+Example in 1D: If $x \in \mathbb{Z}$ and feasible values are $x = 1$ and $x = 3$, then $x = 2$ might be feasible too, but $x = 1.5$ is NOT (not an integer). The feasible set has "gaps" - it's not convex.
+
+\begin{answerbox}
+\textbf{Convexity:} NO, this is \textbf{NON-CONVEX}
+\end{answerbox}
+
+\textbf{Why this matters:}
+
+\begin{itemize}
+\item Integer programs are much harder to solve than regular LPs
+\item No polynomial-time algorithm guaranteed to work (NP-hard in general)
+\item We use specialized algorithms like Branch-and-Bound, Cutting Planes, or Branch-and-Cut
+\item For small problems: can enumerate all possibilities
+\item For large problems: might need heuristics or approximation algorithms
+\end{itemize}
+
+\textit{Note:} If only some variables are integers and others are continuous (like $x_1, x_2 \in \mathbb{Z}$ but $x_3 \in \mathbb{R}$), it's called a Mixed-Integer Linear Program (MILP).
+
+\subsection{Part (d): Why do we want convexity?}
+
+Great question! Convexity is like the holy grail in optimisation. Here's why:
+
+\vspace{0.5em}
+
+\textbf{1. Any local minimum IS the global minimum}
+
+This is HUGE. Let me explain with an example:
+
+\textit{Non-convex problem:} Imagine you're hiking in mountains trying to find the lowest valley. You walk downhill and reach a valley. But how do you know there isn't an even lower valley on the other side of the mountain? You don't! You might be stuck in a "local minimum."
+
+\textit{Convex problem:} Now imagine you're in a giant bowl. If you walk downhill, you'll reach the very bottom of the bowl. There's only ONE bottom, and you KNOW you found it. That's a "global minimum."
+
+Mathematically: For convex problems, if you find a point where you can't go down anymore (local min), you KNOW it's the absolute best point (global min).
+
+\vspace{0.5em}
+
+\textbf{2. Efficient algorithms exist}
+
+For convex problems, we have algorithms that:
+\begin{itemize}
+\item Are guaranteed to work
+\item Run in polynomial time (not exponential - this matters for big problems!)
+\item Examples: Interior point methods, simplex for LP, active-set methods for QP
+\end{itemize}
+
+For non-convex problems, we often resort to:
+\begin{itemize}
+\item Random restarts (try many starting points and hope for the best)
+\item Genetic algorithms or other heuristics
+\item No guarantees we found the best solution!
+\end{itemize}
+
+\vspace{0.5em}
+
+\textbf{3. Strong duality holds}
+
+This is a bit more advanced, but basically: every optimisation problem has a "dual" problem. For convex problems (under some mild conditions), solving the primal or the dual gives you the same answer. This is useful because:
+\begin{itemize}
+\item Sometimes the dual is easier to solve
+\item We can get sensitivity information (how does the answer change if constraints change?)
+\item We can derive useful bounds
+\end{itemize}
+
+\vspace{0.5em}
+
+\textbf{4. Convergence guarantees}
+
+For convex problems, algorithms like gradient descent come with mathematical guarantees like:
+\begin{itemize}
+\item "After $k$ iterations, you'll be within $\epsilon$ of the optimum"
+\item "The error decreases geometrically" (gets smaller by a constant factor each step)
+\end{itemize}
+
+For non-convex problems, gradient descent might:
+\begin{itemize}
+\item Get stuck at saddle points
+\item Never converge
+\item Give different answers depending on where you start
+\end{itemize}
+
+\vspace{0.5em}
+
+\textbf{The Math Behind It:}
+
+For a convex problem with convex objective $f(x)$ and convex feasible region:
+
+If $x^*$ is a local minimum (can't improve by small moves), then $x^*$ is THE global minimum.
+
+Also, the KKT conditions (which we'll see in Question 2) are both \textit{necessary AND sufficient} for optimality in convex problems. For non-convex, they're only necessary.
+
+\begin{answerbox}
+\textbf{Bottom line:} Convexity gives us efficiency, guarantees, and confidence that we found the best solution.
+\end{answerbox}
+
+\newpage
+
+\section{Question 2: Constrained Optimisation}
+
+\subsection{Problem Setup}
+
+We need to solve:
+\begin{align*}
+\min_{x_1, x_2} \quad & f(x_1, x_2) = x_1^2 + x_2^2 \\
+\text{subject to} \quad & h(x_1, x_2) = x_1 + x_2 - 1 = 0 \\
+& g(x_1, x_2) = x_1^2 + x_2 - 1 \leq 0
+\end{align*}
+
+Let me think about this problem intuitively first:
+\begin{itemize}
+\item We're minimizing $x_1^2 + x_2^2$, which is the squared distance from the origin. So we want to get as close to $(0,0)$ as possible.
+\item But we MUST stay on the line $x_1 + x_2 = 1$ (that's the equality constraint)
+\item And we have to stay in the region where $x_1^2 + x_2 \leq 1$ (that's the inequality constraint)
+\end{itemize}
+
+\subsection{Part (a): Solve using KKT conditions}
+
+The KKT (Karush-Kuhn-Tucker) conditions are the optimality conditions for constrained problems. Let me work through this step by step.
+
+\vspace{1em}
+
+\textbf{Step 1: Write down the Lagrangian}
+
+The Lagrangian combines the objective and constraints:
+
+\begin{equation*}
+L(x_1, x_2, \lambda, \mu) = \underbrace{x_1^2 + x_2^2}_{\text{objective}} + \underbrace{\lambda(x_1 + x_2 - 1)}_{\text{equality}} + \underbrace{\mu(x_1^2 + x_2 - 1)}_{\text{inequality}}
+\end{equation*}
+
+where:
+\begin{itemize}
+\item $\lambda$ is the multiplier for the equality constraint (can be any real number)
+\item $\mu$ is the multiplier for the inequality constraint (must be $\geq 0$)
+\end{itemize}
+
+\vspace{1em}
+
+\textbf{Step 2: Write out the KKT conditions}
+
+There are four sets of conditions:
+
+\textbf{Condition 1 - Stationarity} (gradient must be zero):
+
+Taking partial derivatives of $L$:
+
+\begin{align*}
+\frac{\partial L}{\partial x_1} &= 2x_1 + \lambda + 2\mu x_1 = 0 \quad \text{...(equation 1)}\\
+\frac{\partial L}{\partial x_2} &= 2x_2 + \lambda + \mu = 0 \quad \text{...(equation 2)}
+\end{align*}
+
+\textbf{Condition 2 - Primal feasibility} (satisfy the constraints):
+
+\begin{align*}
+x_1 + x_2 - 1 &= 0 \quad \text{...(equation 3)}\\
+x_1^2 + x_2 - 1 &\leq 0 \quad \text{...(equation 4)}
+\end{align*}
+
+\textbf{Condition 3 - Dual feasibility}:
+
+\begin{equation*}
+\mu \geq 0 \quad \text{...(equation 5)}
+\end{equation*}
+
+\textbf{Condition 4 - Complementary slackness}:
+
+\begin{equation*}
+\mu \cdot (x_1^2 + x_2 - 1) = 0 \quad \text{...(equation 6)}
+\end{equation*}
+
+This last one says: either $\mu = 0$ OR the constraint is active (equals zero). They can't both be positive.
+
+\vspace{1em}
+
+\textbf{Step 3: Solve by considering cases}
+
+Because of complementary slackness, I need to consider two cases:
+
+\vspace{1em}
+
+\noindent\rule{\textwidth}{0.4pt}
+
+\textbf{CASE 1: Inequality constraint is INACTIVE ($\mu = 0$)}
+
+\noindent\rule{\textwidth}{0.4pt}
+
+If $\mu = 0$, then equations (1) and (2) become:
+
+\begin{align*}
+2x_1 + \lambda &= 0\\
+2x_2 + \lambda &= 0
+\end{align*}
+
+From the first equation: $x_1 = -\lambda/2$
+
+From the second equation: $x_2 = -\lambda/2$
+
+So $x_1 = x_2$. Let's call this value $a$, so $x_1 = x_2 = a$.
+
+Now use the equality constraint (equation 3):
+\begin{align*}
+x_1 + x_2 &= 1\\
+a + a &= 1\\
+2a &= 1\\
+a &= \frac{1}{2}
+\end{align*}
+
+So we get: $x_1 = x_2 = \frac{1}{2}$
+
+And from $2x_1 + \lambda = 0$: $\lambda = -2x_1 = -2(1/2) = -1$
+
+\textbf{Check:} Does this satisfy the inequality constraint?
+
+\begin{align*}
+g(x_1, x_2) &= x_1^2 + x_2 - 1\\
+&= (1/2)^2 + 1/2 - 1\\
+&= 1/4 + 1/2 - 1\\
+&= 3/4 - 1\\
+&= -1/4 < 0 \quad \checkmark
+\end{align*}
+
+Great! The inequality is satisfied (and not active, which makes sense since $\mu = 0$).
+
+\textbf{Candidate Solution:} $(x_1, x_2) = (1/2, 1/2)$ with $\lambda = -1, \mu = 0$
+
+Objective value: $f = (1/2)^2 + (1/2)^2 = 1/4 + 1/4 = 1/2$
+
+\vspace{1em}
+
+\noindent\rule{\textwidth}{0.4pt}
+
+\textbf{CASE 2: Inequality constraint is ACTIVE ($\mu > 0$)}
+
+\noindent\rule{\textwidth}{0.4pt}
+
+If $\mu > 0$, then by complementary slackness (equation 6):
+\begin{equation*}
+x_1^2 + x_2 - 1 = 0 \quad \Rightarrow \quad x_2 = 1 - x_1^2
+\end{equation*}
+
+Also, the equality constraint (equation 3) gives:
+\begin{equation*}
+x_1 + x_2 = 1 \quad \Rightarrow \quad x_2 = 1 - x_1
+\end{equation*}
+
+Setting these equal:
+\begin{align*}
+1 - x_1^2 &= 1 - x_1\\
+-x_1^2 &= -x_1\\
+x_1^2 &= x_1\\
+x_1^2 - x_1 &= 0\\
+x_1(x_1 - 1) &= 0
+\end{align*}
+
+So either $x_1 = 0$ or $x_1 = 1$.
+
+\vspace{0.5em}
+
+\textbf{Subcase 2a: Try $x_1 = 0$}
+
+From $x_2 = 1 - x_1$: $x_2 = 1$
+
+Check stationarity equation (1): $2(0) + \lambda + 2\mu(0) = 0 \Rightarrow \lambda = 0$
+
+Check stationarity equation (2): $2(1) + 0 + \mu = 0 \Rightarrow \mu = -2$
+
+But wait! We need $\mu \geq 0$ (dual feasibility). Since $\mu = -2 < 0$, this violates the KKT conditions.
+
+$\Rightarrow$ \textbf{This case is INVALID}
+
+\vspace{0.5em}
+
+\textbf{Subcase 2b: Try $x_1 = 1$}
+
+From $x_2 = 1 - x_1$: $x_2 = 0$
+
+Check stationarity equation (2): $2(0) + \lambda + \mu = 0 \Rightarrow \lambda = -\mu$
+
+Check stationarity equation (1): $2(1) + \lambda + 2\mu(1) = 0$
+
+Simplifying: $2 + \lambda + 2\mu = 0$
+
+Substitute $\lambda = -\mu$: $2 + (-\mu) + 2\mu = 0 \Rightarrow 2 + \mu = 0 \Rightarrow \mu = -2$
+
+Again, $\mu = -2 < 0$ violates dual feasibility!
+
+$\Rightarrow$ \textbf{This case is also INVALID}
+
+\vspace{1em}
+
+\noindent\rule{\textwidth}{0.4pt}
+
+\textbf{Step 4: Conclusion}
+
+Only Case 1 satisfies all the KKT conditions!
+
+\begin{answerbox}
+\textbf{OPTIMAL SOLUTION:}\\[0.5em]
+$x_1^* = \frac{1}{2}, \quad x_2^* = \frac{1}{2}$\\[0.5em]
+Minimum value: $f^* = \frac{1}{2}$\\[0.5em]
+Lagrange multipliers: $\lambda^* = -1, \quad \mu^* = 0$
+\end{answerbox}
+
+\textit{Interpretation:} The optimal point is at $(1/2, 1/2)$ on the line $x_1 + x_2 = 1$, and the inequality constraint is not active at the optimum (we're inside the allowed region, not on its boundary).
+
+\subsection{Part (b): Is this a convex problem?}
+
+Let me check each component:
+
+\vspace{0.5em}
+
+\textbf{Check 1: Is the objective function convex?}
+
+The objective is $f(x_1, x_2) = x_1^2 + x_2^2$
+
+Think about this geometrically - this is a paraboloid (like a 3D bowl). It curves upward in all directions.
+
+Mathematically, I can check the Hessian (matrix of second derivatives):
+
+\begin{equation*}
+\nabla^2 f = \begin{bmatrix} \frac{\partial^2 f}{\partial x_1^2} & \frac{\partial^2 f}{\partial x_1 \partial x_2} \\ \frac{\partial^2 f}{\partial x_2 \partial x_1} & \frac{\partial^2 f}{\partial x_2^2} \end{bmatrix} = \begin{bmatrix} 2 & 0 \\ 0 & 2 \end{bmatrix}
+\end{equation*}
+
+This is positive definite (both eigenvalues are 2 > 0), so YES, the objective is convex. ✓
+
+\vspace{0.5em}
+
+\textbf{Check 2: Is the equality constraint affine (linear)?}
+
+The constraint is $h(x_1, x_2) = x_1 + x_2 - 1 = 0$
+
+This is just a linear equation - it defines a straight line. No curves, no squares, just linear.
+
+For convex optimisation, equality constraints must be affine (linear), so YES, this is fine. ✓
+
+\vspace{0.5em}
+
+\textbf{Check 3: Is the inequality constraint convex?}
+
+The constraint is $g(x_1, x_2) = x_1^2 + x_2 - 1 \leq 0$
+
+For this to work in a convex problem, the function $g$ itself must be convex. Let me check the Hessian:
+
+\begin{equation*}
+\nabla^2 g = \begin{bmatrix} \frac{\partial^2 g}{\partial x_1^2} & \frac{\partial^2 g}{\partial x_1 \partial x_2} \\ \frac{\partial^2 g}{\partial x_2 \partial x_1} & \frac{\partial^2 g}{\partial x_2^2} \end{bmatrix} = \begin{bmatrix} 2 & 0 \\ 0 & 0 \end{bmatrix}
+\end{equation*}
+
+This is positive semidefinite (eigenvalues are 2 and 0, both $\geq 0$), so YES, $g$ is convex. ✓
+
+\vspace{1em}
+
+\begin{answerbox}
+\textbf{ANSWER: YES, this is a CONVEX problem}
+\end{answerbox}
+
+\vspace{0.5em}
+
+\textbf{Why this matters:}
+
+Because the problem is convex, we know that:
+\begin{itemize}
+\item Our KKT solution $(1/2, 1/2)$ is not just a local minimum - it's THE global minimum
+\item The KKT conditions are both necessary AND sufficient for optimality
+\item Any algorithm we use is guaranteed to find this same solution
+\end{itemize}
+
+If the problem wasn't convex, the KKT conditions would only be necessary (not sufficient), and we couldn't be sure we found the best solution!
+
+\vspace{2em}
+
+\section{Summary}
+
+\textbf{Question 1 Key Points:}
+\begin{itemize}
+\item Standard optimisation form has objective, variables, equality constraints, inequality constraints
+\item Linear Programs (LP) have linear objective and linear constraints - always convex
+\item Quadratic Programs (QP) have quadratic objective - convex only if $Q \succeq 0$
+\item Convexity gives us: global optimality guarantees, efficient algorithms, and convergence guarantees
+\end{itemize}
+
+\textbf{Question 2 Key Points:}
+\begin{itemize}
+\item Used KKT conditions to solve the constrained problem
+\item Found optimal solution: $(x_1^*, x_2^*) = (1/2, 1/2)$ with $f^* = 1/2$
+\item Inequality constraint was inactive at the optimum ($\mu = 0$)
+\item Verified the problem is convex, confirming our solution is globally optimal
+\end{itemize}
+
+\end{document}

@@ -1,0 +1,380 @@
+\documentclass[11pt]{article}
+
+% Packages for XeLaTeX
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{framed}
+\usepackage{xcolor}
+
+
+
+\geometry{margin=1in}
+
+% Custom commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\ELBO}{\text{ELBO}}
+\newcommand{\tr}{\text{tr}}
+\setlength{\parindent}{0pt}
+
+\title{Project Planning Report:\\
+Optimisation Methods for Variational Inference}
+\author{David Ewing (82171165)\\
+ENEL445  \\
+University of Canterbury}
+\date{17 March 2026}
+
+\begin{document}
+
+\maketitle
+
+\section*{Background and Problem Intuition}
+
+ 
+
+Bayesian inference provides principled uncertainty quantification but requires computing intractable posterior distributions. For most real-world models, the posterior integral, \par
+
+\begin{equation*}
+    p(\bm{\theta} \mid \bm{y}) = \frac{p(\bm{y} \mid \bm{\theta})p(\bm{\theta})}{p(\bm{y})},
+\end{equation*}
+\noindent 
+cannot be evaluated analytically. Variational Inference (VI) converts this inference problem into an optimisation problem, making it directly amenable to the gradient-based methods in this course. \vspace{2em}
+
+ 
+
+Instead of computing the true posterior, VI finds the ``best'' approximation $q(\bm{\theta})$ from a tractable family by maximising the Evidence Lower Bound (ELBO). This transforms intractable integration into tractable optimisation---I think this is a natural fit for an optimisation course project.
+
+\section*{Key Notation}
+
+\begin{center}
+\begin{tabular}{ll}
+\hline
+Symbol & Meaning \\
+\hline
+$\bm{\beta}$ & Regression coefficient vector \\
+$\bm{u}$ & Random effects vector (hierarchical model) \\
+$\bm{\varepsilon}$ & Observation noise vector \\
+$\tau_e$ & Observation-noise precision \\
+$\tau_u$ & Random-effects precision \\
+$\bm{\mu}_\beta$ & Mean of variational posterior $q(\bm{\beta})$ \\
+$\bm{\Sigma}_\beta$ & Covariance of variational posterior $q(\bm{\beta})$ \\
+\hline
+\end{tabular}
+\end{center}
+\newpage
+\section*{Optimisation Problem Formulation}
+
+\subsection*{Decision Variables}
+
+For Bayesian linear regression with $p$ predictors, the variational parameters (decision variables) are:
+\begin{itemize}
+\item $\bm{\mu}_\beta \in \R^p$: posterior mean of regression coefficients
+\item $\bm{\Sigma}_\beta \in \R^{p \times p}$: posterior covariance (symmetric positive definite)
+\item $a_e, b_e > 0$: shape and rate parameters of the variational Gamma factor for precision
+\end{itemize}
+
+Here, $a_e$ and $b_e$ parameterise $q(\tau_e)=\mathrm{Gamma}(a_e,b_e)$; the model prior on $\tau_e$ is specified in the Test Case section.
+
+Total dimension: $d = p + \frac{p(p+1)}{2} + 2 = 11$ variables for $p=3$ predictors.
+
+\subsection*{Objective Function}
+
+Maximise the Evidence Lower Bound (ELBO):
+
+\begin{align}
+\ELBO(\bm{\phi})
+&= \E_q[\log p(\bm{y}, \bm{\beta}, \tau_e)] + H(q) \\
+&= \E_q[\log p(\bm{y}, \bm{\beta}, \tau_e)] - \E_q[\log q(\bm{\beta}, \tau_e)] .
+\end{align}
+
+
+where $\bm{\phi} = (\bm{\mu}_\beta, \bm{\Sigma}_\beta, a_e, b_e)$ are the variational parameters.
+
+\subsection*{Constraints}
+
+\begin{itemize}
+\item $\bm{\Sigma}_\beta \succ 0$: Covariance matrix must be positive definite
+\item $a_e, b_e > 0$: Gamma parameters must be positive
+\item Optional: Minimum variance constraints $\sigma^2_{\beta_j} \geq \sigma^2_{\text{min}}$ to prevent underdispersion
+\end{itemize}
+
+These constraints can be handled via parameterisation (e.g., Cholesky decomposition for $\bm{\Sigma}_\beta$) or penalty methods.
+
+\subsection*{Computational Characteristics}
+
+\begin{itemize}
+\item Gradient computation: $O(np^2)$ per evaluation (dominated by matrix operations)
+\item Hessian computation: $O(np^2 + d^3)$ for Newton's method
+\item Parameters exhibit coupling (changing $\bm{\mu}_\beta$ affects optimal $\bm{\Sigma}_\beta$)
+\item Must handle special functions: digamma $\psi(\cdot)$, trigamma $\psi'(\cdot)$ for Gamma distribution
+\end{itemize}
+\newpage
+\section*{Test Case: Bayesian Linear Regression}
+
+The test case uses Bayesian linear regression with:
+\begin{align}
+\bm{y} &\sim \N(\bm{X}\bm{\beta}, \tau_e^{-1} \bm{I}_n) \quad \text{(likelihood)}\\
+\bm{\beta} &\sim \N(\bm{0}, \lambda_\beta^{-1} \bm{I}_p) \quad \text{(prior on coefficients)}\\
+\tau_e &\sim \text{Gamma}(\alpha_e, \gamma_e) \quad \text{(prior on precision)}
+\end{align}
+
+Mean-field approximation:
+\begin{align}
+q(\bm{\beta}, \tau_e) &= q(\bm{\beta}) \, q(\tau_e)\\
+q(\bm{\beta}) &= \N(\bm{\mu}_\beta, \bm{\Sigma}_\beta)\\
+q(\tau_e) &= \text{Gamma}(a_e, b_e)
+\end{align}
+
+Variational parameters: $\bm{\phi} = (\bm{\mu}_\beta, \bm{\Sigma}_\beta, a_e, b_e)$ with dimension $d = p + \frac{p(p+1)}{2} + 2$
+
+For $p=3$ predictors: $d = 3 + 6 + 2 = 11$ parameters to optimise.
+ 
+\section*{Overview of Optimisation Methods}
+
+\subsection*{Methods considered}
+
+\begin{itemize}
+\item CAVI: Domain-specific baseline exploiting problem structure
+\item Gradient Ascent: Baseline first-order method, expected to be slowest but most robust
+\item Newton's Method: Best convergence rate (quadratic) if Hessian well-conditioned
+\item BFGS: ``Best general-purpose optimiser'' for smooth problems (course recommendation)
+\end{itemize}
+
+\subsection*{Baseline Method: CAVI\footnote{Blei, Kucukelbir, and McAuliffe (2017), Variational Inference: A Review for Statisticians (Journal of the American Statistical Association).}}
+
+Coordinate Ascent Variational Inference (CAVI) is VI-specific. It updates each variational parameter block sequentially using closed-form solutions:
+
+\begin{align}
+\bm{\Sigma}_\beta &\leftarrow \left(\frac{a_e}{b_e} \bm{X}^T\bm{X}\right)^{-1}\\
+\bm{\mu}_\beta &\leftarrow \frac{a_e}{b_e} \bm{\Sigma}_\beta \bm{X}^T\bm{y}\\
+a_e &\leftarrow \alpha_e + \frac{n}{2}\\
+b_e &\leftarrow \gamma_e + \frac{1}{2}\left[\|\bm{y} - \bm{X}\bm{\mu}_\beta\|^2 + \tr(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)\right]
+\end{align}
+
+Properties: Monotonic ELBO increase \footnote{Monotonic ELBO increase means the objective is non-decreasing across iterations: $\mathcal{L}^{(t+1)} \ge \mathcal{L}^{(t)}$. In CAVI, each coordinate update maximises the ELBO with respect to one variational factor while holding the others fixed, so each step cannot decrease the ELBO.}, linear convergence, $O(np^2)$ per iteration. Provides analytical benchmark for validation.
+
+
+\newpage 
+
+\subsection*{Mapping ENEL445 Methods to VI Problem}
+
+\begin{enumerate}[leftmargin=*]
+\item Parameter Ascent (Course: gradient descent)
+\begin{itemize}
+\item Standard iterative update: $\bm{\phi}^{(t+1)} = \bm{\phi}^{(t)} + \alpha_t \nabla \ELBO(\bm{\phi}^{(t)})$
+\item Line search from Chapter 3.2 (bisection/Wolfe conditions)
+\item Stopping criteria: $\|\nabla \ELBO\| < \epsilon$
+\item Convergence: Linear rate
+\end{itemize}
+
+\item Newton's Method   
+\begin{itemize}
+\item Standard Newton update: $\bm{\phi}^{(t+1)} = \bm{\phi}^{(t)} + \alpha_t [\nabla^2 \ELBO]^{-1} \nabla \ELBO$
+\item Requires computing and inverting the Hessian matrix
+\item Computational cost: $O(d^3)$ per iteration for Hessian inversion
+\item Convergence: Quadratic rate near optimum
+\item Challenge: Hessian may not be positive definite away from the optimum
+\end{itemize}
+
+\item BFGS Quasi-Newton (one of five required methods from Project 2)
+\begin{itemize}
+\item BFGS update formula builds inverse Hessian approximation
+\item Uses gradient differences: $\bm{s}_k = \bm{\phi}^{(k)} - \bm{\phi}^{(k-1)}$, $\bm{y}_k = \nabla \ELBO(\bm{\phi}^{(k)}) - \nabla \ELBO(\bm{\phi}^{(k-1)})$
+\item Woodbury identity for efficient updates of inverse Hessian
+\item Computational cost: $O(d^2)$ per iteration
+\item Convergence: Superlinear rate
+\item Widely regarded as best general-purpose optimiser for smooth unconstrained problems
+\end{itemize}
+\end{enumerate}
+
+
+Comparison will reveal whether general optimisation methods can compete with or outperform problem-specific algorithms
+
+\section*{Solution Plan}
+
+\subsection*{Phase 1: Data Generation and Baseline (Completed)}
+
+Data simulation:
+\begin{itemize}
+\item Generate $n = 100$ observations, $p = 3$ predictors
+\item Design matrix $\bm{X} \sim \N(0, 1)$, true coefficients $\bm{\beta}_{\text{true}} = [1, -0.5, 2]^T$
+\item Noise: $\epsilon \sim \N(0, 0.5^2)$
+\end{itemize}
+
+Mathematical foundations (in progress):
+\begin{itemize}
+\item Complete ELBO derivation for Bayesian linear regression
+\item CAVI closed-form update equations
+\item Gradient expressions: $\nabla_{\bm{\mu}_\beta} \ELBO$, $\nabla_{\bm{\Sigma}_\beta} \ELBO$, $\nabla_{a_e} \ELBO$, $\nabla_{b_e} \ELBO$
+\item Hessian block structure: diagonal and mixed blocks
+\item BFGS update formulation with Woodbury identity
+\end{itemize}
+
+Derivations to be documented in \texttt{vi\_optimisation\_solution.pdf} (or an appendix to the report?)
+
+\subsection*{Phase 2: Implementation (In Progress)}
+
+\begin{enumerate}[leftmargin=*]
+\item Data Generation (5\%)
+\begin{itemize}
+\item Simulate data: $n = 100$ observations, $p = 3$ predictors
+\item Generate $\bm{X}$ from standard normal, $\bm{\beta}_{\text{true}} = [1, -0.5, 2]^T$
+\item Add noise: $\epsilon \sim \N(0, 0.5^2)$
+\end{itemize}
+
+\item Baseline Implementation: CAVI (15\%)
+\begin{itemize}
+\item Implement closed-form coordinate updates
+\item Track ELBO convergence
+\item Stopping criterion: $|\ELBO^{(t+1)} - \ELBO^{(t)}| < 10^{-6}$
+\end{itemize}
+
+\item Method 1: Gradient Ascent (25\%)
+\begin{itemize}
+\item Implement ELBO gradient computation
+\item Line search: bisection method or Wolfe conditions
+\item Stopping criterion: $\|\nabla \ELBO\| < 10^{-6}$
+\item Track iteration count and ELBO values
+\end{itemize}
+
+\item Method 2: Newton's Method (0\%)
+\begin{itemize}
+\item Implement Hessian computation (block structure)
+\item Regularisation: add $\lambda \bm{I}$ if Hessian not positive definite
+\item Line search for step size $\alpha_t$
+\item Track convergence and computational cost
+\end{itemize}
+
+\item Method 3: BFGS Quasi-Newton (0\%)
+\begin{itemize}
+\item Initialise inverse Hessian approximation: $\bm{B}_0 = \bm{I}_d$
+\item Implement BFGS update formula with Woodbury identity
+\item Line search with Wolfe conditions
+\item Track superlinear convergence
+\end{itemize}
+
+\item Comparison and Analysis (5\%)
+\begin{itemize}
+\item Compare convergence speed (iterations to $10^{-6}$ tolerance)
+\item Compare computational cost (time per iteration, total time)
+\item Compare solution quality (posterior approximation accuracy)
+\item Analyse when each method performs best
+\end{itemize}
+\end{enumerate}
+
+\subsection*{Success Metrics}
+
+\begin{enumerate}
+\item Convergence: All methods reach ELBO optimum within tolerance
+\item Correctness:
+\begin{itemize}
+\item CAVI correctness: Gradient/Newton/BFGS implementation is correct if it reaches the same ELBO optimum / variational fixed point as CAVI (same VI objective, same variational family)
+\item MCMC correctness: VI is assessed against MCMC as a posterior-accuracy benchmark (means, intervals, calibration), not expected to match exactly because VI is approximate
+\end{itemize}
+\item Performance hierarchy:
+\begin{itemize}
+\item Expected optimisation speed: BFGS $>$ Newton $>$ Gradient Ascent (for ELBO convergence)
+\item CAVI likely fastest for this conjugate problem
+\item MCMC/Gibbs expected slowest computationally, but best for posterior uncertainty accuracy (gold-standard benchmark, not a direct ELBO-optimiser competitor)
+\end{itemize}
+\item Understanding: Clear explanation of why each method performs as it does
+\end{enumerate}
+\newpage
+\section*{Progress To Date}
+
+\subsection*{Work in progress using an iterative / Agile method}
+
+\begin{enumerate}
+\item Problem formulation: Draft optimisation problem specified with decision variables, objective function (ELBO), and constraints
+
+\item Mathematical derivations\footnote{This needs some kind of peer review}:   
+\begin{itemize}
+\item Draft ELBO derivation from first principles
+\item Draft CAVI algorithm with closed-form updates
+\item Analytical gradient expressions for all 11 variational parameters (unverified) 
+\item Potential Hessian block computations for Newton's method
+\item BFGS quasi-Newton formulation
+\item Atempt at Penalty method formulation for constrained optimisation
+\end{itemize}
+
+\item Draft method selection justification:  
+\begin{itemize}
+\item Paraameter ascent $\leftrightarrow$ Algorithm 3.2 (gradient descent)
+\item Newton's method $\leftrightarrow$ Equation 3.26
+\item BFGS $\leftrightarrow$ Equations 4.50-4.51 (one of five required project methods\footnote{Project 2 specification})
+\end{itemize}
+
+\item Validation strategy: Established CAVI as analytical benchmark for correctness checking
+\end{enumerate}
+
+\subsection*{Preliminary Results}
+
+Implementation is pending, the mathematical analysis hints\footnote{I havent been over this enough to make any claim of completeness}
+
+\begin{itemize}
+\item Gradient structure: $\nabla_{\bm{\mu}_\beta} \ELBO \propto \bm{X}^T(\bm{y} - \bm{X}\bm{\mu}_\beta)$ resembles least-squares gradient, suggesting ELBO surface may be well-behaved
+
+\item Hessian properties: Diagonal blocks are negative definite (ELBO is locally concave?), supporting Newton's method applicability
+
+\item Dimensionality: With $d=11$ parameters, Hessian inversion costs may be manageable for Newton's method ( L-BFGS reduction may not be needed)
+
+\item Parameter coupling: Mixed Hessian blocks non-zero, indicating gradient-based methods exploiting joint updates should outperform coordinate ascent
+\end{itemize}
+\newpage
+\subsection*{Next Steps}
+
+\begin{enumerate}
+\item Implement CAVI baseline in Python (Week 7)
+\item Implement parameter ascent with line search (Week 7)
+\item Implement Newton's method with regularisation (Week 8)
+\item Implement BFGS quasi-Newton (Week 8)
+\item Monte Carlo comparison: convergence iterations, wall-clock time, ELBO values (Week 8-9)
+\item Final report with performance analysis (Week 12)
+\end{enumerate}
+
+\section*{Alignment with Course Requirements}
+
+This project is looking if  the core learning objectives of ENEL445 are potentuals:
+
+\begin{enumerate}[leftmargin=*]
+\item Optimisation formulation: Convert inference problem to unconstrained optimisation
+\item Gradient computation: Analytical derivation and numerical implementation
+\item Method implementation: Code gradient ascent, Newton, and BFGS from scratch
+\item Line search: Apply bisection or Wolfe conditions for step size selection
+\item Stopping criteria: Implement gradient norm and function value convergence tests
+\item Performance comparison: Empirical evaluation of convergence rates and computational costs
+\item Method selection: Understand when/which  optimisation algorithm is to be used
+\end{enumerate}
+
+Key insight: The VI problem represents a real computational challenge in machine learning, making the comparison of optimisation methods both  valuable and  relevant.
+
+\section*{Timeline}
+
+\begin{tabular}{ll}
+March 17, 2026 & Mathematical derivations completed \\
+March 18, 2026 & Data generation and CAVI implementation \\
+March 19, 2026 & Gradient ascent and Newton's method implementation \\
+March 20, 2026 & BFGS implementation and comparison analysis \\
+March 20, 2026 & Progress report submission \\
+\end{tabular}
+
+\section*{Summary}
+
+The Variational Inference optimisation problem provides a testbed for implementing and comparing gradient-based methods, and, 
+
+\begin{itemize}
+\item Applies to course material (gradient descent, Newton, BFGS)
+\item Requires implementation of algorithms with line search and stopping criteria
+\item Enables performance comparison on a realistic and meaningful problem
+\item Demonstrates an application of optimisation theory to modern machine learning
+\end{itemize}
+
+\end{document}
+
+

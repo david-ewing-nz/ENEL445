@@ -1,0 +1,46 @@
+# Zip archives
+*.zip
+
+# Unzipped course files (contain long filenames)
+_unzipped/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+env/
+venv/
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# LaTeX build artefacts
+*.aux
+*.fls
+*.fdb_latexmk
+*.toc
+*.out
+*.synctex.gz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Course material images (stored locally, not in repo)
+course.material/figs/
+
+# Python-generated figures (derived outputs, not source)
+figs/
+
+# Archive snapshots (local build history only)
+archive/
+
+# Generated PDF and HTML outputs
+results/pdf/
+results/html/

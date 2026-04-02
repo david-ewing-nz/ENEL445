@@ -1,0 +1,103 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\ELBO}{\mathrm{ELBO}}
+\newcommand{\tr}{\mathrm{tr}}
+\setlength{\parindent}{0pt}
+
+\title{20260401A Number Crunch}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Background and Problem Intuition}
+\textbf{Mathematical process:} Start from Bayes' rule, then convert inference into optimisation.
+\begin{align}
+p(\bm\theta\mid\bm y)
+&= \frac{p(\bm y\mid\bm\theta)p(\bm\theta)}{p(\bm y)}
+ = \frac{p(\bm y\mid\bm\theta)p(\bm\theta)}{\displaystyle\int p(\bm y,\bm\theta)\,d\bm\theta} \\ 
+p(\bm y)
+&= \int p(\bm y,\bm\theta)\,d\bm\theta\\
+&= \int p(\bm y \mid \bm\theta) p(\bm\theta)\,d\bm\theta, \\[1em] 
+\intertext{{\setstretch{1.5}where $\displaystyle\int p(\bm y\mid\bm\theta)\,p(\bm\theta)\,d\bm\theta$ is potentially
+intractable. To circumvent this, we introduce a tractable surrogate
+density $q(\bm\theta)$ from a family of distributions $\mathcal{Q}$,
+and shift our focus to reformulating $\log p(\bm y)$ as an expectation
+under $q(\bm\theta)$. This converts the inference problem into an
+optimisation problem: instead of computing $p(\bm\theta\mid\bm y)$
+directly, we search for the $q(\bm\theta)\in\mathcal{Q}$ that best
+approximates it. This is made possible by noting that $\log p(\bm y)$
+contains no $\bm\theta$, so it is constant with respect to~$\bm\theta$
+and its value is unchanged by multiplication with any expression
+equal to~1. Since every probability density integrates to~1, both
+$\displaystyle\int p(\bm\theta)\,d\bm\theta$ and $\displaystyle\int q(\bm\theta)\,d\bm\theta$
+are valid choices, giving}}
+\log p(\bm y)
+&= \log p(\bm y)\int p(\bm\theta)\,d\bm\theta \\
+&= \log p(\bm y)\int q(\bm\theta)\,d\bm\theta \\
+&= \int q(\bm\theta)\log p(\bm y)\,d\bm\theta \\
+&= \int q(\bm\theta)f(\bm\theta)\,d\bm\theta,
+\quad f(\bm\theta)\equiv \log p(\bm y) \\
+&= \E_q\!\left[f(\bm\theta)\right] \\
+\end{align} 
+\begin{align} 
+\log p(\bm y)
+&= \E_q\!\left[\log p(\bm y)\right]  \\ 
+&= \E_q\!\left[\log \frac{p(\bm y,\bm\theta)}{p(\bm\theta\mid\bm y)}\right] \\
+&= \E_q\!\left[\log \left(\frac{p(\bm y,\bm\theta)}{q(\bm\theta)}\cdot
+\frac{q(\bm\theta)}{p(\bm\theta\mid\bm y)}\right)\right] \\
+&= \E_q\!\left[\log \frac{p(\bm y,\bm\theta)}{q(\bm\theta)}\right]
+ +\E_q\!\left[\log \frac{q(\bm\theta)}{p(\bm\theta\mid\bm y)}\right] \\
+&= \E_q[\log p(\bm y,\bm\theta)]-\E_q[\log q(\bm\theta)]
+ +\E_q\!\left[\log \frac{q(\bm\theta)}{p(\bm\theta\mid\bm y)}\right].
+\end{align} 
+
+\textbf{Sequence of events (plain-language):}
+\begin{enumerate}
+\item Start from $\log p(\bm y)$, which is constant with respect to $\bm\theta$.
+\item Multiply by $1$ using normalisation of $q$: $\int q(\bm\theta)\,d\bm\theta=1$.
+\item Rewrite as an integral: $\log p(\bm y)=\int q(\bm\theta)\log p(\bm y)\,d\bm\theta$.
+\item Recognise expectation form: $\int q(\bm\theta)f(\bm\theta)\,d\bm\theta=\E_q[f(\bm\theta)]$.
+\item Use Bayes identity inside the logarithm: $p(\bm y)=\frac{p(\bm y,\bm\theta)}{p(\bm\theta\mid\bm y)}$.
+\item Insert $q(\bm\theta)/q(\bm\theta)$ to create ELBO and KL terms.
+\item Split product and quotient with log rules, then split expectations linearly.
+\item Identify
+\[\ELBO(q)=\E_q[\log p(\bm y,\bm\theta)]-\E_q[\log q(\bm\theta)]\]
+and
+\[\mathrm{KL}\!\left(q(\bm\theta)\,\|\,p(\bm\theta\mid\bm y)\right)=\E_q\!\left[\log\frac{q(\bm\theta)}{p(\bm\theta\mid\bm y)}\right].\]
+\end{enumerate}
+
+Define
+\begin{align}
+\ELBO(q)
+&= \E_q[\log p(\bm y,\bm\theta)]-\E_q[\log q(\bm\theta)] \\
+&= \E_q[\log p(\bm y,\bm\theta)] + H(q),
+\end{align}
+so that
+\begin{equation}
+\log p(\bm y) = \ELBO(q) + \mathrm{KL}\!\left(q(\bm\theta)\,\|\,p(\bm\theta\mid\bm y)\right).
+\end{equation}
+Since $\mathrm{KL}(\cdot\|\cdot)\ge 0$, maximising $\ELBO(q)$ is equivalent to minimising divergence to the true posterior.
+ 
+
+\subsection*{Next Steps}
+
+
+\section*{Alignment with Course Requirements}
+
+
+\section*{Timeline}
+
+
+\section*{Summary}
+
+
+\end{document}

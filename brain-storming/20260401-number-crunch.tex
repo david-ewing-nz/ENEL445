@@ -1,0 +1,354 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage[margin=1in]{geometry}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\ELBO}{\mathrm{ELBO}}
+\newcommand{\tr}{\mathrm{tr}}
+\setlength{\parindent}{0pt}
+
+\title{20260320 Number Crunch}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Background and Problem Intuition}
+
+\textbf{Mathematical process:} Start from Bayes' rule, then convert inference into optimisation.
+\begin{align}
+p(\bm\theta\mid\bm y)
+&= \frac{p(\bm y\mid\bm\theta)p(\bm\theta)}{p(\bm y)}, \\
+p(\bm y)
+&= \int p(\bm y,\bm\theta)\,d\bm\theta,
+\end{align}
+where $p(\bm y)$ is typically intractable.
+
+Introduce a tractable variational density $q(\bm\theta)$ and write
+\begin{align}
+\log p(\bm y)
+&= \log p(\bm y)\int q(\bm\theta)\,d\bm\theta \\
+&= \int q(\bm\theta)\log p(\bm y)\,d\bm\theta \\
+&= \int q(\bm\theta)f(\bm\theta)\,d\bm\theta,
+\quad f(\bm\theta)\equiv \log p(\bm y) \\
+&= \E_q\!\left[f(\bm\theta)\right] \\
+&= \E_q\!\left[\log p(\bm y)\right] \\
+&= \E_q\!\left[\log \frac{p(\bm y,\bm\theta)}{p(\bm\theta\mid\bm y)}\right] \\
+&= \E_q\!\left[\log \left(\frac{p(\bm y,\bm\theta)}{q(\bm\theta)}\cdot
+\frac{q(\bm\theta)}{p(\bm\theta\mid\bm y)}\right)\right] \\
+&= \E_q\!\left[\log \frac{p(\bm y,\bm\theta)}{q(\bm\theta)}\right]
+ +\E_q\!\left[\log \frac{q(\bm\theta)}{p(\bm\theta\mid\bm y)}\right] \\
+&= \E_q[\log p(\bm y,\bm\theta)]-\E_q[\log q(\bm\theta)]
+ +\E_q\!\left[\log \frac{q(\bm\theta)}{p(\bm\theta\mid\bm y)}\right].
+\end{align}
+
+\textbf{Sequence of events (plain-language):}
+\begin{enumerate}
+\item Start from $\log p(\bm y)$, which is constant with respect to $\bm\theta$.
+\item Multiply by $1$ using normalisation of $q$: $\int q(\bm\theta)\,d\bm\theta=1$.
+\item Rewrite as an integral: $\log p(\bm y)=\int q(\bm\theta)\log p(\bm y)\,d\bm\theta$.
+\item Recognise expectation form: $\int q(\bm\theta)f(\bm\theta)\,d\bm\theta=\E_q[f(\bm\theta)]$.
+\item Use Bayes identity inside the logarithm: $p(\bm y)=\frac{p(\bm y,\bm\theta)}{p(\bm\theta\mid\bm y)}$.
+\item Insert $q(\bm\theta)/q(\bm\theta)$ to create ELBO and KL terms.
+\item Split product and quotient with log rules, then split expectations linearly.
+\item Identify
+\[\ELBO(q)=\E_q[\log p(\bm y,\bm\theta)]-\E_q[\log q(\bm\theta)]\]
+and
+\[\mathrm{KL}\!\left(q(\bm\theta)\,\|\,p(\bm\theta\mid\bm y)\right)=\E_q\!\left[\log\frac{q(\bm\theta)}{p(\bm\theta\mid\bm y)}\right].\]
+\end{enumerate}
+
+Define
+\begin{align}
+\ELBO(q)
+&= \E_q[\log p(\bm y,\bm\theta)]-\E_q[\log q(\bm\theta)] \\
+&= \E_q[\log p(\bm y,\bm\theta)] + H(q),
+\end{align}
+so that
+\begin{equation}
+\log p(\bm y) = \ELBO(q) + \mathrm{KL}\!\left(q(\bm\theta)\,\|\,p(\bm\theta\mid\bm y)\right).
+\end{equation}
+Since $\mathrm{KL}(\cdot\|\cdot)\ge 0$, maximising $\ELBO(q)$ is equivalent to minimising divergence to the true posterior.
+
+\section*{Key Notation}
+
+
+\section*{Optimisation Problem Formulation}
+
+\subsection*{Decision Variables}
+
+\textbf{Mathematical process:} Parameter counting and feasible-domain specification.
+\begin{align}
+\bm\phi &= (\bm\mu_\beta,\bm\Sigma_\beta,a_e,b_e),\\
+\bm\mu_\beta &\in \R^p,\quad \bm\Sigma_\beta\in\mathbb S_{++}^p,\quad a_e>0,\ b_e>0,\\
+d &= p + \frac{p(p+1)}{2} + 2.
+\end{align}
+For $p=3$: $d=3+6+2=11$.
+
+\subsection*{Objective Function}
+
+\textbf{Mathematical process:} Expand $\ELBO(\bm\phi)$ term-by-term under mean-field
+$q(\bm\beta,\tau_e)=q(\bm\beta)\,q(\tau_e)$ with
+$q(\bm\beta)=\N(\bm\mu_\beta,\bm\Sigma_\beta)$ and
+$q(\tau_e)=\mathrm{Gamma}(a_e,b_e)$ (shape/rate parameterisation).
+
+Write the five-term decomposition:
+\begin{equation}
+\ELBO(\bm\phi)= T_1+T_2+T_3+T_4+T_5,
+\end{equation}
+where
+\[
+T_1=\E_q[\log p(\bm y\mid\bm\beta,\tau_e)],\quad
+T_2=\E_q[\log p(\bm\beta)],\quad
+T_3=\E_q[\log p(\tau_e)],\quad
+T_4=-\E_q[\log q(\bm\beta)],\quad
+T_5=-\E_q[\log q(\tau_e)].
+\]
+
+\textbf{Core building-block expectations} (used throughout):
+\begin{align}
+\E_q[\tau_e] &= \frac{a_e}{b_e}, &
+\E_q[\log\tau_e] &= \psi(a_e)-\log b_e,\\
+\E_q\!\left[\|\bm y-\bm X\bm\beta\|^2\right]
+  &= \|\bm y-\bm X\bm\mu_\beta\|^2+\tr(\bm X^\top\bm X\bm\Sigma_\beta), &
+\E_q[\bm\beta^\top\bm\beta]
+  &= \bm\mu_\beta^\top\bm\mu_\beta+\tr(\bm\Sigma_\beta).
+\end{align}
+The first two follow from Gamma moment formulae; the third uses
+$\E_q[\bm\beta\bm\beta^\top]=\bm\Sigma_\beta+\bm\mu_\beta\bm\mu_\beta^\top$
+and the trace–quadratic identity; the fourth is the same identity with $\bm A=\bm I$.
+
+\subsubsection*{$T_1$: Expected log-likelihood}
+
+From $\bm y\mid\bm\beta,\tau_e\sim\N(\bm X\bm\beta,\tau_e^{-1}\bm I_n)$:
+\begin{equation}
+\log p(\bm y\mid\bm\beta,\tau_e)
+= \frac{n}{2}\log\tau_e - \frac{n}{2}\log(2\pi)
+  - \frac{\tau_e}{2}\|\bm y-\bm X\bm\beta\|^2.
+\end{equation}
+Taking the expectation and using mean-field independence ($\tau_e\perp\bm\beta$ under $q$):
+\begin{equation}
+T_1 = \frac{n}{2}\bigl(\psi(a_e)-\log b_e\bigr)
+    - \frac{n}{2}\log(2\pi)
+    - \frac{a_e}{2b_e}\Bigl(\|\bm y-\bm X\bm\mu_\beta\|^2
+      +\tr(\bm X^\top\bm X\bm\Sigma_\beta)\Bigr).
+\end{equation}
+
+\subsubsection*{$T_2$: Expected log-prior on $\bm\beta$}
+
+From $\bm\beta\sim\N(\bm 0,\lambda_\beta^{-1}\bm I_p)$:
+\begin{equation}
+\log p(\bm\beta)
+= \frac{p}{2}\log\lambda_\beta - \frac{p}{2}\log(2\pi)
+  - \frac{\lambda_\beta}{2}\bm\beta^\top\bm\beta,
+\end{equation}
+\begin{equation}
+T_2 = \frac{p}{2}\log\lambda_\beta - \frac{p}{2}\log(2\pi)
+    - \frac{\lambda_\beta}{2}\Bigl(\bm\mu_\beta^\top\bm\mu_\beta
+      +\tr(\bm\Sigma_\beta)\Bigr).
+\end{equation}
+
+\subsubsection*{$T_3$: Expected log-prior on $\tau_e$}
+
+From $\tau_e\sim\mathrm{Gamma}(\alpha_e,\gamma_e)$ (shape/rate):
+\begin{equation}
+\log p(\tau_e)
+= \alpha_e\log\gamma_e - \log\Gamma(\alpha_e)
+  + (\alpha_e-1)\log\tau_e - \gamma_e\tau_e,
+\end{equation}
+\begin{equation}
+T_3 = \alpha_e\log\gamma_e - \log\Gamma(\alpha_e)
+    + (\alpha_e-1)\bigl(\psi(a_e)-\log b_e\bigr)
+    - \gamma_e\,\frac{a_e}{b_e}.
+\end{equation}
+
+\subsubsection*{$T_4$: Entropy of $q(\bm\beta)$}
+
+The differential entropy of a $p$-variate Gaussian is
+\begin{equation}
+T_4 = H\!\bigl(q(\bm\beta)\bigr)
+= \frac{p}{2}\bigl(1+\log(2\pi)\bigr)+\frac{1}{2}\log\lvert\bm\Sigma_\beta\rvert.
+\end{equation}
+With the Cholesky factor $\bm\Sigma_\beta=\bm L\bm L^\top$ this becomes
+$\log\lvert\bm\Sigma_\beta\rvert=2\sum_i\log L_{ii}$, which is numerically stable.
+
+\subsubsection*{$T_5$: Entropy of $q(\tau_e)$}
+
+The differential entropy of a $\mathrm{Gamma}(a,b)$ (shape/rate) distribution is
+\begin{equation}
+T_5 = H\!\bigl(q(\tau_e)\bigr)
+= a_e - \log b_e + \log\Gamma(a_e) + (1-a_e)\psi(a_e).
+\end{equation}
+
+\subsubsection*{Full ELBO (up to constants in $\bm\phi$)}
+
+Dropping all terms that depend only on hyperparameters $(\lambda_\beta,\alpha_e,\gamma_e)$:
+\begin{align}
+\ELBO(\bm\phi)
+&= \frac{n}{2}(\psi(a_e)-\log b_e)
+   -\frac{a_e}{2b_e}\Bigl(\|\bm y-\bm X\bm\mu_\beta\|^2
+   +\tr(\bm X^\top\bm X\bm\Sigma_\beta)\Bigr)
+   \tag{$T_1$}\\
+&\quad
+   -\frac{\lambda_\beta}{2}\bigl(\bm\mu_\beta^\top\bm\mu_\beta+\tr(\bm\Sigma_\beta)\bigr)
+   \tag{$T_2$}\\
+&\quad
+   +(\alpha_e-1)(\psi(a_e)-\log b_e)
+   -\gamma_e\frac{a_e}{b_e}
+   \tag{$T_3$}\\
+&\quad
+   +\tfrac{1}{2}\log\lvert\bm\Sigma_\beta\rvert
+   \tag{$T_4$}\\
+&\quad
+   +\log\Gamma(a_e)+(1-a_e)\psi(a_e)-\log b_e+a_e
+   +C,
+   \tag{$T_5$}
+\end{align}
+where $C$ absorbs all terms independent of $\bm\phi=(\bm\mu_\beta,\bm\Sigma_\beta,a_e,b_e)$.
+
+\subsection*{Constraints}
+
+\textbf{Mathematical process:} Convert constrained variables to unconstrained parameters.
+\begin{align}
+\bm\Sigma_\beta &= \bm L\bm L^\top,\quad \bm L \text{ lower triangular with } L_{ii}>0,\\
+a_e &= e^{\eta_a},\quad b_e=e^{\eta_b},\quad \eta_a,\eta_b\in\R.
+\end{align}
+This guarantees $\bm\Sigma_\beta\succ0$ and $a_e,b_e>0$ by construction.
+
+\subsection*{Computational Characteristics}
+
+\textbf{Mathematical process:} Leading-order complexity accounting.
+\begin{align}
+\text{Gradient evaluation} &:\ O(np^2),\\
+\text{Newton step (Hessian build + solve)} &:\ O(np^2+d^3),\\
+\text{BFGS update} &:\ O(d^2).
+\end{align}
+
+\section*{Test Case: Bayesian Linear Regression}
+
+\textbf{Mathematical process:} Specify generative model, variational family, and joint log-density components.
+\begin{align}
+\bm y\mid\bm\beta,\tau_e &\sim \N(\bm X\bm\beta,\tau_e^{-1}\bm I_n),\\
+\bm\beta &\sim \N(\bm 0,\lambda_\beta^{-1}\bm I_p),\\
+\tau_e &\sim \mathrm{Gamma}(\alpha_e,\gamma_e).
+\end{align}
+
+Useful joint log form (up to constants):
+\begin{align}
+\log p(\bm y,\bm\beta,\tau_e)
+&= \frac{n}{2}\log\tau_e
+-\frac{\tau_e}{2}\|\bm y-\bm X\bm\beta\|^2
+-\frac{\lambda_\beta}{2}\bm\beta^\top\bm\beta \\
+&\quad +(\alpha_e-1)\log\tau_e-\gamma_e\tau_e + C.
+\end{align}
+
+\section*{Overview of Optimisation Methods}
+
+\subsection*{Methods considered}
+
+
+\subsection*{Baseline Method: CAVI\footnote{Blei, Kucukelbir, and McAuliffe (2017), Variational Inference: A Review for Statisticians (Journal of the American Statistical Association).}}
+
+\textbf{Mathematical process:} Coordinate-wise maximisation of ELBO.
+\begin{align}
+\bm\Sigma_\beta &\leftarrow \left(\frac{a_e}{b_e}\bm X^\top\bm X\right)^{-1},\\
+\bm\mu_\beta &\leftarrow \frac{a_e}{b_e}\,\bm\Sigma_\beta\bm X^\top\bm y,\\
+a_e &\leftarrow \alpha_e+\frac n2,\\
+b_e &\leftarrow \gamma_e+\frac12\Big(\|\bm y-\bm X\bm\mu_\beta\|^2+\tr(\bm X^\top\bm X\bm\Sigma_\beta)\Big).
+\end{align}
+Each block update solves
+\begin{equation}
+q_j^{(t+1)} = \arg\max_{q_j}\ \ELBO(q_j,q_{-j}^{(t)}),
+\end{equation}
+so ELBO is non-decreasing across iterations.
+
+\subsection*{Mapping ENEL445 Methods to VI Problem}
+
+\textbf{Mathematical process:} Express optimisation updates on $\bm\phi$.
+
+\textbf{Gradient ascent}
+\begin{equation}
+\bm\phi^{(k+1)} = \bm\phi^{(k)} + \alpha_k\nabla\ELBO(\bm\phi^{(k)}).
+\end{equation}
+
+\textbf{Newton's method}
+\begin{equation}
+\bm\phi^{(k+1)}
+= \bm\phi^{(k)} + \alpha_k\big[\nabla^2\ELBO(\bm\phi^{(k)})\big]^{-1}\nabla\ELBO(\bm\phi^{(k)}).
+\end{equation}
+
+\textbf{BFGS (inverse form)}
+\begin{align}
+\bm s_k &= \bm\phi_{k+1}-\bm\phi_k,
+\qquad
+\bm y_k = \nabla\ELBO(\bm\phi_{k+1})-\nabla\ELBO(\bm\phi_k),\\
+\rho_k &= (\bm y_k^\top\bm s_k)^{-1},\\
+\bm B_{k+1} &= (\bm I-\rho_k\bm s_k\bm y_k^\top)\bm B_k(\bm I-\rho_k\bm y_k\bm s_k^\top)+\rho_k\bm s_k\bm s_k^\top.
+\end{align}
+
+\section*{Solution Plan}
+
+\subsection*{Phase 1: Data Generation and Baseline}
+
+\textbf{Mathematical process:} Derive and verify all analytical quantities required before coding.
+\begin{align}
+\text{Deliverables}:
+\quad &\ELBO(\bm\phi),\ \nabla\ELBO(\bm\phi),\ \nabla^2\ELBO(\bm\phi),\\
+&\text{CAVI updates, and numerical checks against finite differences.}
+\end{align}
+
+\subsection*{Phase 2: Implementation (in progress)}
+
+
+\subsection*{Success Metrics}
+
+\textbf{Mathematical process:} Define quantitative stopping and agreement criteria.
+\begin{align}
+\text{Function tolerance:}
+\quad &|\ELBO^{(k+1)}-\ELBO^{(k)}|<10^{-6},\\
+\text{Gradient tolerance:}
+\quad &\|\nabla\ELBO(\bm\phi^{(k)})\|_2<10^{-6},\\
+\text{Method agreement:}
+\quad &|\ELBO_{\text{method}}^\star-\ELBO_{\text{CAVI}}^\star|\le \varepsilon.
+\end{align}
+
+\section*{Progress To Date}
+
+\subsection*{Work in progress using an iterative / Agile method}
+
+\textbf{Mathematical process identified as drafted/partial:}
+\begin{align}
+&\text{(i) ELBO derivation from model assumptions,}\\
+&\text{(ii) CAVI closed-form updates,}\\
+&\text{(iii) analytical gradients for } d=11,\\
+&\text{(iv) Hessian block structure,}\\
+&\text{(v) preliminary BFGS and penalty formulations.}
+\end{align}
+
+\subsection*{Preliminary Results}
+
+\textbf{Mathematical process:} Local structure checks before implementation.
+\begin{align}
+\nabla_{\bm\mu_\beta}\ELBO
+&\propto \bm X^\top(\bm y-\bm X\bm\mu_\beta),\\
+\text{Hessian block sign checks}
+&\Rightarrow \text{local concavity in selected directions},\\
+ d&=11\ \Rightarrow\ \text{Newton linear-algebra cost is tractable at this scale.}
+\end{align}
+
+\subsection*{Next Steps}
+
+
+\section*{Alignment with Course Requirements}
+
+
+\section*{Timeline}
+
+
+\section*{Summary}
+
+
+\end{document}
