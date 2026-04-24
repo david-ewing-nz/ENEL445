@@ -1,0 +1,218 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{courier}
+\usepackage{setspace}
+\usepackage{titlesec}
+
+\geometry{margin=1in}
+\setstretch{1.15}
+
+\titleformat{\section}{\large\bfseries}{\thesection}{0.5em}{}
+
+\lstset{
+    basicstyle=\footnotesize\ttfamily,
+    breaklines=true,
+    frame=single,
+    columns=fullflexible
+}
+
+\title{Exploratory Thoughts: Unified Recommender System Architecture\\
+\large Transformer Sequence Modeling + Feature Interaction\\
+\normalsize \href{https://algo.qq.com/\#intro}{algo.qq.com}}
+\author{David \and Xia}
+\date{April 2026 \\ \small Draft v0.02}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+    \small\textit{Prepared in the context of the QQ Algorithm Challenge ---
+    \href{https://algo.qq.com/\#intro}{algo.qq.com}}
+\end{center}
+
+\begin{abstract}
+These are first-thoughts towards a unified recommender system architecture
+that merges transformer-based sequence modelling with structured feature
+interaction, targeting the QQ Algorithm Challenge. This version explores a
+TensorFlow/Keras implementation. The intent is exploratory: to sketch the
+mathematical and implementation foundations before committing to a full
+proposal.
+\end{abstract}
+
+\noindent\textbf{Keywords:} recommender systems, transformers, feature interaction, TensorFlow, Keras, deep learning
+
+\bigskip
+
+\section{Overview}
+This document presents a compact technical model describing how a unified
+recommender-system architecture can merge:
+\begin{itemize}
+    \item Transformer-style sequence modeling,
+    \item Feature-interaction modeling (e.g.\ DeepFM, DCN, DIN),
+    \item A unified TensorFlow/Keras implementation,
+    \item A training pipeline using the Keras \texttt{fit} API.
+\end{itemize}
+
+The goal is to show how modern recommender systems integrate temporal
+dependencies and structured feature interactions into a single scalable model,
+leveraging TensorFlow's production-ready ecosystem.
+
+\section{1.\ Minimal Unified Architecture (TensorFlow/Keras)}
+Below is a minimal Keras model that combines:
+\begin{itemize}
+    \item \texttt{MultiHeadAttention} for sequential user behaviour,
+    \item static feature embeddings (user, item, context),
+    \item an MLP for feature interactions.
+\end{itemize}
+
+\subsection*{Model Code}
+\begin{lstlisting}[language=Python]
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+
+class UnifiedRecModel(keras.Model):
+    def __init__(
+        self,
+        num_items,
+        num_users,
+        num_context_feats,
+        d_model=64,
+        n_heads=4,
+        d_ff=128,
+        mlp_hidden=128,
+    ):
+        super().__init__()
+
+        self.item_emb = layers.Embedding(num_items, d_model)
+        self.user_emb = layers.Embedding(num_users, d_model)
+        self.ctx_emb  = layers.Embedding(num_context_feats, d_model)
+
+        self.attention = layers.MultiHeadAttention(
+            num_heads=n_heads,
+            key_dim=d_model // n_heads,
+        )
+        self.ffn = keras.Sequential([
+            layers.Dense(d_ff, activation="relu"),
+            layers.Dense(d_model),
+        ])
+        self.norm1 = layers.LayerNormalization()
+        self.norm2 = layers.LayerNormalization()
+
+        self.mlp = keras.Sequential([
+            layers.Dense(mlp_hidden, activation="relu"),
+            layers.Dense(1),
+        ])
+
+    def call(self, inputs, training=False):
+        seq_items, user_ids, target_items, ctx_feats, seq_mask = inputs
+
+        seq_emb  = self.item_emb(seq_items)          # (B, T, d)
+        user_vec = self.user_emb(user_ids)            # (B, d)
+        item_vec = self.item_emb(target_items)        # (B, d)
+        ctx_vec  = tf.reduce_mean(
+            self.ctx_emb(ctx_feats), axis=1
+        )                                             # (B, d)
+
+        # self-attention with padding mask
+        attn_mask = seq_mask[:, tf.newaxis, tf.newaxis, :]
+        attn_out  = self.attention(
+            seq_emb, seq_emb, attention_mask=attn_mask
+        )
+        seq_enc = self.norm1(seq_emb + attn_out)
+        seq_enc = self.norm2(seq_enc + self.ffn(seq_enc))
+
+        # masked mean-pool
+        mask_f   = tf.cast(seq_mask, tf.float32)
+        lengths  = tf.reduce_sum(mask_f, axis=1, keepdims=True)
+        seq_pool = tf.reduce_sum(
+            seq_enc * mask_f[:, :, tf.newaxis], axis=1
+        ) / tf.maximum(lengths, 1.0)
+
+        x = tf.concat([seq_pool, user_vec, item_vec, ctx_vec], axis=-1)
+        return tf.squeeze(self.mlp(x), axis=-1)
+\end{lstlisting}
+
+\section{2.\ Merging Attention and Feature-Interaction Layers}
+A unified architecture combines:
+\begin{itemize}
+    \item Transformer attention for temporal modelling,
+    \item Feature-interaction layers (e.g.\ FM, DeepFM) for structured fields.
+\end{itemize}
+
+\subsection*{Attention}
+\[
+\mathrm{Attn}(Q,K,V)
+= \mathrm{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right)V.
+\]
+
+\subsection*{Factorization Machine Interaction}
+\[
+y_{\mathrm{FM}}
+= \frac{1}{2}\sum_{i<j}
+\left(
+\langle v_i, v_j\rangle
+\right).
+\]
+
+\subsection*{FM Layer Code}
+\begin{lstlisting}[language=Python]
+class FMInteraction(keras.layers.Layer):
+    def call(self, field_embs):
+        # field_embs: (B, num_fields, d)
+        sum_emb = tf.reduce_sum(field_embs, axis=1)
+        sum_sq  = sum_emb * sum_emb
+        sq_sum  = tf.reduce_sum(field_embs * field_embs, axis=1)
+        fm = 0.5 * tf.reduce_sum(sum_sq - sq_sum, axis=1)
+        return fm
+\end{lstlisting}
+
+\section{3.\ Training Pipeline}
+TensorFlow's \texttt{model.compile}/\texttt{model.fit} API provides a concise
+training pipeline:
+\begin{enumerate}
+    \item Data preparation (sequence padding, masks, feature IDs) as \texttt{tf.data.Dataset}.
+    \item Compile with Adam optimiser and binary cross-entropy loss.
+    \item Call \texttt{model.fit} with built-in AUC metric tracking.
+    \item Export via TF-Serving or TFLite for deployment.
+\end{enumerate}
+
+\subsection*{Training Loop}
+\begin{lstlisting}[language=Python]
+model = UnifiedRecModel(
+    num_items, num_users, num_context_feats
+)
+
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+    loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+    metrics=[tf.keras.metrics.AUC(name="auc")],
+)
+
+model.fit(
+    train_dataset,
+    validation_data=val_dataset,
+    epochs=num_epochs,
+    callbacks=[
+        tf.keras.callbacks.EarlyStopping(
+            monitor="val_auc",
+            patience=3,
+            restore_best_weights=True,
+        )
+    ],
+)
+\end{lstlisting}
+
+\section{4.\ TensorFlow Ecosystem and Deployment}
+\begin{itemize}
+    \item \textbf{TF-Serving}: production-grade REST/gRPC model serving with versioning.
+    \item \textbf{TFLite}: on-device inference for mobile and edge scenarios.
+    \item \textbf{TF Extended (TFX)}: end-to-end ML pipelines with data validation and model monitoring.
+    \item \textbf{SavedModel format}: language-agnostic serialisation for cross-platform deployment.
+    \item \textbf{Trend}: TensorFlow remains the dominant choice in large-scale industry CTR/CVR systems.
+\end{itemize}
+
+\end{document}

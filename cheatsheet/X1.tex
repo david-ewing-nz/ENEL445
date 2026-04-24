@@ -1,0 +1,43 @@
+\documentclass[10pt]{article}
+
+\usepackage[a5paper, landscape, margin=5mm]{geometry}
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Heros}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{graphicx}
+
+\setlength{\parskip}{2pt}
+\setlength{\parindent}{0pt}
+\setlength{\abovedisplayskip}{3pt}
+\setlength{\belowdisplayskip}{3pt}
+\setlength{\abovedisplayshortskip}{1pt}
+\setlength{\belowdisplayshortskip}{1pt}
+
+\pagestyle{empty}
+
+% 4 equal minipages — each 0.245\textwidth with \hfill gaps
+\newlength{\mpw}
+\setlength{\mpw}{0.245\textwidth}
+
+\begin{document}
+
+\noindent
+%% ── col 1 : Nelder–Mead + Pattern Search ────────────────────────────────────
+\begin{minipage}[t]{\mpw}
+  \includegraphics[width=\linewidth]{../figs/nelder_mead_ops.png}\\[2pt]
+  \includegraphics[width=\linewidth]{../figs/pattern_search_diagram.png}
+\end{minipage}\hfill
+%% ── col 2 ────────────────────────────────────────────────────────────────────
+\begin{minipage}[t]{\mpw}
+  \textbf{col 2 placeholder}
+\end{minipage}\hfill
+%% ── col 3 ────────────────────────────────────────────────────────────────────
+\begin{minipage}[t]{\mpw}
+  \textbf{col 3 placeholder}
+\end{minipage}\hfill
+%% ── col 4 ────────────────────────────────────────────────────────────────────
+\begin{minipage}[t]{\mpw}
+  \textbf{col 4 placeholder}
+\end{minipage}
+
+\end{document}

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="isbn9781040198629" xml:lang="en">
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+<dc:title>generatingfunctionology: Edition 3</dc:title>
+<dc:creator id="creator1">Herbert S. Wilf</dc:creator>
+<meta refines="#creator1" property="role" scheme="marc:relators">aut</meta>
+<dc:format>application/ePub</dc:format>
+<dc:date>2005</dc:date>
+<dc:identifier id="isbn9781040198629">9781040198629</dc:identifier>
+<meta refines="#isbn9781040198629" property="identifier-type" scheme="onix:codelist5">15</meta>
+<dc:source id="isbn9781568812793">9781568812793</dc:source>
+<meta refines="#isbn9781568812793" property="source-of">pagination</meta>
+<dc:language>en</dc:language>
+<dc:publisher>Taylor &amp; Francis Group</dc:publisher>
+<dc:relation>9781568812793</dc:relation>
+<dc:rights>© 2005 by Taylor &amp; Francis Group, LLC</dc:rights>
+<dc:description>Generating functions, one of the most important tools in enumerative combinatorics, are a bridge between discrete mathematics and continuous analysis. Generating functions have numerous applications in mathematics, especially in - Combinatorics - Probability Theory - Statistics - Theory of Markov Chains - Number Theory One of the most important and relevant recent applications of combinatorics lies in the development of Internet search engines whose incredible capabilities dazzle even the mathematically trained user.</dc:description>
+<meta property="dcterms:modified">2024-12-19T00:00:00Z</meta>
+<meta name="cover" content="cover-image"/>
+<meta property="schema:accessMode">textual</meta>
+<meta property="schema:accessMode">visual</meta>
+<meta property="schema:accessModeSufficient">textual</meta>
+<meta property="schema:accessibilityFeature">structuralNavigation</meta>
+<meta property="schema:accessibilityFeature">tableOfContents</meta>
+<meta property="schema:accessibilityFeature">MathML</meta>
+<meta property="schema:accessibilityFeature">index</meta>
+<meta property="schema:accessibilityFeature">readingOrder</meta>
+<meta property="schema:accessibilityFeature">displayTransformability</meta>
+<meta property="schema:accessibilityHazard">none</meta>
+<meta property="schema:accessibilityFeature">printPageNumbers</meta>
+<meta property="schema:accessibilityFeature">alternativeText</meta>
+<meta property="schema:accessibilitySummary">generatingfunctionology: Edition 3 is a Heavy complex with figures, tables, MathML, footnotes, lists, and formatting defined with structural markup. This book contains accessibility features such as a table of contents, page-list, landmarks, reading order, structural navigation, semantic structure, in-text links, page numbers, index and backlinks. All in-text citations are linked, however backlinks only return to their first in-text citation. Linked DOIs are provided, but are not uniquely identified.</meta>
+</metadata>
+<manifest>
+<item id="toc" href="xhtml/00_Nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+<item id="stylesheet" href="styles/stylesheet.css" media-type="text/css"/>
+<item id="Cover" href="xhtml/01_Cover.xhtml" media-type="application/xhtml+xml"/>
+<item id="Halftitle" href="xhtml/02_Halftitle.xhtml" media-type="application/xhtml+xml"/>
+<item id="Title" href="xhtml/03_Title.xhtml" media-type="application/xhtml+xml"/>
+<item id="Copyright" href="xhtml/04_Copyright.xhtml" media-type="application/xhtml+xml"/>
+<item id="Contents" href="xhtml/05_Contents.xhtml" media-type="application/xhtml+xml"/>
+<item id="Preface" href="xhtml/06_Preface.xhtml" media-type="application/xhtml+xml"/>
+<item id="Chapter01" href="xhtml/07_Chapter01.xhtml" media-type="application/xhtml+xml" properties="mathml"/>
+<item id="Chapter02" href="xhtml/08_Chapter02.xhtml" media-type="application/xhtml+xml" properties="mathml"/>
+<item id="Chapter03" href="xhtml/09_Chapter03.xhtml" media-type="application/xhtml+xml" properties="mathml"/>
+<item id="Chapter04" href="xhtml/10_Chapter04.xhtml" media-type="application/xhtml+xml" properties="mathml"/>
+<item id="Chapter05" href="xhtml/11_Chapter05.xhtml" media-type="application/xhtml+xml" properties="mathml"/>
+<item id="Backmatter01" href="xhtml/12_Backmatter01.xhtml" media-type="application/xhtml+xml" properties="mathml"/>
+<item id="Backmatter02" href="xhtml/13_Backmatter02.xhtml" media-type="application/xhtml+xml" properties="mathml"/>
+<item id="Backmatter03" href="xhtml/14_Backmatter03.xhtml" media-type="application/xhtml+xml" properties="mathml"/>
+<item id="cover-image" href="images/cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+
+<item id="img1" href="images/pg109_1.jpg" media-type="image/jpeg"/>
+<item id="img2" href="images/pg159_1.jpg" media-type="image/jpeg"/>
+<item id="img3" href="images/pg160_1.jpg" media-type="image/jpeg"/>
+<item id="img4" href="images/pg40_1.jpg" media-type="image/jpeg"/>
+<item id="img5" href="images/pg77_1.jpg" media-type="image/jpeg"/>
+<item id="img6" href="images/pg78_1.jpg" media-type="image/jpeg"/>
+<item id="img7" href="images/pg81_1.jpg" media-type="image/jpeg"/>
+<item id="img8" href="images/pg81_2.jpg" media-type="image/jpeg"/>
+<item id="img9" href="images/pg82_1.jpg" media-type="image/jpeg"/>
+<item id="img10" href="images/pg83_1.jpg" media-type="image/jpeg"/>
+<item id="img11" href="images/pg93_1.jpg" media-type="image/jpeg"/>
+<item id="img12" href="images/pgiii_1.jpg" media-type="image/jpeg"/>
+</manifest>
+<spine>
+<itemref idref="Cover" linear="yes"/>
+<itemref idref="Halftitle"/>
+<itemref idref="Title"/>
+<itemref idref="Copyright"/>
+<itemref idref="Contents"/>
+<itemref idref="Preface"/>
+<itemref idref="Chapter01"/>
+<itemref idref="Chapter02"/>
+<itemref idref="Chapter03"/>
+<itemref idref="Chapter04"/>
+<itemref idref="Chapter05"/>
+<itemref idref="Backmatter01"/>
+<itemref idref="Backmatter02"/>
+<itemref idref="Backmatter03"/>
+</spine>
+</package>

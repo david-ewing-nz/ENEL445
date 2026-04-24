@@ -1,0 +1,172 @@
+
+\documentclass[10pt,a3paper]{article}
+
+\usepackage[a3paper, left=20mm, right=60mm, top=15mm, bottom=15mm]{geometry}
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Heros}
+\usepackage{amsmath,amssymb,mathtools}
+
+\setlength{\parskip}{2pt}
+\setlength{\abovedisplayskip}{4pt}
+\setlength{\belowdisplayskip}{4pt}
+\setlength{\abovedisplayshortskip}{2pt}
+\setlength{\belowdisplayshortskip}{2pt}
+
+\pagestyle{empty}
+
+\begin{document}
+
+\noindent
+\begin{minipage}[t]{0.45\linewidth}
+
+\noindent\textbf{Newton on KKT} \quad $\min\ f(x) = x_1^2+5x_2^2$,\; s.t.\ $g(x)=4-x_1-x_2 \leq 0$
+
+\noindent Form KKT residual system $r(x,\lambda)=0$:
+\[
+  r = \begin{bmatrix} \nabla_x l \\ g(x) \end{bmatrix}
+    = \begin{bmatrix} 2x_1-\lambda \\ 10x_2-\lambda \\ x_1+x_2-4 \end{bmatrix}
+  \qquad
+  J = \frac{\partial r}{\partial(x_1,x_2,\lambda)}
+    = \begin{bmatrix} 2&0&-1\\0&10&-1\\1&1&0 \end{bmatrix}
+\]
+
+\noindent\textbf{Init:} $z_0=(0,0,0)^\top$;\quad $r(z_0)=(0,\ 0,\ -4)^\top$
+
+\noindent\textbf{Newton step:} solve $J\,\Delta z = -r(z_0)$
+\[
+  \begin{bmatrix}2&0&-1\\0&10&-1\\1&1&0\end{bmatrix}
+  \begin{bmatrix}\Delta x_1\\\Delta x_2\\\Delta\lambda\end{bmatrix}
+  =\begin{bmatrix}0\\0\\4\end{bmatrix}
+\]
+
+Row 1: $\Delta x_1 = \tfrac{\Delta\lambda}{2}$\quad
+Row 2: $\Delta x_2 = \tfrac{\Delta\lambda}{10}$
+
+Row 3: $\tfrac{\Delta\lambda}{2}+\tfrac{\Delta\lambda}{10}=4 \;\Rightarrow\; 6\Delta\lambda=40 \;\Rightarrow\; \Delta\lambda=\tfrac{20}{3}$
+
+\[
+  \Delta x_1 = \frac{10}{3} \qquad \Delta x_2 = \frac{2}{3}
+\]
+
+\noindent\textbf{Update} ($\alpha=1$, linear system $\Rightarrow$ exact in one step):
+\[
+  z_1 = z_0+\Delta z = \left(\frac{10}{3},\ \frac{2}{3},\ \frac{20}{3}\right)
+  \qquad f(x^*) = \frac{100}{9}+\frac{20}{9} = \frac{40}{3}
+\]
+
+\end{minipage}\hfill
+\begin{minipage}[t]{0.50\linewidth}
+
+\noindent\textbf{KKT} \quad $\min\ f(x) = x_1^2 + 5x_2^2,\quad x \in \mathbb{R}^2,\quad \text{s.t.}\ g(x) = x_1 + x_2 - 4$
+
+\noindent\textbf{Slack:} $g(x) - s^2 = 0$, so $l(x,\lambda,s) = f(x) - \lambda(g(x) - s^2)$
+
+\noindent$\dfrac{\partial l}{\partial s} = 2\lambda s = 0 \;\Rightarrow\; \lambda = 0$ (inactive) or $s = 0$ (active)
+
+\noindent\textbf{Test:} $X_\text{unc} = (0,0)$;\; $g(X_\text{unc}) = -4 < 0$ \quad $\therefore$ infeasible $\Rightarrow$ $\lambda \neq 0$ \quad $\xRightarrow{2\lambda s=0}$ \quad $s = 0$, constraint \textbf{active}
+
+\[
+  l(x,\lambda) = x_1^2 + 5x_2^2 - \lambda(x_1 + x_2 - 4) \qquad \text{KKT: set } s=0
+\]
+
+\[
+  \nabla_x l = \begin{bmatrix} 2x_1 - \lambda \\ 10x_2 - \lambda \end{bmatrix}
+  \rightarrow
+  x^*(\lambda) = \begin{bmatrix} \lambda/2 \\ \lambda/10 \end{bmatrix}
+\]
+
+\[
+  g\!\left(x^*(\lambda)\right) = \frac{\lambda}{2} + \frac{\lambda}{10} - 4
+  \qquad\Rightarrow\qquad
+  \frac{\lambda}{2} + \frac{\lambda}{10} = 4
+\]
+
+\[
+  10\lambda + 2\lambda = 80 \qquad \lambda = \frac{80}{12} = \frac{20}{3}
+\]
+
+\[
+  x^* = \begin{bmatrix} \dfrac{20/3}{2} \\[4pt] \dfrac{20/3}{10} \end{bmatrix}
+       = \begin{bmatrix} \dfrac{10}{3} \\[4pt] \dfrac{2}{3} \end{bmatrix}
+  \qquad
+  f(x^*) = \left(\frac{10}{3}\right)^2 + 5\left(\frac{2}{3}\right)^2
+          = \frac{100}{9} + \frac{20}{9}
+          = \frac{120}{9}
+          = \frac{40}{3}
+\]
+
+\end{minipage}\hfill
+\begin{minipage}[t]{0.46\linewidth}
+
+\noindent\textbf{SQP connection}
+
+\noindent\textbf{KKT} — necessary conditions for a constrained optimum; gives the system $r(x,\lambda)=0$
+
+\noindent\textbf{Lagrangian} — function whose stationarity encodes the KKT conditions; introduces $\lambda$
+
+\noindent\textbf{Slack variables} — convert inequalities to equalities; lead to complementary slackness $\lambda s = 0$
+
+\noindent\textbf{SQP} — solves $r=0$ using Newton's method; each step inverts the Jacobian of $r$:
+\[
+  r(x,\lambda) = \begin{bmatrix} \nabla_x \mathcal{L} \\ g(x) \end{bmatrix}
+               = \begin{bmatrix} 2x_1-\lambda \\ 10x_2-\lambda \\ x_1+x_2-4 \end{bmatrix} = 0
+  \qquad
+  J = \frac{\partial r}{\partial(x_1,x_2,\lambda)}
+    = \begin{bmatrix} 2 & 0 & -1 \\ 0 & 10 & -1 \\ 1 & 1 & 0 \end{bmatrix}
+\]
+
+\noindent\textbf{BFGS} — quasi-Newton approximation of the Hessian of $\mathcal{L}$ when exact computation is too costly
+
+\end{minipage}
+
+\vspace{8pt}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\vspace{4pt}
+
+\noindent\textbf{Newton's method applied to KKT} (same example: $\min\ x_1^2+5x_2^2$ s.t.\ $x_1+x_2=4$, starting at $z_0=(0,0,0)$)
+
+\vspace{4pt}
+
+\noindent
+\begin{minipage}[t]{0.30\linewidth}
+
+\textbf{Step 1 — residual at $z_0$:}
+\[
+  r(z_0) = \begin{bmatrix} 2(0)-0 \\ 10(0)-0 \\ 0+0-4 \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \\ -4 \end{bmatrix}
+\]
+
+\textbf{Step 2 — Jacobian} (constant here since $r$ is linear):
+\[
+  J = \begin{bmatrix} 2 & 0 & -1 \\ 0 & 10 & -1 \\ 1 & 1 & 0 \end{bmatrix}
+\]
+
+\end{minipage}\hfill
+\begin{minipage}[t]{0.64\linewidth}
+
+\textbf{Step 3 — solve} $J\,\Delta z = -r(z_0)$:
+\[
+  \begin{bmatrix} 2 & 0 & -1 \\ 0 & 10 & -1 \\ 1 & 1 & 0 \end{bmatrix}
+  \begin{bmatrix} \Delta x_1 \\ \Delta x_2 \\ \Delta\lambda \end{bmatrix}
+  = \begin{bmatrix} 0 \\ 0 \\ 4 \end{bmatrix}
+\]
+
+Row 1: $2\Delta x_1 - \Delta\lambda = 0 \;\Rightarrow\; \Delta x_1 = \tfrac{\Delta\lambda}{2}$
+
+Row 2: $10\Delta x_2 - \Delta\lambda = 0 \;\Rightarrow\; \Delta x_2 = \tfrac{\Delta\lambda}{10}$
+
+Row 3: $\Delta x_1 + \Delta x_2 = 4 \;\Rightarrow\; \tfrac{\Delta\lambda}{2} + \tfrac{\Delta\lambda}{10} = 4 \;\Rightarrow\; 6\Delta\lambda = 40 \;\Rightarrow\; \Delta\lambda = \tfrac{20}{3}$
+
+\[
+  \Delta x_1 = \frac{10}{3} \qquad \Delta x_2 = \frac{2}{3}
+\]
+
+\textbf{Step 4 — update:} $z_1 = z_0 + \Delta z$
+\[
+  z_1 = \left(\frac{10}{3},\ \frac{2}{3},\ \frac{20}{3}\right) = x^* \quad \checkmark \quad \text{(one step: KKT system is linear)}
+\]
+
+\end{minipage}
+
+\end{document}

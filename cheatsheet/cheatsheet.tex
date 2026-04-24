@@ -1,0 +1,404 @@
+% !TEX TS-program = xelatex
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[a4paper, margin=15mm]{geometry}
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Heros}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multicol}
+\usepackage{xcolor}
+\usepackage{mdframed}
+\usepackage{parskip}
+
+% colours
+\definecolor{headbg}{RGB}{30,80,140}
+\definecolor{boxbg}{RGB}{235,242,252}
+\definecolor{notebg}{RGB}{255,248,220}
+
+% section heading style
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries\color{white}}{}{0pt}{}[{}]
+\titlespacing{\section}{0pt}{6pt}{4pt}
+\newcommand{\sectionbox}[1]{%
+  \begin{mdframed}[backgroundcolor=headbg, linewidth=0pt,
+    innertopmargin=4pt, innerbottommargin=4pt,
+    innerleftmargin=6pt, innerrightmargin=6pt]
+    \large\bfseries\color{white}#1
+  \end{mdframed}\vspace{2pt}
+}
+
+% algorithm step box
+\newenvironment{algbox}{%
+  \begin{mdframed}[backgroundcolor=boxbg, linewidth=0.6pt,
+    innertopmargin=6pt, innerbottommargin=6pt,
+    innerleftmargin=8pt, innerrightmargin=8pt]
+}{%
+  \end{mdframed}
+}
+
+% note box
+\newenvironment{notebox}{%
+  \begin{mdframed}[backgroundcolor=notebg, linewidth=0.6pt,
+    innertopmargin=4pt, innerbottommargin=4pt,
+    innerleftmargin=8pt, innerrightmargin=8pt]
+}{%
+  \end{mdframed}
+}
+
+\setlist[enumerate]{leftmargin=*, itemsep=2pt, topsep=2pt}
+\setlist[itemize]{leftmargin=*, itemsep=2pt, topsep=2pt}
+
+\title{\vspace{-12mm}\textbf{ENEL445 --- Test Revision Notes}\\
+  \large Weeks 1--6: Gradient Methods $\cdot$ LS/Ridge/LASSO $\cdot$ Constrained Optimisation $\cdot$ MPC $\cdot$ Nelder--Mead}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-8mm}
+
+% ============================================================
+\sectionbox{Notation Convention}
+
+\begin{tabular}{@{}ll@{}}
+$x_1, x_2, \ldots, x_n$ & components of the design variable vector (lowercase = dimension index) \\
+$X_0, X_1, X_2, \ldots, X_k$ & sequence of iterates (uppercase = iteration number) \\
+$\hat{X}_k$ & candidate point while $\alpha$ is still unknown \\
+$p_k$ & search direction at iteration $k$ \\
+$\alpha_k$ & step size at iteration $k$, found by line search \\
+$\phi(\alpha)$ & 1D slice of $f$ along the search line (line search function only) \\
+$\nabla f(X_k)$ & gradient of $f$ evaluated at iterate $X_k$ \\
+$H_f(X_k)$ & Hessian of $f$ evaluated at iterate $X_k$ \\
+\end{tabular}
+
+\vspace{4pt}
+\begin{notebox}
+\textbf{Key distinction:} ``objective function'' $= f(X)$. \quad
+$\phi(\alpha) = f(\hat{X}_k)$ is the \emph{line search function} --- a 1D slice of $f$ along the search direction.
+Once $\alpha$ is solved, $\hat{X}_k$ becomes the confirmed iterate $X_k$.
+\end{notebox}
+
+% ============================================================
+\vspace{4pt}
+\sectionbox{General Gradient-Based Update Rule}
+
+Every gradient-based method iterates:
+\[
+  X_k = X_{k-1} + \alpha_{k-1}\, p_{k-1}
+\]
+Methods differ \emph{only} in how $p_{k-1}$ is chosen.
+
+% ============================================================
+\vspace{4pt}
+\sectionbox{Optimality Conditions (Unconstrained)}
+
+\begin{tabular}{@{}lll@{}}
+\toprule
+Condition & Mathematical statement & Meaning \\
+\midrule
+1st-order necessary & $\nabla f(X^*) = 0$ & $f$ is flat at $X^*$ (stationary point) \\
+2nd-order necessary & $H_f(X^*)$ positive semi-definite & no downward curvature \\
+Sufficient (minimum) & $\nabla f(X^*) = 0$ \emph{and} $H_f(X^*)$ positive definite & confirmed strong minimum \\
+\bottomrule
+\end{tabular}
+
+\vspace{4pt}
+\begin{notebox}
+$\nabla f(X^*) = 0$ alone is not enough --- saddle points and maxima also satisfy it.
+Check the Hessian to confirm a minimum.
+
+\smallskip
+\textbf{Hessian sign summary:}
+positive definite $\to$ minimum;\quad
+negative definite $\to$ maximum;\quad
+indefinite (mixed eigenvalue signs) $\to$ saddle point.
+\end{notebox}
+
+% ============================================================
+\vspace{4pt}
+\sectionbox{Algorithm 1 — Steepest Descent}
+
+\textbf{Search direction:} $p_{k-1} = -\nabla f(X_{k-1})$
+
+\begin{algbox}
+\textbf{Given} $\min f(X)$ and starting point $X_0$. Repeat for $k = 1, 2, \ldots$
+
+\begin{enumerate}
+  \item Compute $\nabla f(X_{k-1})$ \hfill\textit{numeric vector}
+  \item Set $p_{k-1} = -\nabla f(X_{k-1})$ \hfill\textit{search direction}
+  \item $\hat{X}_k = X_{k-1} + \alpha\, p_{k-1}$ \hfill\textit{vector in terms of $\alpha$} \\[2pt]
+        e.g.\ $\hat{X}_1 = X_0 + \alpha\, p_0$
+  \item Substitute into $f$: \quad $\phi(\alpha) = f(\hat{X}_k)$
+  \item Solve $\dfrac{d\phi}{d\alpha} = 0$ for $\alpha_{k-1}$ \hfill\textit{exact line search}
+  \item Update: $X_k = X_{k-1} + \alpha_{k-1}\, p_{k-1}$ \hfill\textit{confirmed numeric point}
+\end{enumerate}
+\end{algbox}
+
+\begin{notebox}
+\textbf{Weakness:} each search direction is perpendicular to the previous one (exact line search forces
+$\nabla f(X_k)^T p_{k-1} = 0$). On ill-conditioned functions (elongated contours), this causes
+\emph{zigzagging} --- the algorithm overshoots across the valley on each step.
+The condition number of $H_f$ determines severity: larger ratio of max/min eigenvalue $\to$ worse zigzag.
+\end{notebox}
+
+% ============================================================
+\vspace{4pt}
+\sectionbox{Algorithm 2 --- Conjugate Gradient (Fletcher--Reeves)}
+
+\textbf{Search direction:} $p_{k-1} = -\nabla f(X_{k-1}) + \beta_{k-1}\, p_{k-2}$ \quad (for $k \geq 2$)
+
+\begin{algbox}
+\textbf{Given} $\min f(X)$ and starting point $X_0$.
+
+\medskip
+\textbf{Iteration 1} (identical to steepest descent, no previous direction):
+\begin{enumerate}
+  \item Compute $\nabla f(X_0)$
+  \item Set $\beta_0 = 0$, \quad $p_0 = -\nabla f(X_0)$
+  \item Form $\hat{X}_1 = X_0 + \alpha\, p_0$; \quad compute $\phi(\alpha) = f(\hat{X}_1)$
+  \item Solve $\dfrac{d\phi}{d\alpha} = 0$ for $\alpha_0$; \quad update $X_1 = X_0 + \alpha_0\, p_0$
+\end{enumerate}
+
+\medskip
+\textbf{Iteration $k \geq 2$} (conjugate correction applied):
+\begin{enumerate}
+  \item Compute $\nabla f(X_{k-1})$
+  \item Compute $\beta_{k-1}$ using \textbf{Fletcher--Reeves}:
+    \[
+      \beta_{k-1} = \frac{\nabla f(X_{k-1})^T\, \nabla f(X_{k-1})}{\nabla f(X_{k-2})^T\, \nabla f(X_{k-2})}
+    \]
+  \item Set $p_{k-1} = -\nabla f(X_{k-1}) + \beta_{k-1}\, p_{k-2}$ \hfill\textit{corrected direction}
+  \item Form $\hat{X}_k = X_{k-1} + \alpha\, p_{k-1}$; \quad compute $\phi(\alpha) = f(\hat{X}_k)$
+  \item Solve $\dfrac{d\phi}{d\alpha} = 0$ for $\alpha_{k-1}$; \quad update $X_k = X_{k-1} + \alpha_{k-1}\, p_{k-1}$
+\end{enumerate}
+\end{algbox}
+
+\begin{notebox}
+\textbf{Key property:} for an $n$-dimensional quadratic objective, conjugate gradient converges in
+\emph{exactly} $n$ iterations. Steepest descent has no such guarantee.
+
+\smallskip
+\textbf{Polak--Ribi\`ere alternative} for $\beta_{k-1}$:
+\[
+  \beta_{k-1} = \frac{\nabla f(X_{k-1})^T\bigl(\nabla f(X_{k-1}) - \nabla f(X_{k-2})\bigr)}
+                     {\nabla f(X_{k-2})^T\, \nabla f(X_{k-2})}
+\]
+If $\beta_{k-1} < 0$, set $\beta_{k-1} = 0$ (resets to steepest descent for that step).
+Polak--Ribi\`ere converges faster empirically on nonlinear problems.
+\end{notebox}
+
+% ============================================================
+\vspace{4pt}
+\sectionbox{Algorithm 3 --- Newton's Method}
+
+\textbf{Search direction:} $p_{k-1} = -H_f(X_{k-1})^{-1}\,\nabla f(X_{k-1})$
+
+\begin{algbox}
+\textbf{Given} $\min f(X)$ and starting point $X_0$. Repeat for $k = 1, 2, \ldots$
+
+\begin{enumerate}
+  \item Compute $\nabla f(X_{k-1})$ \hfill\textit{numeric vector}
+  \item Compute $H_f(X_{k-1})$ \hfill\textit{Hessian matrix}
+  \item Invert: $H_f(X_{k-1})^{-1}$ \hfill\textit{for $2\times2$: swap diagonal, negate off-diagonal, divide by det}
+  \item Set $p_{k-1} = -H_f(X_{k-1})^{-1}\,\nabla f(X_{k-1})$ \hfill\textit{Newton direction}
+  \item Try $\alpha = 1$: form $\hat{X}_k = X_{k-1} + p_{k-1}$\hfill\textit{pure Newton step}
+  \item If needed, line search: $\phi(\alpha) = f(\hat{X}_k)$; solve $d\phi/d\alpha = 0$ for $\alpha_{k-1}$
+  \item Update: $X_k = X_{k-1} + \alpha_{k-1}\, p_{k-1}$
+\end{enumerate}
+\end{algbox}
+
+\begin{notebox}
+\textbf{$2\times 2$ inverse:}\quad
+$\begin{bmatrix}a & b \\ c & d\end{bmatrix}^{-1}
+= \dfrac{1}{ad-bc}\begin{bmatrix}d & -b \\ -c & a\end{bmatrix}$
+
+\smallskip
+\textbf{Key property:} quadratic convergence near minimum --- converges in one step for a quadratic $f$.
+High cost per iteration (Hessian computation and inversion), but very few iterations needed.
+\end{notebox}
+
+% ============================================================
+\vspace{4pt}
+\sectionbox{Algorithm 4 --- BFGS (Quasi-Newton)}
+
+\textbf{Search direction:} $p_{k-1} = -\tilde{V}_{k-1}\,\nabla f(X_{k-1})$
+\quad where $\tilde{V}_{k-1} \approx H_f(X_{k-1})^{-1}$ is built iteratively
+
+\begin{algbox}
+\textbf{Initialise:} $\tilde{V}_0 = I$ (identity). Repeat for $k = 1, 2, \ldots$
+
+\begin{enumerate}
+  \item Compute $\nabla f(X_{k-1})$
+  \item Set $p_{k-1} = -\tilde{V}_{k-1}\,\nabla f(X_{k-1})$ \hfill\textit{quasi-Newton direction}
+  \item Form $\hat{X}_k = X_{k-1} + \alpha\, p_{k-1}$;\quad compute $\phi(\alpha) = f(\hat{X}_k)$
+  \item Solve $d\phi/d\alpha = 0$ for $\alpha_{k-1}$;\quad update $X_k = X_{k-1} + \alpha_{k-1}\, p_{k-1}$
+  \item Compute correction vectors:
+    \[s_{k-1} = X_k - X_{k-1}, \qquad y_{k-1} = \nabla f(X_k) - \nabla f(X_{k-1})\]
+  \item Compute scalar: $\sigma_{k-1} = \dfrac{1}{y_{k-1}^T s_{k-1}}$
+  \item Update inverse Hessian approximation:
+    \[\tilde{V}_k = \bigl(I - \sigma_{k-1}\,s_{k-1}\,y_{k-1}^T\bigr)\,\tilde{V}_{k-1}\,\bigl(I - \sigma_{k-1}\,y_{k-1}\,s_{k-1}^T\bigr) + \sigma_{k-1}\,s_{k-1}\,s_{k-1}^T\]
+\end{enumerate}
+\end{algbox}
+
+\begin{notebox}
+\textbf{Key property:} no Hessian computation required --- $\tilde{V}_k$ is built from gradient differences only.
+First iteration ($\tilde{V}_0 = I$) is identical to steepest descent.
+
+\smallskip
+\textbf{Memory:} stores one $n\times n$ matrix $\tilde{V}_k$ (or $\mathcal{O}(n^2)$ entries).
+L-BFGS variant stores only the last $m$ correction vectors ($\mathcal{O}(mn)$) for large-scale problems.
+\end{notebox}
+
+% ============================================================
+\vspace{4pt}
+\sectionbox{Comparison}
+
+\begin{tabular}{@{}llll@{}}
+\toprule
+Method & Direction $p_{k-1}$ & Memory & Weakness \\
+\midrule
+Steepest descent & $-\nabla f(X_{k-1})$ & None & Zigzags on ill-conditioned problems \\
+Conjugate gradient & $-\nabla f(X_{k-1}) + \beta_{k-1} p_{k-2}$ & One step back & Resets needed for nonlinear $f$ \\
+Newton & $-H_f(X_{k-1})^{-1}\nabla f(X_{k-1})$ & Full curvature & Requires Hessian computation \\
+BFGS & $-\tilde{V}_{k-1}\,\nabla f(X_{k-1})$ & Approx.\ inverse Hessian $\tilde{V}_{k-1}$ & No Hessian needed; $\tilde{V}_0=I$ \\
+\bottomrule
+\end{tabular}
+
+% ============================================================
+\vspace{4pt}
+\sectionbox{Mathematical Background}
+
+\begin{tabular}{@{}ll@{}}
+\toprule
+Concept & Formula \\
+\midrule
+Gradient & $\nabla f(X) = [\partial f/\partial x_1,\ \ldots,\ \partial f/\partial x_n]^T$ \\
+Hessian & $[H_f]_{ij} = \partial^2 f/\partial x_i\,\partial x_j$;\quad symmetric \\
+2nd-order Taylor & $f(X{+}p) \approx f(X) + \nabla f(X)^T p + \tfrac{1}{2}p^T H_f(X)\,p$ \\
+Convexity & $f$ convex $\Leftrightarrow H_f \succeq 0$ everywhere;\quad local min $=$ global min \\
+Numerical gradient & $\partial f/\partial x_i \approx [f(X + h\,e_i) - f(X)]/h$;\quad $h \approx 10^{-6}$ \\
+\bottomrule
+\end{tabular}
+
+% ============================================================
+\vspace{4pt}
+\sectionbox{Least Squares \& Regularisation}
+
+\textbf{Problem:} fit $A\theta \approx b$ where $A \in \mathbb{R}^{m\times n}$, $b \in \mathbb{R}^m$.
+
+\begin{tabular}{@{}lll@{}}
+\toprule
+Method & Objective & Solution \\
+\midrule
+Least squares & $\|A\theta - b\|_2^2$ & $\theta^* = (A^TA)^{-1}A^Tb$ \;(normal equations) \\
+Ridge ($L^2$) & $\|A\theta - b\|_2^2 + \lambda\|\theta\|_2^2$ & $\theta^* = (A^TA + \lambda I)^{-1}A^Tb$ \\
+LASSO ($L^1$) & $\|A\theta - b\|_2^2 + \lambda\|\theta\|_1$ & no closed form;\quad induces sparsity \\
+\bottomrule
+\end{tabular}
+
+\vspace{2pt}
+Ridge: $A^TA + \lambda I$ always invertible; shrinks all coefficients uniformly.\quad
+LASSO soft-threshold: $\mathrm{prox}_\lambda(z)=\mathrm{sign}(z)\max(|z|-\lambda,\,0)$.
+
+\vspace{2pt}
+\textbf{Majorization--Minimization (MM):} at iterate $\theta^k$, build surrogate
+$g(\theta,\theta^k) \geq f(\theta)$ with $g(\theta^k,\theta^k)=f(\theta^k)$; minimise $g$; repeat.
+Guarantees $f(\theta^{k+1})\le f(\theta^k)$. MM generalises EM and proximal gradient.
+
+% ============================================================
+\vspace{4pt}
+\sectionbox{Constrained Optimisation}
+
+\textbf{Standard form:}\quad
+$\displaystyle\min_X f(X)$\quad s.t.\quad
+$h_j(X)=0\ (j=1,\ldots,m)$,\quad
+$g_i(X)\le 0\ (i=1,\ldots,p)$
+
+\textbf{Lagrangian:}
+\[
+  \mathcal{L}(X,\lambda,\mu) = f(X) + \textstyle\sum_{j}\lambda_j h_j(X) + \textstyle\sum_{i}\mu_i g_i(X)
+\]
+
+\begin{notebox}
+\textbf{KKT Conditions} (necessary at local min $X^*$ under regularity; sufficient for convex problems):
+\begin{enumerate}
+  \item \textbf{Stationarity:} $\nabla_X \mathcal{L}(X^*,\lambda^*,\mu^*) = 0$
+  \item \textbf{Primal feasibility:} $h_j(X^*)=0\ \forall j$;\quad $g_i(X^*)\le 0\ \forall i$
+  \item \textbf{Dual feasibility:} $\mu_i^* \ge 0\ \forall i$
+  \item \textbf{Complementary slackness:} $\mu_i^*\,g_i(X^*)=0\ \forall i$
+    \hfill\textit{(inactive constraint $\Rightarrow \mu_i^*=0$)}
+\end{enumerate}
+\end{notebox}
+
+\begin{tabular}{@{}ll@{}}
+\textbf{Penalty method:} & add $\tfrac{c}{2}\sum_i\max(0,g_i)^2$; solve unconstrained; increase $c$ \\
+\textbf{Interior point:} & barrier $-\mu\sum_i\log(-g_i)$; stays strictly feasible; decrease $\mu\to 0$ \\
+\textbf{SQP:} & solve quadratic approximation to constrained problem at each iterate \\
+\end{tabular}
+
+\vspace{2pt}
+\textbf{Duality:} $q(\lambda,\mu)=\inf_X \mathcal{L}(X,\lambda,\mu)$;\quad dual problem $\max_{\lambda,\mu\ge 0}q$.\quad
+Weak duality: $q \le p^*$ always.\quad
+Strong duality (zero gap): convex $f,g$, affine $h$, Slater's condition ($\exists$ strictly feasible $X$).
+
+% ============================================================
+\vspace{4pt}
+\sectionbox{Optimal Control \& MPC}
+
+\textbf{Finite-horizon problem} (given $x_0$):
+\[
+  \min_{u_0,\ldots,u_{N-1}} \sum_{k=0}^{N-1} c(x_k,u_k) + V_f(x_N)
+  \quad\text{s.t.}\quad x_{k+1}=f(x_k,u_k),\; x_k\in\mathcal{X},\; u_k\in\mathcal{U}
+\]
+
+\textbf{Dynamic programming (backward induction):}
+\[
+  V_N(x) = V_f(x); \qquad
+  V_k(x) = \min_{u\in\mathcal{U}(x)}\bigl[c(x,u)+V_{k+1}(f(x,u))\bigr]
+\]
+MPC feedback law: $\mu_k(x) = \arg\min_u [c(x,u)+V_{k+1}(f(x,u))]$.\quad
+Bellman's principle: sub-sequences of an optimal sequence are optimal.
+
+\textbf{Receding horizon (MPC):} solve finite-horizon problem from current $x_k$; apply $u_0^*$ only; advance; repeat.
+
+\begin{tabular}{@{}ll@{}}
+Advantages & handles hard constraints; follows optimal trajectory; works well with short horizons \\
+Disadvantages & requires accurate model; computationally expensive; stability hard to prove \\
+\end{tabular}
+
+% ============================================================
+\vspace{4pt}
+\sectionbox{Nelder--Mead (Gradient-Free)}
+
+\textbf{Simplex:} $n{+}1$ vertices in $\mathbb{R}^n$. Order as $X^{(0)},\ldots,X^{(n)}$ with
+$f(X^{(0)})\le\cdots\le f(X^{(n)})$ (best to worst).
+
+\textbf{Centroid} (exclude worst): $\bar{X}=\tfrac{1}{n}\sum_{i=0}^{n-1}X^{(i)}$
+
+Standard parameters: $\alpha=1$ (reflect),\; $\gamma=2$ (expand),\; $\rho=\tfrac{1}{2}$ (contract),\; $\sigma=\tfrac{1}{2}$ (shrink).
+
+\begin{algbox}
+\textbf{Each iteration:} order, compute $\bar{X}$, reflect: $X_r = \bar{X}+\alpha(\bar{X}-X^{(n)})$
+\begin{enumerate}
+  \item $f(X^{(0)})\le f(X_r)<f(X^{(n-1)})$: replace $X^{(n)}\leftarrow X_r$. \textit{(accept reflection)}
+  \item $f(X_r)<f(X^{(0)})$: \textbf{expand} $X_e=\bar{X}+\gamma(X_r-\bar{X})$;\;
+        replace $X^{(n)}\leftarrow\arg\min(X_r,X_e)$.
+  \item $f(X^{(n-1)})\le f(X_r)<f(X^{(n)})$: \textbf{outer contract} $X_{oc}=\bar{X}+\rho(X_r-\bar{X})$;\;
+        if $f(X_{oc})\le f(X_r)$: $X^{(n)}\leftarrow X_{oc}$; else shrink.
+  \item $f(X_r)\ge f(X^{(n)})$: \textbf{inner contract} $X_{ic}=\bar{X}-\rho(\bar{X}-X^{(n)})$;\;
+        if $f(X_{ic})<f(X^{(n)})$: $X^{(n)}\leftarrow X_{ic}$; else shrink.
+  \item \textbf{Shrink} (last resort): $X^{(i)}\leftarrow X^{(0)}+\sigma(X^{(i)}-X^{(0)})$ for $i=1,\ldots,n$.
+\end{enumerate}
+\end{algbox}
+
+\begin{notebox}
+Nelder--Mead requires only function evaluations (zeroth-order / derivative-free).\quad
+Useful for noisy, discontinuous, or black-box $f$.\quad
+Local search only --- no global optimality guarantee.\quad
+KKT conditions do not apply (no smoothness required).
+\end{notebox}
+
+\end{document}

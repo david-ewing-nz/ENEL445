@@ -1,0 +1,381 @@
+% Exam practice Q&A — gradient-free methods, GA, PSO
+% Topics: when to use gradient-free; GA steps; elitism; binary vs real; PSO update
+
+\documentclass[11pt,a4paper]{article}
+\usepackage{amsmath, amssymb, geometry, enumitem, booktabs, parskip}
+\geometry{margin=2cm}
+\setlength{\parindent}{0pt}
+
+\newcommand{\Q}[2]{\subsection*{Q#1 \quad #2}}
+\newenvironment{answer}{\medskip\textbf{Answer.}\par}{\bigskip\hrule\bigskip}
+
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries ENEL445 Practice Q\&A}\\[4pt]
+  Gradient-Free Methods, Genetic Algorithms, Particle Swarm Optimisation\\[2pt]
+  {\small Sources: 2024 exam Q1(a,g); 2025 exam Q1(a,g,h,i); lecture T2-3}
+\end{center}
+
+\bigskip
+\hrule
+\bigskip
+
+%-----------------------------------------------------------------------
+\section*{Original Exam Questions}
+%-----------------------------------------------------------------------
+
+\Q{2024-1a}{[3 marks] When to use gradient-free methods}
+Give three situations where gradient-free methods are more suited than
+gradient-based methods for solving an optimisation problem.
+
+\begin{answer}
+\begin{enumerate}[leftmargin=*, label=\arabic{*}.]
+  \item \textbf{Non-differentiable or discontinuous objective.}
+    Gradient-based methods require at least $C^1$ continuity.
+    If $f$ has kinks, jumps, or is piecewise-defined, no gradient exists
+    and finite-difference approximations are unreliable.
+
+  \item \textbf{Black-box / simulation-based objective.}
+    When $f$ is evaluated by an external simulator (e.g.\ FEA, CFD),
+    no analytical expression is available so gradients cannot be computed.
+
+  \item \textbf{Noisy function evaluations.}
+    High-frequency noise corrupts finite-difference gradient estimates
+    (the signal is swamped by the noise in the difference quotient).
+    Gradient-free methods operate only on function values, which can be
+    averaged or filtered.
+
+  \item[\textit{(alt)}] \textbf{Highly multimodal landscape.}
+    Gradient-based methods converge to the nearest local minimum.
+    Gradient-free population-based methods (GA, PSO) explore the
+    space more globally and are more likely to locate a good optimum.
+
+  \item[\textit{(alt)}] \textbf{Mixed-integer or combinatorial design variables.}
+    Gradients are undefined for discrete variables; gradient-free
+    methods can handle integer or categorical genes directly.
+\end{enumerate}
+\textit{Any three of the above (with brief justification) earn full marks.}
+\end{answer}
+
+%-----------------------------------------------------------------------
+
+\Q{2024-1g}{[4 marks] GA steps; binary vs real-coded genes}
+Briefly explain the three main steps in a genetic algorithm and discuss
+the advantages and disadvantages of a binary-coded gene versus a
+real-coded gene.
+
+\begin{answer}
+\textbf{Three main steps (one GA iteration / generation):}
+\begin{enumerate}[leftmargin=*, label=\arabic{*}.]
+  \item \textbf{Selection.}
+    Chromosomes (design points) are chosen from the population to form
+    a mating pool.  Better (fitter) chromosomes have a higher probability
+    of being selected, mimicking natural selection.
+    Common methods: tournament selection, roulette-wheel selection.
+
+  \item \textbf{Crossover.}
+    Pairs of parent chromosomes in the mating pool are combined to
+    produce offspring, exchanging genetic material.
+    Binary: single-point crossover (split bit-string at random index $k$).
+    Real: linear crossover (offspring lie on the line joining the parents).
+
+  \item \textbf{Mutation.}
+    Random changes are applied to individual genes to introduce new
+    genetic information and maintain diversity.
+    Binary: flip a random bit.
+    Real: add a small random number to a gene.
+\end{enumerate}
+
+\textbf{Binary vs.\ real-coded comparison:}
+
+\begin{tabular}{@{}lll@{}}
+  \toprule
+  & \textbf{Binary-coded} & \textbf{Real-coded} \\
+  \midrule
+  Representation & Bit string (0/1) & Real number per gene \\
+  Crossover/mutation & Simple bit operations & Linear/arithmetic ops \\
+  Accuracy & Limited by bit length & Machine precision \\
+  Chromosome length & Longer & Shorter \\
+  Hamming cliff & Yes — adjacent reals & No \\
+  & differ by many bits & \\
+  \bottomrule
+\end{tabular}
+
+\medskip
+\textit{Hamming cliff}: e.g.\ $0111 \to 1000$ requires 4 bits to change for
+a unit increment, so mutation/crossover is less effective near optima.
+Real-coded avoids this and is generally preferred for continuous problems.
+\end{answer}
+
+%-----------------------------------------------------------------------
+
+\Q{2025-1a}{[2 marks] One problem suited to gradient-free methods}
+Name or define one optimisation problem for which gradient-free methods
+are suited to solve, and give one reason why this is the case.
+
+\begin{answer}
+\textbf{Example answer:}
+Aerodynamic shape optimisation where drag is evaluated by a CFD solver.
+The objective is a black-box simulation — no analytical expression exists,
+so gradients cannot be computed, making gradient-based methods inapplicable.
+
+\medskip
+\textit{Other acceptable examples:} antenna design (GA commonly used),
+combinatorial scheduling (integer variables), neural network hyper-parameter
+tuning (noisy/discrete), structural topology optimisation with mesh changes.
+\end{answer}
+
+%-----------------------------------------------------------------------
+
+\Q{2025-1g}{[1 mark] Elitism in a genetic algorithm}
+What is elitism in a genetic algorithm?
+
+\begin{answer}
+Elitism is the practice of automatically carrying the fittest chromosome
+(or the top $k$ chromosomes) from the current generation into the next,
+unchanged.  This guarantees the population never regresses — the best
+solution found so far is always retained.
+\end{answer}
+
+%-----------------------------------------------------------------------
+
+\Q{2025-1h}{[3 marks] PSO symbols}
+The update rule for the particle swarm algorithm is
+\begin{align*}
+  x^{(i)}_{k+1} &= x^{(i)}_k + v^{(i)}_{k+1}\,\Delta t \\
+  v^{(i)}_{k+1} &= \alpha\, v^{(i)}_k
+    + \beta\,\frac{x^{(i)}_\text{best} - x^{(i)}_k}{\Delta t}
+    + \gamma\,\frac{x_\text{best} - x^{(i)}_k}{\Delta t}
+\end{align*}
+What does $x^{(i)}_k$, $v^{(i)}_k$, $x^{(i)}_\text{best}$, and
+$x_\text{best}$ represent?  Define all symbols including $k$ and $i$.
+
+\begin{answer}
+\begin{itemize}[leftmargin=*]
+  \item $i$ — particle index; labels one member of the swarm.
+  \item $k$ — iteration (time-step) index.
+  \item $x^{(i)}_k$ — position of particle $i$ at iteration $k$
+        (a vector in the design space).
+  \item $v^{(i)}_k$ — velocity of particle $i$ at iteration $k$
+        (rate of change of position; units: design-space units / time).
+  \item $x^{(i)}_\text{best}$ — the best position ever visited by
+        particle $i$ itself (personal best / cognitive memory).
+  \item $x_\text{best}$ — the best position ever found by \emph{any}
+        particle in the entire swarm (global best / social influence).
+\end{itemize}
+
+\textbf{Velocity terms:}
+\begin{itemize}[leftmargin=*]
+  \item $\alpha\,v^{(i)}_k$ — inertia term; carries momentum from
+        the previous velocity.
+  \item $\beta(\ldots)$ — cognitive term; pulls particle toward its
+        own personal best.
+  \item $\gamma(\ldots)$ — social term; pulls particle toward the
+        swarm's global best.
+\end{itemize}
+\end{answer}
+
+%-----------------------------------------------------------------------
+
+\Q{2025-1i}{[3 marks] PSO graphical update}
+In Figure 3 (exam), draw the position of $x^{(i)}_{k+1}$ showing
+intermediate vectors.  Assume $\alpha = \beta = \gamma = 1$.
+
+\begin{answer}
+With $\alpha = \beta = \gamma = 1$ and $\Delta t = 1$, the velocity
+update simplifies to:
+\[
+  v^{(i)}_{k+1}
+    = v^{(i)}_k
+    + \bigl(x^{(i)}_\text{best} - x^{(i)}_k\bigr)
+    + \bigl(x_\text{best}        - x^{(i)}_k\bigr)
+\]
+and the new position is:
+\[
+  x^{(i)}_{k+1} = x^{(i)}_k + v^{(i)}_{k+1}
+\]
+
+\textbf{Construction (three vector additions from $x^{(i)}_k$):}
+\begin{enumerate}[leftmargin=*, label=Step \arabic{*}.]
+  \item Draw $v^{(i)}_k$ from $x^{(i)}_k$
+        (direction = $x^{(i)}_k - x^{(i)}_{k-1}$, since $v\Delta t$
+        is the displacement from the previous step).
+  \item Add the vector from $x^{(i)}_k$ toward $x^{(i)}_\text{best}$.
+  \item Add the vector from $x^{(i)}_k$ toward $x_\text{best}$.
+  \item The resultant sum gives $v^{(i)}_{k+1}$; adding this to
+        $x^{(i)}_k$ gives $x^{(i)}_{k+1}$.
+\end{enumerate}
+
+\textit{On the diagram: the new point lies roughly in the direction
+of both $x^{(i)}_\text{best}$ and $x_\text{best}$, offset by the
+inertia of the previous velocity.}
+\end{answer}
+
+%-----------------------------------------------------------------------
+\newpage
+\section*{Additional Practice Questions}
+%-----------------------------------------------------------------------
+
+\Q{P1}{[3 marks] Characteristics making gradient-based methods unsuitable}
+Give three characteristics of an optimisation problem that would make
+gradient-based methods unsuitable, and briefly explain why each
+characteristic causes a problem.
+
+\begin{answer}
+\begin{enumerate}[leftmargin=*, label=\arabic{*}.]
+  \item \textbf{Non-differentiability.}
+    Gradient methods require $\nabla f$ to exist.  Kinks or discontinuities
+    mean $\nabla f$ is undefined, so no descent direction can be computed.
+
+  \item \textbf{Expensive / unavailable derivatives.}
+    If $f$ is a black-box simulation, no analytic gradient exists.
+    Finite differences require $O(n)$ extra function evaluations per
+    iteration and can be inaccurate when $f$ is expensive or noisy.
+
+  \item \textbf{Many local minima (multimodality).}
+    Gradient descent converges to the nearest local minimum.
+    In a highly multimodal landscape this is likely to be a poor solution;
+    global exploration requires gradient-free population methods.
+\end{enumerate}
+\end{answer}
+
+%-----------------------------------------------------------------------
+
+\Q{P2}{[4 marks] GA steps and purpose of each}
+Briefly describe the three main operations in one iteration of a genetic
+algorithm.  For each operation, state its \emph{purpose}.
+
+\begin{answer}
+\begin{tabular}{@{}lll@{}}
+  \toprule
+  \textbf{Operation} & \textbf{What it does} & \textbf{Purpose} \\
+  \midrule
+  Selection & Chooses fitter individuals & Exploit good solutions; \\
+            & as parents (mating pool) & improve average fitness \\[4pt]
+  Crossover & Combines pairs of parents & Recombine existing \\
+            & to produce offspring & information; explore \\
+            &                      & new regions \\[4pt]
+  Mutation  & Randomly alters genes & Introduce new information; \\
+            & in offspring          & maintain diversity; \\
+            &                       & escape local optima \\
+  \bottomrule
+\end{tabular}
+\end{answer}
+
+%-----------------------------------------------------------------------
+
+\Q{P3}{[2 marks] Elitism — advantage and disadvantage}
+Explain what elitism is in a genetic algorithm and state one advantage
+and one potential disadvantage.
+
+\begin{answer}
+\textbf{Elitism}: the best chromosome(s) from the current generation are
+copied unchanged into the next generation.
+
+\medskip
+\textbf{Advantage:} The best solution found so far is never lost due to
+crossover or mutation, guaranteeing monotone improvement of the best fitness.
+
+\medskip
+\textbf{Disadvantage:} If elitism is too aggressive (too many elites),
+diversity in the population is reduced, which can cause premature convergence
+to a local optimum.
+\end{answer}
+
+%-----------------------------------------------------------------------
+
+\Q{P4}{[3 marks] Binary vs real-coded — precision argument}
+A GA is applied to $x \in [0,1]$ with required precision $10^{-6}$.
+Discuss whether binary or real-coded encoding is more appropriate.
+
+\begin{answer}
+For binary encoding with $m$ bits, the precision is $1/(2^m - 1)$.
+To achieve $10^{-6}$:
+\[
+  2^m \geq 10^6 + 1 \implies m \geq \log_2(10^6) \approx 19.9
+  \implies m = 20 \text{ bits per gene.}
+\]
+With, say, $n = 10$ design variables, each chromosome is 200 bits long.
+Crossover and mutation are fast (bit operations) but the Hamming cliff
+issue reduces search effectiveness near the optimum.
+
+Real-coded encoding uses a single floating-point number per gene
+(chromosome length = 10), gives machine-precision accuracy automatically,
+and has no Hamming cliff.  For a continuous problem with high required
+precision, \textbf{real-coded is preferred}.
+\end{answer}
+
+%-----------------------------------------------------------------------
+
+\Q{P5}{[4 marks] PSO velocity terms — effect of $\beta=0$ and $\gamma=0$}
+For the PSO velocity update, explain the role of each of the three terms.
+What happens to the swarm's behaviour if $\beta = 0$?  If $\gamma = 0$?
+
+\begin{answer}
+\begin{itemize}[leftmargin=*]
+  \item $\alpha\,v^{(i)}_k$ — \textbf{inertia}: particle tends to keep
+        moving in the same direction (momentum / exploration).
+  \item $\beta(x^{(i)}_\text{best} - x^{(i)}_k)/\Delta t$ —
+        \textbf{cognitive (personal best)}: attraction toward the particle's
+        own best-ever position (individual memory / local exploitation).
+  \item $\gamma(x_\text{best} - x^{(i)}_k)/\Delta t$ —
+        \textbf{social (global best)}: attraction toward the swarm's
+        best-ever position (collective knowledge / global exploitation).
+\end{itemize}
+
+$\beta = 0$: particles have no memory of their own personal best; they
+are only attracted to the global best.  The swarm converges more quickly
+but loses diversity, increasing the risk of getting stuck in a local optimum.
+
+$\gamma = 0$: particles ignore the global best; each explores independently
+based only on its own history and inertia.  The swarm loses coordination
+and may not converge efficiently.
+\end{answer}
+
+%-----------------------------------------------------------------------
+
+\Q{P6}{[3 marks] PSO numerical update}
+A particle is at $x^{(i)}_k = (2,\,3)$ with velocity displacement
+$v^{(i)}_k \Delta t = (1,\,-1)$.  Its personal best is
+$x^{(i)}_\text{best} = (3,\,4)$ and the global best is
+$x_\text{best} = (4,\,2)$.  With $\alpha = \beta = \gamma = 1$,
+$\Delta t = 1$, compute $v^{(i)}_{k+1}$ and $x^{(i)}_{k+1}$.
+
+\begin{answer}
+\[
+  v^{(i)}_{k+1}
+    = \alpha\,v^{(i)}_k
+    + \beta\,\frac{x^{(i)}_\text{best} - x^{(i)}_k}{\Delta t}
+    + \gamma\,\frac{x_\text{best} - x^{(i)}_k}{\Delta t}
+\]
+\[
+  = (1,-1) + \bigl((3,4)-(2,3)\bigr) + \bigl((4,2)-(2,3)\bigr)
+  = (1,-1) + (1,1) + (2,-1)
+  = (4,\,-1)
+\]
+\[
+  x^{(i)}_{k+1} = x^{(i)}_k + v^{(i)}_{k+1}\,\Delta t
+    = (2,3) + (4,-1) = \boxed{(6,\,2)}
+\]
+\end{answer}
+
+%-----------------------------------------------------------------------
+
+\Q{P7}{[2 marks] Real-world gradient-free example}
+Name a real-world engineering problem where gradient-free methods are
+necessary.  State what property makes gradient-based methods inapplicable.
+
+\begin{answer}
+\textbf{Example:} Optimising the geometry of a microwave antenna for
+maximum gain, where performance is evaluated by an electromagnetic
+simulation (e.g.\ FDTD or MoM solver).
+
+The objective is a \textbf{black-box} — the simulation returns only a
+scalar value with no gradient information.  Computing finite-difference
+gradients would require $O(n)$ additional full simulations per iteration,
+which is computationally prohibitive.  A GA operating on the gene-encoded
+antenna geometry is a standard practical approach.
+\end{answer}
+
+\end{document}

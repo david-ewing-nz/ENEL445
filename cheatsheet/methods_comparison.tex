@@ -1,0 +1,291 @@
+% !TEX TS-program = xelatex
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper, margin=20mm]{geometry}
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Heros}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{mdframed}
+\usepackage{graphicx}
+\usepackage{parskip}
+
+% colours
+\definecolor{headbg}{RGB}{30,80,140}
+\definecolor{boxbg}{RGB}{235,242,252}
+\definecolor{sdbg}{RGB}{232,240,255}
+\definecolor{newtbg}{RGB}{255,232,232}
+
+\usepackage{titlesec}
+\titlespacing{\section}{0pt}{8pt}{4pt}
+
+\newcommand{\sectionbox}[1]{%
+  \begin{mdframed}[backgroundcolor=headbg, linewidth=0pt,
+    innertopmargin=4pt, innerbottommargin=4pt,
+    innerleftmargin=8pt, innerrightmargin=8pt]
+    \large\bfseries\color{white}#1
+  \end{mdframed}\vspace{4pt}
+}
+
+\newenvironment{methodbox}[1]{%
+  \begin{mdframed}[backgroundcolor=#1, linewidth=0.5pt,
+    innertopmargin=6pt, innerbottommargin=6pt,
+    innerleftmargin=10pt, innerrightmargin=10pt]
+}{%
+  \end{mdframed}\vspace{4pt}
+}
+
+\title{\vspace{-12mm}\textbf{ENEL445 --- Gradient Methods Comparison}\\
+  \large $\min f(X) = x_1^2 + 5x_2^2$, \quad $X_0 = (3,\;1)^T$, \quad $X \in \mathbb{R}^2$}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-8mm}
+
+% shared quantities
+\sectionbox{Shared Quantities at $X_0$}
+
+\[
+  \nabla f(X_0) = \begin{bmatrix}2x_1\\10x_2\end{bmatrix}_{X_0}
+                = \begin{bmatrix}6\\10\end{bmatrix}
+  \qquad
+  H_f = \begin{bmatrix}2&0\\0&10\end{bmatrix}
+  \qquad
+  H_f^{-1} = \begin{bmatrix}\tfrac{1}{2}&0\\0&\tfrac{1}{10}\end{bmatrix}
+\]
+
+Every method iterates $X_k = X_{k-1} + \alpha_{k-1}\,p_{k-1}$.
+Methods differ only in how $p_{k-1}$ is chosen.
+
+% ------------------------------------------------------------
+\vspace{4pt}
+\sectionbox{Method 1 --- Steepest Descent}
+
+\begin{methodbox}{sdbg}
+\textbf{Direction:}\quad
+$\boxed{p_0 = -\nabla f(X_0) = \begin{bmatrix}-6\\-10\end{bmatrix}}$
+
+\medskip
+\textbf{Candidate point:}\quad
+$\hat{X}_1 = \begin{bmatrix}3\\1\end{bmatrix} + \alpha\begin{bmatrix}-6\\-10\end{bmatrix}
+           = \begin{bmatrix}3-6\alpha\\1-10\alpha\end{bmatrix}$
+
+\medskip
+\textbf{Line search:}\quad
+$\phi(\alpha) = (3-6\alpha)^2 + 5(1-10\alpha)^2 = 14 - 136\alpha + 536\alpha^2$
+\[
+  \frac{d\phi}{d\alpha} = -136 + 1072\alpha = 0
+  \quad\Rightarrow\quad \alpha_0 = \frac{136}{1072} \approx 0.1269
+\]
+
+\textbf{Result:}\quad
+$X_1 = \begin{bmatrix}3\\1\end{bmatrix} + 0.1269\begin{bmatrix}-6\\-10\end{bmatrix}
+      = \begin{bmatrix}2.239\\-0.269\end{bmatrix}$
+\end{methodbox}
+
+% ------------------------------------------------------------
+\sectionbox{Method 2 --- Conjugate Gradient (Fletcher--Reeves)}
+
+\begin{methodbox}{sdbg}
+\textbf{Iteration 1} ($\beta_0 = 0$, no previous direction --- identical to steepest descent):
+
+\medskip
+$\boxed{p_0 = -\nabla f(X_0) = \begin{bmatrix}-6\\-10\end{bmatrix}}$
+\quad Line search gives $\alpha_0 = \dfrac{136}{1072} \approx 0.1269$
+
+\medskip
+\textbf{Result:}\quad
+$X_1 = \begin{bmatrix}2.239\\-0.269\end{bmatrix}$
+
+\bigskip
+\textbf{Iteration 2} (conjugate correction applied):
+
+\medskip
+\textbf{Gradient at $X_1$:}\quad
+$\nabla f(X_1) = \begin{bmatrix}2\times2.239\\10\times(-0.269)\end{bmatrix} = \begin{bmatrix}4.478\\-2.687\end{bmatrix}$
+
+\medskip
+\textbf{Fletcher--Reeves $\beta_1$:}
+\[
+  \beta_1 = \frac{\nabla f(X_1)^T\,\nabla f(X_1)}{\nabla f(X_0)^T\,\nabla f(X_0)}
+          = \frac{4.478^2 + 2.687^2}{6^2 + 10^2}
+          = \frac{27.27}{136} = 0.2005
+\]
+
+\textbf{Conjugate direction:}
+\[
+  \boxed{p_1 = -\nabla f(X_1) + \beta_1\,p_0}
+  = \begin{bmatrix}-4.478\\2.687\end{bmatrix} + 0.2005\begin{bmatrix}-6\\-10\end{bmatrix}
+  = \begin{bmatrix}-5.681\\0.682\end{bmatrix}
+\]
+
+\textbf{Candidate point:}\quad
+$\hat{X}_2 = \begin{bmatrix}2.239 - 5.681\alpha\\-0.269 + 0.682\alpha\end{bmatrix}$
+
+\medskip
+\textbf{Line search:}\quad
+$\phi(\alpha) = 5.373 - 27.27\alpha + 34.59\alpha^2$
+\[
+  \frac{d\phi}{d\alpha} = -27.27 + 69.18\alpha = 0
+  \quad\Rightarrow\quad \alpha_1 = \frac{27.27}{69.18} = 0.3942
+\]
+
+\textbf{Result:}\quad
+$X_2 = \begin{bmatrix}2.239\\-0.269\end{bmatrix} + 0.3942\begin{bmatrix}-5.681\\0.682\end{bmatrix}
+      = \begin{bmatrix}0\\0\end{bmatrix}$
+\quad\textbf{exact minimum in 2 iterations} (= $n$, guaranteed for quadratic $f$)
+\end{methodbox}
+
+% ------------------------------------------------------------
+\sectionbox{Method 3 --- Newton's Method}
+
+\begin{methodbox}{newtbg}
+\textbf{Iteration 1:}
+
+\medskip
+\textbf{Hessian and inverse at $X_0$:}\quad
+$H_f = \begin{bmatrix}2&0\\0&10\end{bmatrix}$
+\quad\textit{(2×2 inverse: swap diagonal, negate off-diagonal, divide by det $= 20$)}
+\[
+  H_f^{-1} = \frac{1}{20}\begin{bmatrix}10&0\\0&2\end{bmatrix}
+            = \begin{bmatrix}\tfrac{1}{2}&0\\0&\tfrac{1}{10}\end{bmatrix}
+\]
+
+\textbf{Direction:}
+\[
+  \boxed{p_0 = -H_f(X_0)^{-1}\,\nabla f(X_0)}
+  = -\begin{bmatrix}\tfrac{1}{2}&0\\0&\tfrac{1}{10}\end{bmatrix}
+     \begin{bmatrix}6\\10\end{bmatrix}
+  = \begin{bmatrix}-3\\-1\end{bmatrix}
+\]
+
+\textbf{Candidate point:}\quad
+$\hat{X}_1 = X_0 + \alpha\,p_0
+           = \begin{bmatrix}3-3\alpha\\1-\alpha\end{bmatrix}$
+
+\medskip
+\textbf{Line search:}\quad
+$\phi(\alpha) = (3-3\alpha)^2 + 5(1-\alpha)^2 = 14 - 28\alpha + 14\alpha^2$
+\[
+  \frac{d\phi}{d\alpha} = -28 + 28\alpha = 0
+  \quad\Rightarrow\quad \alpha_0 = 1
+\]
+\textit{(Newton's method always gives $\alpha = 1$ for a quadratic objective --- no line search needed)}
+
+\medskip
+\textbf{Result:}\quad
+$X_1 = \begin{bmatrix}3\\1\end{bmatrix} + 1\cdot\begin{bmatrix}-3\\-1\end{bmatrix}
+      = \begin{bmatrix}0\\0\end{bmatrix}$
+\quad\textbf{exact minimum in one step} (guaranteed for quadratic $f$)
+\end{methodbox}
+
+% ------------------------------------------------------------
+\sectionbox{Method 4 --- BFGS (Quasi-Newton)}
+
+\begin{methodbox}{sdbg}
+\textbf{Iteration 1} ($\tilde{V}_0 = I$, initialised to identity --- identical to steepest descent):
+
+\medskip
+$\boxed{p_0 = -\tilde{V}_0\,\nabla f(X_0)} = -I\begin{bmatrix}6\\10\end{bmatrix} = \begin{bmatrix}-6\\-10\end{bmatrix}$
+\quad Line search: $\alpha_0 \approx 0.1269$
+
+\medskip
+\textbf{Result:}\quad $X_1 = (2.239,\;-0.269)^T$
+
+\bigskip
+\textbf{BFGS rank-2 update} (build better $\tilde{V}_1$ from curvature information):
+
+\medskip
+\textbf{Displacement and gradient change:}
+\[
+  s_0 = X_1 - X_0 = \begin{bmatrix}-0.761\\-1.269\end{bmatrix}
+  \qquad
+  y_0 = \nabla f(X_1) - \nabla f(X_0)
+      = \begin{bmatrix}4.478\\-2.687\end{bmatrix} - \begin{bmatrix}6\\10\end{bmatrix}
+      = \begin{bmatrix}-1.522\\-12.687\end{bmatrix}
+\]
+
+\textbf{Curvature scalar:}\quad
+$\sigma_0 = \dfrac{1}{y_0^T s_0} = \dfrac{1}{(-1.522)(-0.761)+(-12.687)(-1.269)} = \dfrac{1}{17.254} \approx 0.05796$
+
+\medskip
+\textbf{Rank-2 update formula:}
+\[
+  \boxed{\tilde{V}_1 = \bigl(I - \sigma_0\,s_0 y_0^T\bigr)\tilde{V}_0\bigl(I - \sigma_0\,y_0 s_0^T\bigr) + \sigma_0\,s_0 s_0^T}
+\]
+With $\tilde{V}_0 = I$, evaluating term by term:
+\[
+  \tilde{V}_1 \approx \begin{bmatrix}1.217 & -0.086\\-0.086 & 0.110\end{bmatrix}
+\]
+\textit{(satisfies secant condition $\tilde{V}_1 y_0 = s_0$; converges to $H_f^{-1}$ as iterations proceed)}
+
+\bigskip
+\textbf{Iteration 2:}
+
+\medskip
+\textbf{Direction:}
+\[
+  \boxed{p_1 = -\tilde{V}_1\,\nabla f(X_1)}
+  = -\begin{bmatrix}1.217 & -0.086\\-0.086 & 0.110\end{bmatrix}\begin{bmatrix}4.478\\-2.687\end{bmatrix}
+  = \begin{bmatrix}-5.681\\0.682\end{bmatrix}
+\]
+\textit{(same direction as CG --- for a 2D quadratic, BFGS and CG are equivalent conjugate direction methods)}
+
+\medskip
+\textbf{Candidate point:}\quad
+$\hat{X}_2 = \begin{bmatrix}2.239 - 5.681\alpha\\-0.269 + 0.682\alpha\end{bmatrix}$
+
+\medskip
+\textbf{Line search:}\quad
+$\phi(\alpha) = 5.375 - 27.285\alpha + 34.602\alpha^2$
+\[
+  \frac{d\phi}{d\alpha} = -27.285 + 69.204\alpha = 0
+  \quad\Rightarrow\quad \alpha_1 \approx 0.3942
+\]
+
+\textbf{Result:}\quad
+$X_2 = \begin{bmatrix}2.239\\-0.269\end{bmatrix} + 0.3942\begin{bmatrix}-5.681\\0.682\end{bmatrix}
+      = \begin{bmatrix}0\\0\end{bmatrix}$
+\quad\textbf{exact minimum in 2 iterations} (= $n$, same as CG)
+\end{methodbox}
+
+% ------------------------------------------------------------
+\vspace{4pt}
+\sectionbox{Summary}
+
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Method & Direction $p_0$ & $\alpha_0$ & $X_1$ & Notes \\
+\midrule
+Steepest descent & $-\nabla f(X_0)$ & 0.1269 & $(2.239,\,-0.269)^T$ & \\
+Conjugate gradient & $-\nabla f(X_0)+\beta_0 p_{-1}$ & 0.1269 & $(2.239,\,-0.269)^T$ & $\beta_0=0$ \\
+Newton & $-H_f^{-1}\nabla f(X_0)$ & 1 & $(0,\,0)^T$ & exact min \\
+BFGS & $-\tilde{V}_0\,\nabla f(X_0)$ & 0.1269 & $(2.239,\,-0.269)^T$ & $\tilde{V}_0=I$ \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+SD, CG, and BFGS all agree on iteration 1 because their direction formulas all reduce to
+$-\nabla f(X_0)$ at $k=0$.
+Newton uses $H_f^{-1}$ which accounts for the different curvature along $x_1$ and $x_2$,
+allowing it to reach the minimum in one step.
+
+% ------------------------------------------------------------
+\vspace{8pt}
+\sectionbox{Visualisation --- Iterates on Contour Plot}
+
+\begin{center}
+  \includegraphics[width=0.72\textwidth]{../figs/gradient_methods_comparison.png}
+\end{center}
+
+\vspace{2pt}
+Elliptical contours reflect the factor of 5 on $x_2^2$.
+The condition number of $H_f$ is $10/2 = 5$, causing the
+steepest descent step to overshoot across the valley.
+Newton corrects for this curvature exactly.
+
+\end{document}

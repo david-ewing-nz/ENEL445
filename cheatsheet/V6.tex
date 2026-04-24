@@ -1,0 +1,276 @@
+\documentclass[10pt,a3paper]{article}
+
+\usepackage[a3paper, left=20mm, right=60mm, top=15mm, bottom=15mm]{geometry}
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Heros}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{array}
+
+\setlength{\parskip}{2pt}
+\setlength{\abovedisplayskip}{4pt}
+\setlength{\belowdisplayskip}{4pt}
+\setlength{\abovedisplayshortskip}{2pt}
+\setlength{\belowdisplayshortskip}{2pt}
+\setlength{\extrarowheight}{2pt}
+
+\pagestyle{empty}
+
+% top-aligned ragged-right p column
+\newcolumntype{T}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\begin{document}
+
+\noindent
+\begin{tabular}{@{}T{0.46\linewidth}|T{0.46\linewidth}@{}}
+\hline
+\textbf{Newton on KKT} & \textbf{KKT Analytical} \\
+\hline\hline
+% row 1 — problem (both)
+$\min\ f(x)=x_1^2+5x_2^2$,\; s.t.\ $g(x)=4-x_1-x_2\leq 0$
+&
+$\min\ f(x)=x_1^2+5x_2^2$,\; s.t.\ $g(x)=x_1+x_2-4\leq 0$
+\\[3pt]\hline
+% row 2 — slack (KKT only)
+&
+\textbf{Slack:} $g(x)-s^2=0$,\; so $l(x,\lambda,s)=f(x)-\lambda(g(x)-s^2)$
+\\[3pt]\hline
+% row 3 — dl/ds (KKT only)
+&
+$\dfrac{\partial l}{\partial s}=2\lambda s=0 \;\Rightarrow\; \lambda=0$ (inactive) or $s=0$ (active)
+\\[3pt]\hline
+% row 4 — test (KKT only)
+&
+\textbf{Test:} $X_\text{unc}=(0,0)$;\; $g(X_\text{unc})=-4<0$ \quad $\therefore$ infeasible $\Rightarrow$ $\lambda\neq 0$
+\quad $\xRightarrow{2\lambda s=0}$ \quad $s=0$, constraint \textbf{active}
+\\[3pt]\hline
+% row 5 — Lagrangian (both)
+$l(x,\lambda)=x_1^2+5x_2^2-\lambda(x_1+x_2-4)$ \quad (same $l$, implicit in $\nabla_x l$)
+&
+$l(x,\lambda)=x_1^2+5x_2^2-\lambda(x_1+x_2-4)$ \quad (set $s=0$)
+\\[3pt]\hline
+% row 6 — r and J (both, first parallel)
+\begin{minipage}[t]{\linewidth}
+Assert $r(x,\lambda)=0$ and $J$; note $J=\begin{bmatrix}H_l & -\nabla_x g \\ \nabla_x g^\top & 0\end{bmatrix}$:
+\[
+  r = \begin{bmatrix} \nabla_x l \\ g(x) \end{bmatrix}
+    = \begin{bmatrix} 2x_1-\lambda \\ 10x_2-\lambda \\ x_1+x_2-4 \end{bmatrix}
+  \quad
+  J = \begin{bmatrix} 2&0&-1\\0&10&-1\\1&1&0 \end{bmatrix}
+\]
+\end{minipage}
+&
+\begin{minipage}[t]{\linewidth}
+Same $r$ and $J$ arrived at from $\nabla_x l=0$ and $g=0$:
+\[
+  r = \begin{bmatrix} \nabla_x l \\ g(x) \end{bmatrix}
+    = \begin{bmatrix} 2x_1-\lambda \\ 10x_2-\lambda \\ x_1+x_2-4 \end{bmatrix}
+  \quad
+  J = \begin{bmatrix} 2&0&-1\\0&10&-1\\1&1&0 \end{bmatrix}
+\]
+\end{minipage}
+\\\hline
+% row 7 — init (Newton only)
+\begin{minipage}[t]{\linewidth}
+\textbf{Init:} $z_0=(0,0,0)^\top$; evaluate $r$ at $z_0$:
+\[
+  r(z_0) = \begin{bmatrix}2x_1-\lambda\\10x_2-\lambda\\x_1+x_2-4\end{bmatrix}_{z_0=(0,0,0)}
+  = \begin{bmatrix}2(0)-0\\10(0)-0\\0+0-4\end{bmatrix}
+  = \begin{bmatrix}0\\0\\-4\end{bmatrix}
+\]
+\end{minipage}
+&
+{\footnotesize (no iterate — constraint known active from test above)}
+\\[3pt]\hline
+% row 8 — stationarity conditions (both, parallel)
+\begin{minipage}[t]{\linewidth}
+\textbf{Newton step:} $J\,\Delta z=-r(z_0)$, i.e.\ $-r(z_0)=(0,0,4)^\top$:
+\[
+  J\,\Delta z =
+  \begin{bmatrix}2&0&-1\\0&10&-1\\1&1&0\end{bmatrix}
+  \begin{bmatrix}\Delta x_1\\\Delta x_2\\\Delta\lambda\end{bmatrix}
+  =\begin{bmatrix}0\\0\\4\end{bmatrix}
+\]
+Row 1: $2\Delta x_1-\Delta\lambda=0 \;\Rightarrow\; \Delta x_1=\tfrac{\Delta\lambda}{2}$
+
+Row 2: $10\Delta x_2-\Delta\lambda=0 \;\Rightarrow\; \Delta x_2=\tfrac{\Delta\lambda}{10}$
+\end{minipage}
+&
+\begin{minipage}[t]{\linewidth}
+$\nabla_x l = H_f\,x - \lambda\,\nabla_x g = 0 \;\Rightarrow\; x^*(\lambda)=H_f^{-1}\lambda\,\nabla_x g$:
+\[
+  \begin{bmatrix} 2x_1-\lambda \\ 10x_2-\lambda \end{bmatrix} = 0
+  \;\Rightarrow\;
+  x^*(\lambda) = \begin{bmatrix} \lambda/2 \\ \lambda/10 \end{bmatrix}
+\]
+\end{minipage}
+\\\hline
+% row 9 — constraint substitution (both, parallel)
+Row 3: $\tfrac{\Delta\lambda}{2}+\tfrac{\Delta\lambda}{10}=4
+  \;\Rightarrow\; 6\Delta\lambda=40
+  \;\Rightarrow\; \Delta\lambda=\tfrac{20}{3}$
+&
+Sub $x^*(\lambda)$ into $g=0$:\;
+$\tfrac{\lambda}{2}+\tfrac{\lambda}{10}=4
+  \;\Rightarrow\; 10\lambda+2\lambda=80
+  \;\Rightarrow\; \lambda=\tfrac{20}{3}$
+\\[3pt]\hline
+% row 10 — solution values (both, parallel)
+$\Delta x_1=\dfrac{10}{3}$,\quad $\Delta x_2=\dfrac{2}{3}$;\quad
+$z_1=z_0+\Delta z=\!\left(\tfrac{10}{3},\,\tfrac{2}{3},\,\tfrac{20}{3}\right)$
+&
+$x^*=\!\left(\dfrac{10}{3},\,\dfrac{2}{3}\right)^\top$
+\\[3pt]\hline
+% row 11 — objective (both, parallel)
+$f(x^*)=\!\left(\tfrac{10}{3}\right)^2+5\!\left(\tfrac{2}{3}\right)^2
+  =\tfrac{100}{9}+\tfrac{20}{9}=\tfrac{40}{3}$
+&
+$f(x^*)=\!\left(\tfrac{10}{3}\right)^2+5\!\left(\tfrac{2}{3}\right)^2
+  =\tfrac{100}{9}+\tfrac{20}{9}=\tfrac{40}{3}$
+\\\hline
+\end{tabular}
+
+\vspace{8pt}
+
+ 
+
+\vspace{8pt}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\vspace{4pt}
+
+\noindent\textbf{Newton's method applied to KKT} (same example: $\min\ x_1^2+5x_2^2$ s.t.\ $x_1+x_2=4$, starting at $z_0=(0,0,0)$)
+
+\vspace{4pt}
+
+\noindent
+\begin{minipage}[t]{0.30\linewidth}
+
+\textbf{Step 1 — residual at $z_0$:}
+\[
+  r(z_0) = \begin{bmatrix} 2(0)-0 \\ 10(0)-0 \\ 0+0-4 \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \\ -4 \end{bmatrix}
+\]
+
+\textbf{Step 2 — Jacobian} (constant here since $r$ is linear):
+\[
+  J = \begin{bmatrix} 2 & 0 & -1 \\ 0 & 10 & -1 \\ 1 & 1 & 0 \end{bmatrix}
+\]
+
+\end{minipage}\hfill
+\begin{minipage}[t]{0.64\linewidth}
+
+\textbf{Step 3 — solve} $J\,\Delta z = -r(z_0)$:
+\[
+  \begin{bmatrix} 2 & 0 & -1 \\ 0 & 10 & -1 \\ 1 & 1 & 0 \end{bmatrix}
+  \begin{bmatrix} \Delta x_1 \\ \Delta x_2 \\ \Delta\lambda \end{bmatrix}
+  = \begin{bmatrix} 0 \\ 0 \\ 4 \end{bmatrix}
+\]
+
+Row 1: $2\Delta x_1 - \Delta\lambda = 0 \;\Rightarrow\; \Delta x_1 = \tfrac{\Delta\lambda}{2}$
+
+Row 2: $10\Delta x_2 - \Delta\lambda = 0 \;\Rightarrow\; \Delta x_2 = \tfrac{\Delta\lambda}{10}$
+
+Row 3: $\Delta x_1 + \Delta x_2 = 4 \;\Rightarrow\; \tfrac{\Delta\lambda}{2} + \tfrac{\Delta\lambda}{10} = 4 \;\Rightarrow\; 6\Delta\lambda = 40 \;\Rightarrow\; \Delta\lambda = \tfrac{20}{3}$
+
+\[
+  \Delta x_1 = \frac{10}{3} \qquad \Delta x_2 = \frac{2}{3}
+\]
+
+\textbf{Step 4 — update:} $z_1 = z_0 + \Delta z$
+\[
+  z_1 = \left(\frac{10}{3},\ \frac{2}{3},\ \frac{20}{3}\right) = x^* \quad \checkmark \quad \text{(one step: KKT system is linear)}
+\]
+
+\end{minipage}
+
+\vspace{8pt}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\vspace{4pt}
+
+\noindent
+\begin{minipage}[t]{0.46\linewidth}
+\textbf{Newton — unconstrained} \quad $p_0 = -H_f(X_0)^{-1}\nabla f(X_0)$
+
+$f(x_1,x_2)=x_1^2+5x_2^2$,\; $X_0=(3,1)^\top$
+
+\[
+  \nabla f(x) = \begin{bmatrix}2x_1\\10x_2\end{bmatrix}
+  \;\Rightarrow\;
+  \nabla f(X_0) = \begin{bmatrix}6\\10\end{bmatrix}
+\]
+
+\[
+  H_f = \begin{bmatrix}2&0\\0&10\end{bmatrix}
+  \;\Rightarrow\;
+  H_f^{-1} = \begin{bmatrix}\tfrac{1}{2}&0\\0&\tfrac{1}{10}\end{bmatrix}
+\]
+
+\[
+  p_0 = -\begin{bmatrix}\tfrac{1}{2}&0\\0&\tfrac{1}{10}\end{bmatrix}
+         \begin{bmatrix}6\\10\end{bmatrix}
+       = \begin{bmatrix}-3\\-1\end{bmatrix}
+\]
+
+\textbf{Line search:} $\hat{X}_1 = \begin{bmatrix}3-3\alpha\\1-\alpha\end{bmatrix}$
+
+\[
+  \phi(\alpha) = (3-3\alpha)^2+5(1-\alpha)^2 = 14-28\alpha+14\alpha^2
+\]
+
+\[
+  \frac{d\phi}{d\alpha}=-28+28\alpha=0 \;\Rightarrow\; \alpha_0=1
+\]
+
+\textbf{Update:} $ 
+  X_1 = \begin{bmatrix}3\\1\end{bmatrix}+1\cdot\begin{bmatrix}-3\\-1\end{bmatrix}
+      = \begin{bmatrix}0\\0\end{bmatrix}
+$
+
+$f(X_1)=0$ — one step, exact (quadratic $f$, $\alpha=1$ always)
+
+\end{minipage}\hfill
+\begin{minipage}[t]{0.46\linewidth}
+\textbf{BFGS — quasi-Newton} \quad $p_0 = -B_0^{-1}\nabla f(X_0)$,\; $B_0=I$
+
+$f(x_1,x_2)=x_1^2+5x_2^2$,\; $X_0=(3,1)^\top$
+
+\[
+  \nabla f(X_0) = \begin{bmatrix}6\\10\end{bmatrix}
+  \;\Rightarrow\;
+  p_0 = -I\begin{bmatrix}6\\10\end{bmatrix} = \begin{bmatrix}-6\\-10\end{bmatrix}
+\]
+
+\textbf{Line search:} $\hat{X}_1 = \begin{bmatrix}3-6\alpha\\1-10\alpha\end{bmatrix}$
+
+\[
+  \phi(\alpha) = (3-6\alpha)^2+5(1-10\alpha)^2 = 14-136\alpha+536\alpha^2
+\]
+
+\[
+  \frac{d\phi}{d\alpha}=-136+1072\alpha=0
+  \;\Rightarrow\; \alpha_0=\frac{136}{1072}\approx 0.1269
+\]
+
+\textbf{Update:}
+\[
+  X_1 = \begin{bmatrix}3\\1\end{bmatrix}+0.1269\begin{bmatrix}-6\\-10\end{bmatrix}
+      = \begin{bmatrix}2.239\\-0.269\end{bmatrix}
+\]
+
+\textbf{BFGS vectors} (for $B_1$ update):
+\[
+  s_0 = X_1-X_0 = \begin{bmatrix}-0.7614\\-1.269\end{bmatrix}
+\]
+\[
+  y_0 = \nabla f(X_1)-\nabla f(X_0)
+      = \begin{bmatrix}4.478\\-2.69\end{bmatrix}-\begin{bmatrix}6\\10\end{bmatrix}
+      = \begin{bmatrix}-1.522\\-12.689\end{bmatrix}
+\]
+
+$s_0,y_0$ feed the rank-2 update: $B_1 = B_0 - \dfrac{B_0 s_0 s_0^\top B_0}{s_0^\top B_0 s_0} + \dfrac{y_0 y_0^\top}{y_0^\top s_0}$
+
+\end{minipage}
+
+\end{document}

@@ -4,5 +4,26 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"chat.tools.autoApprove": true,
+		"latex-workshop.latex.recipe.default": "archive-xelatex",
+		"latex-workshop.latex.recipes": [
+			{
+				"name": "archive-xelatex",
+				"tools": ["archive-xelatex-tool"]
+			}
+		],
+		"latex-workshop.latex.tools": [
+			{
+				"name": "archive-xelatex-tool",
+				"command": "D:\\PowerShell\\7.6.0\\pwsh.exe",
+				"args": [
+					"-File",
+					"d:\\github\\ENEL445\\scripts\\run_and_archive_tex.ps1",
+					"-TexFilePath",
+					"%DOC%.tex"
+				]
+			}
+		]
+	}
 }
