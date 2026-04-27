@@ -1,0 +1,327 @@
+% X3.tex — exam cheatsheet: all topics
+% Based on X1 layout; content from cheatsheet.tex, V7.tex, and brainstorming images
+\documentclass[10pt]{article}
+
+\usepackage[a3paper, landscape, margin=5mm]{geometry}
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Heros}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+
+\setlength{\parskip}{2pt}
+\setlength{\parindent}{0pt}
+\setlength{\abovedisplayskip}{3pt}
+\setlength{\belowdisplayskip}{3pt}
+\setlength{\abovedisplayshortskip}{1pt}
+\setlength{\belowdisplayshortskip}{1pt}
+
+\pagestyle{empty}
+
+\newlength{\mpw}
+\setlength{\mpw}{0.245\textwidth}
+
+\begin{document}
+
+% ══════════════════════════════════════════════════════════════════════════════
+% PAGE 1 — gradient-free images + gradient descent images
+% ══════════════════════════════════════════════════════════════════════════════
+\noindent
+\begin{minipage}[t]{\mpw}\vspace{0pt}
+  \includegraphics[width=\linewidth]{../figs/nelder_mead_ops.png}\\[2pt]
+  \includegraphics[width=\linewidth]{../figs/partical-swarm-update.png}\\[2pt]
+  \includegraphics[width=\linewidth]{../figs/genetic_algorithm_diagram.png}
+\end{minipage}\hfill
+\begin{minipage}[t]{\mpw}\vspace{0pt}
+  \includegraphics[width=\linewidth]{../figs/gradient-desent-1.jpeg}
+\end{minipage}\hfill
+\begin{minipage}[t]{\mpw}\vspace{0pt}
+  \includegraphics[width=\linewidth]{../figs/gradient-desent-2.jpeg}
+\end{minipage}
+
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+% PAGE 2 — unconstrained methods
+% ══════════════════════════════════════════════════════════════════════════════
+
+\noindent
+\begin{minipage}[t]{0.49\textwidth}\vspace{0pt}
+  \textbf{Notation}
+
+  \begin{tabular}{@{}ll@{}}
+    $x_1, x_2, \ldots, x_n$ & components of design variable vector \\
+    $X_0, X_1, \ldots, X_k$ & sequence of iterates \\
+    $\hat{X}_k$              & candidate point ($\alpha$ still unknown) \\
+    $p_k$                    & search direction at iteration $k$ \\
+    $\alpha_k$               & step size at iteration $k$ (line search) \\
+    $\phi(\alpha)$           & $f(\hat{X}_k)$ — 1D slice along search line \\
+    $\nabla f(X_k)$          & gradient evaluated at $X_k$ \\
+    $H_f(X_k)$               & Hessian evaluated at $X_k$ \\
+  \end{tabular}
+
+  $X_k = X_{k-1} + \alpha_{k-1}\,p_{k-1}$ \quad — general update
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}\vspace{0pt}
+  \textbf{Optimality conditions (unconstrained)}
+
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    Condition & Statement & Meaning \\
+    \midrule
+    1st-order necessary & $\nabla f(X^*)=0$ & stationary point \\
+    2nd-order necessary & $H_f(X^*)\succeq0$ & no downward curvature \\
+    Sufficient (min)    & $\nabla f=0$ and $H_f\succ0$ & confirmed minimum \\
+    \bottomrule
+  \end{tabular}
+
+  \smallskip
+  $H_f\succ0$ = min;\quad $H_f\prec0$ = max;\quad indefinite = saddle.
+\end{minipage}
+
+\vspace{3pt}\hrule\vspace{3pt}
+
+\noindent
+\begin{minipage}[t]{\mpw}\vspace{0pt}
+  \textbf{Steepest descent}\quad $p_{k-1}=-\nabla f(X_{k-1})$
+  \begin{enumerate}\setlength\itemsep{1pt}\setlength\topsep{2pt}
+    \item $\nabla f(X_{k-1})$
+    \item $p_{k-1}=-\nabla f$
+    \item $\hat{X}_k=X_{k-1}+\alpha p_{k-1}$
+    \item $\phi(\alpha)=f(\hat{X}_k)$
+    \item solve $d\phi/d\alpha=0$ for $\alpha_{k-1}$
+    \item $X_k=X_{k-1}+\alpha_{k-1}p_{k-1}$
+  \end{enumerate}
+  Weakness: $p_k\perp p_{k-1}$ (exact line search) $\Rightarrow$ zigzagging. Severity $\propto$ cond($H_f$).
+\end{minipage}\hfill
+\begin{minipage}[t]{\mpw}\vspace{0pt}
+  \textbf{Conjugate gradient (FR)}\quad $p_{k-1}=-\nabla f+\beta_{k-1}p_{k-2}$
+
+  Iter 1: $\beta_0=0$ (= SD).\quad Iter $k\ge2$:
+  \[
+    \beta_{k-1}=\frac{\|\nabla f(X_{k-1})\|^2}{\|\nabla f(X_{k-2})\|^2}
+  \]
+  Converges in $n$ steps (quadratic $f$).
+
+  Polak--Ribi\`ere ($g_k=\nabla f(X_{k-1})$):
+  \[
+    \beta_{k-1}=\frac{g_k^\top(g_k-g_{k-1})}{\|g_{k-1}\|^2}
+  \]
+  If $\beta<0$, set $\beta=0$.
+\end{minipage}\hfill
+\begin{minipage}[t]{\mpw}\vspace{0pt}
+  \textbf{Newton's method}\quad $p_{k-1}=-H_f^{-1}\nabla f$
+  \begin{enumerate}\setlength\itemsep{1pt}\setlength\topsep{2pt}
+    \item $\nabla f(X_{k-1})$
+    \item $H_f(X_{k-1})$, invert
+    \item $p_{k-1}=-H_f^{-1}\nabla f$
+    \item try $\alpha=1$: $\hat{X}_k=X_{k-1}+p_{k-1}$
+    \item line search if needed
+    \item $X_k=X_{k-1}+\alpha_{k-1}p_{k-1}$
+  \end{enumerate}
+  $\begin{bmatrix}a&b\\c&d\end{bmatrix}^{-1}=\frac{1}{ad-bc}\begin{bmatrix}d&-b\\-c&a\end{bmatrix}$
+
+  \smallskip
+  \textbf{Worked:} $f=x_1^2+5x_2^2$, $X_0=(3,1)^\top$
+  \[
+    \nabla f(X_0)=\begin{bmatrix}6\\10\end{bmatrix},\quad
+    H_f^{-1}=\begin{bmatrix}\tfrac{1}{2}&0\\0&\tfrac{1}{10}\end{bmatrix}
+  \]
+  $p_0=-({\tfrac{1}{2}}\cdot6,\,{\tfrac{1}{10}}\cdot10)^\top=(-3,-1)^\top$
+
+  $\hat{X}_1=(3-3\alpha,\,1-\alpha)^\top$
+
+  $\phi(\alpha)=14-28\alpha+14\alpha^2$;\; $\alpha_0=1$
+
+  $X_1=(0,0)^\top$,\; $f(X_1)=0$ — one step exact
+\end{minipage}\hfill
+\begin{minipage}[t]{\mpw}\vspace{0pt}
+  \textbf{BFGS}\quad $p_{k-1}=-\tilde{V}_{k-1}\nabla f$,\; $\tilde{V}_0=I$
+  \begin{enumerate}\setlength\itemsep{1pt}\setlength\topsep{2pt}
+    \item $p=-\tilde{V}_{k-1}\nabla f$;\; l.s.\ $\to\alpha_{k-1}$;\; $X_k=X_{k-1}+\alpha p$
+    \item $s=X_k-X_{k-1}$,\; $y=\nabla f(X_k)-\nabla f(X_{k-1})$,\; $\sigma=1/(y^\top s)$
+    \item $\tilde{V}_k=(I{-}\sigma sy^\top)\tilde{V}_{k-1}(I{-}\sigma ys^\top)+\sigma ss^\top$
+  \end{enumerate}
+  Iter 1 ($\tilde{V}_0=I$): same as SD.
+
+  \smallskip
+  \textbf{Worked:} $X_0=(3,1)^\top$, $\nabla f_0=(6,10)^\top$
+
+  $\alpha_0\approx0.127$;\; $X_1=(2.24,-0.27)^\top$
+
+  $s_0=(-0.76,-1.27)^\top$;\; $y_0=(-1.52,-12.69)^\top$
+
+  \medskip\hrule\smallskip
+  \textbf{Comparison}
+
+  \begin{tabular}{@{}ll@{}}
+    \toprule
+    Method & Direction $p_{k-1}$ \\
+    \midrule
+    SD   & $-\nabla f$ \\
+    CG   & $-\nabla f+\beta p_{k-2}$ \\
+    Newton & $-H_f^{-1}\nabla f$ \\
+    BFGS & $-\tilde{V}_{k-1}\nabla f$ \\
+    \bottomrule
+  \end{tabular}
+\end{minipage}
+
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+% PAGE 3 — constrained optimisation
+% ══════════════════════════════════════════════════════════════════════════════
+
+\noindent
+\begin{minipage}[t]{0.49\textwidth}\vspace{0pt}
+
+  \textbf{Constrained standard form:}
+  $\min f(X)$ s.t.\ $h_j(X)=0$,\; $g_i(X)\le0$
+
+  \textbf{Lagrangian:}
+  $\mathcal{L}=f(X)+\sum_j\lambda_j h_j+\sum_i\mu_i g_i$
+
+  \medskip
+  \textbf{KKT conditions} (necessary; sufficient for convex):
+  \begin{enumerate}\setlength\itemsep{0pt}
+    \item Stationarity: $\nabla_X\mathcal{L}=0$
+    \item Primal feasibility: $h_j(X^*)=0$,\; $g_i(X^*)\le0$
+    \item Dual feasibility: $\mu_i^*\ge0$
+    \item Complementary slackness: $\mu_i^*\,g_i(X^*)=0$\newline (inactive constraint $\Rightarrow\mu_i^*=0$)
+  \end{enumerate}
+
+  \medskip\hrule\medskip
+
+  \textbf{KKT analytical}\quad $\min x_1^2+5x_2^2$ s.t.\ $x_1+x_2\ge4$
+
+  Rewrite: $g=4-x_1-x_2\le0$.\quad
+  Test $X_\text{unc}=(0,0)$: $g=4>0$ — infeasible $\Rightarrow$ active.
+
+  $l=x_1^2+5x_2^2-\lambda(x_1+x_2-4)$
+
+  $\partial l/\partial x_1=2x_1-\lambda=0 \;\Rightarrow\; x_1=\lambda/2$
+
+  $\partial l/\partial x_2=10x_2-\lambda=0 \;\Rightarrow\; x_2=\lambda/10$
+
+  Sub into $x_1+x_2=4$: $\;\lambda/2+\lambda/10=4\;\Rightarrow\;\lambda=20/3$
+
+  $x^*=(10/3,\;2/3)^\top$,\quad $f^*=40/3$
+
+  \medskip
+  Residual and Jacobian (shared with Newton on KKT):
+  \[
+    r=\begin{bmatrix}2x_1-\lambda\\10x_2-\lambda\\x_1+x_2-4\end{bmatrix}
+    \qquad
+    J=\begin{bmatrix}2&0&-1\\0&10&-1\\1&1&0\end{bmatrix}
+  \]
+
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}\vspace{0pt}
+
+  \textbf{Newton on KKT}\quad init $z_0=(0,0,0)^\top$
+
+  $r(z_0)=(0,0,-4)^\top$;\quad solve $J\,\Delta z=-r(z_0)=(0,0,4)^\top$:
+
+  Row 1: $\Delta x_1=\Delta\lambda/2$\quad
+  Row 2: $\Delta x_2=\Delta\lambda/10$
+
+  Row 3: $\tfrac{\Delta\lambda}{2}+\tfrac{\Delta\lambda}{10}=4
+    \;\Rightarrow\;6\Delta\lambda=40\;\Rightarrow\;\Delta\lambda=20/3$
+
+  $\Delta x_1=10/3$,\; $\Delta x_2=2/3$
+
+  $z_1=z_0+\Delta z=(10/3,\;2/3,\;20/3)=x^*$
+
+  (one step — KKT system is linear here)
+
+  \medskip\hrule\medskip
+
+  \textbf{Penalty method}\quad $\min x_1^2+5x_2^2+\tfrac{c}{2}(x_1+x_2-4)^2$
+
+  $\partial/\partial x_1$: $2x_1+c(x_1+x_2-4)=0$
+
+  $\partial/\partial x_2$: $10x_2+c(x_1+x_2-4)=0$
+
+  $\Rightarrow x_1=5x_2$;\quad as $c\to\infty$: $x^*\to(10/3,\;2/3)$
+
+  Each $c$ gives an unconstrained subproblem.
+
+  \medskip\hrule\medskip
+
+  \begin{tabular}{@{}lp{0.68\linewidth}@{}}
+    \textbf{Penalty:} & $+\tfrac{c}{2}\sum\max(0,g_i)^2$; increase $c$ \\[2pt]
+    \textbf{Int.\ pt.:} & barrier $-\mu\sum\log(-g_i)$; decrease $\mu\to0$ \\[2pt]
+    \textbf{SQP:} & QP subproblem at each iterate (Newton on KKT) \\
+  \end{tabular}
+
+\end{minipage}
+
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+% PAGE 4 — LP classification + MPC + LP standard form image
+% ══════════════════════════════════════════════════════════════════════════════
+
+\noindent
+\begin{minipage}[t]{0.48\textwidth}
+
+\textbf{LP standard form:}\quad $\min c^\top x$ s.t.\ $Ax=b$,\; $x\ge0$
+
+Four steps to convert:
+\begin{enumerate}\setlength\itemsep{0pt}
+  \item \textbf{Objective:} if max, negate
+  \item \textbf{Free variable:} $x=x^+-x^-$,\; $x^+,x^-\ge0$
+  \item \textbf{$\le$ constraint:} add slack $s\ge0$
+  \item \textbf{$\ge$ constraint:} subtract surplus $s\ge0$
+\end{enumerate}
+
+\includegraphics[width=\linewidth]{../figs/standrd-lp-form.png}
+
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\textwidth}
+
+\textbf{Problem classification:}
+
+\begin{tabular}{@{}ll@{}}
+\toprule
+Type & Key feature \\
+\midrule
+LP & $f$ and all constraints linear \\
+QP & $f$ quadratic, constraints linear \\
+NLP & nonlinear $f$ or constraints \\
+Convex & $f$ convex, feasible set convex \\
+Non-convex & multiple local minima possible \\
+Unconstrained & no $h,g$ \\
+Equality constrained & $h_j=0$ only \\
+Inequality constrained & $g_i\le0$ included \\
+\bottomrule
+\end{tabular}
+
+\medskip
+
+\textbf{MPC — receding horizon control:}
+
+Finite-horizon problem at each step $k$:
+\[
+  \min_{u_0,\ldots,u_{N-1}} \sum_{t=0}^{N-1} c(x_t,u_t)+V_f(x_N)
+\]
+s.t.\quad $x_{t+1}=f(x_t,u_t)$,\; $x_t\in\mathcal{X}$,\; $u_t\in\mathcal{U}$
+
+Apply $u_0^*$ only; advance; repeat.
+
+\medskip
+\textbf{Dynamic programming:}\quad $V_N=V_f(x)$;\quad
+$V_k(x)=\min_u[c(x,u)+V_{k+1}(f(x,u))]$
+
+Bellman: sub-sequences of an optimal sequence are optimal.
+
+\medskip
+\begin{tabular}{@{}lp{0.55\textwidth}@{}}
+Adv: & hard constraints; optimal traj; short horizons \\
+Disadv: & needs model; computationally expensive; stability hard \\
+\end{tabular}
+
+\end{minipage}
+
+\end{document}

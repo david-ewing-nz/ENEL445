@@ -52,13 +52,15 @@ if ((Test-Path $localFigs) -and ($localFigs -ne $rootFigs)) {
 }
 
 # -- compile with xelatex (twice for cross-references and ToC)
+# compile inside the archive tex folder to keep all artefacts out of the source folder
+$archiveTexFile = Join-Path $archiveTex "$texBase.tex"
 Write-Host ""
 Write-Host "Compiling: $texBase (pass 1)..."
-Push-Location $texDir
+Push-Location $archiveTex
 try {
-    xelatex -interaction=nonstopmode "$texFile"
+    xelatex -interaction=nonstopmode "$archiveTexFile"
     Write-Host "Compiling: $texBase (pass 2)..."
-    xelatex -interaction=nonstopmode "$texFile"
+    xelatex -interaction=nonstopmode "$archiveTexFile"
 }
 finally {
     Pop-Location
@@ -66,20 +68,18 @@ finally {
 
 Write-Host ""
 
-# -- copy PDF to archive and results
-$pdfOut = Join-Path $texDir "$texBase.pdf"
+# -- copy PDF to results
+$pdfOut = Join-Path $archiveTex "$texBase.pdf"
 if (Test-Path $pdfOut) {
-    Copy-Item $pdfOut $archiveTex  -Force
-    Copy-Item $pdfOut $resultsPDF  -Force
+    Copy-Item $pdfOut $resultsPDF -Force
     Write-Host "PDF -> $resultsPDF"
 } else {
     Write-Host "No PDF generated - check compile log for errors"
 }
 
-# -- copy HTML to archive and results (if generated)
-$htmlOut = Join-Path $texDir "$texBase.html"
+# -- copy HTML to results (if generated)
+$htmlOut = Join-Path $archiveTex "$texBase.html"
 if (Test-Path $htmlOut) {
-    Copy-Item $htmlOut $archiveTex  -Force
     Copy-Item $htmlOut $resultsHTML -Force
     Write-Host "HTML -> $resultsHTML"
 }

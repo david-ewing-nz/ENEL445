@@ -1,0 +1,537 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[a4paper, left=20mm, right=20mm, top=15mm, bottom=15mm]{geometry}
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Heros}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{array,booktabs}
+\usepackage{enumitem}
+
+\setlength{\parskip}{3pt}
+\setlength{\parindent}{0pt}
+\setlength{\abovedisplayskip}{4pt}
+\setlength{\belowdisplayskip}{4pt}
+\setlength{\abovedisplayshortskip}{2pt}
+\setlength{\belowdisplayshortskip}{2pt}
+
+\pagestyle{plain}
+
+\newcommand{\sectitle}[1]{%
+  \vspace{8pt}\noindent\rule{\linewidth}{0.8pt}\par\vspace{2pt}%
+  {\large\textbf{#1}}\par\vspace{2pt}\rule{\linewidth}{0.4pt}\vspace{4pt}}
+
+\newcommand{\Sol}{\par\vspace{4pt}\noindent\textbf{Solution:}\enspace}
+
+\begin{document}
+
+\begin{center}
+  {\large\textbf{ENEL445 Mock Test --- Questions \& Solutions}}\\[2pt]
+  {\small Based on 2024 mid-year exam and 2025 mid-year exam. Questions and mark
+  allocations taken directly from past papers.}
+\end{center}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+% ==============================================================
+\sectitle{Q1. Gradient-Free Optimisation (Part I)}
+% ==============================================================
+
+\noindent\textbf{(a)} [3 marks]\quad Give three situations where gradient-free methods are more suited than gradient-based methods for solving an optimisation problem.
+
+\Sol
+\begin{enumerate}[noitemsep, topsep=2pt]
+  \item \textbf{Non-differentiable or discontinuous} objective --- gradient does
+        not exist or is unreliable (e.g.\ simulation outputs, physical
+        experiments, $|x|$ at $x=0$).
+  \item \textbf{Black-box function} --- no analytical expression is available;
+        only function evaluations are possible (e.g.\ legacy simulation code,
+        hardware-in-the-loop testing).
+  \item \textbf{Noisy function evaluations} --- gradient estimates are corrupted
+        by noise, making gradient-based methods unreliable or divergent.
+\end{enumerate}
+
+\vspace{4pt}
+\noindent\textbf{(b)} [2 marks]\quad Describe (or sketch) the Nelder-Mead
+\textit{expansion} operation.
+
+\Sol The worst vertex $x_w$ is reflected through the centroid $\bar{x}$ of the
+remaining vertices:
+\[
+  x_r = \bar{x} + (\bar{x} - x_w) \quad\text{(reflection)}.
+\]
+Expansion then extends further:
+\[
+  x_e = \bar{x} + 2(\bar{x} - x_w).
+\]
+If $f(x_e) < f(x_r)$, accept $x_e$; otherwise accept $x_r$. On a contour plot
+$x_e$ lies on the opposite side of $\bar{x}$ from $x_w$, twice as far as the
+reflection point.
+
+\vspace{4pt}
+\noindent\textbf{(c)} [3 marks]\quad Name three convergence metrics used with
+Nelder-Mead.
+
+\Sol
+\begin{enumerate}[noitemsep, topsep=2pt]
+  \item \textbf{Simplex size}: $\max_i \|x_i - x_1\|_2 < \varepsilon$
+  \item \textbf{Function value spread}: $\max_i |f(x_i) - f(x_1)| < \varepsilon$
+  \item \textbf{Iteration / evaluation limit}: $k > k_{\max}$ or number of
+        function evaluations exceeds $N_{\max}$
+\end{enumerate}
+
+\vspace{4pt}
+\noindent\textbf{(d)} [2 marks]\quad Sketch a minimal positive spanning set in
+$\mathbb{R}^2$ \textbf{and} state the process of opportunistic polling in the
+generalised pattern search algorithm.
+
+\Sol A minimal positive spanning set in $\mathbb{R}^2$ requires $n+1=3$ vectors.
+Example: $\{e_1,\, e_2,\, -e_1-e_2\}$ where $e_1=(1,0)^\top$,
+$e_2=(0,1)^\top$. These span all of $\mathbb{R}^2$ in the positive sense.
+
+\textbf{Opportunistic polling:} poll directions are evaluated one at a time in a
+preferred order. As soon as one direction yields $f < f_{\text{current}}$, the
+algorithm immediately accepts that point and starts a new iteration --- it does
+\emph{not} evaluate all remaining directions in the pattern.
+
+\vspace{4pt}
+\noindent\textbf{(e)} [3 marks]\quad State the two significant shortcomings of
+Shubert's algorithm and briefly explain how DIRECT addresses them.
+
+\Sol
+\textbf{Shubert shortcomings:}
+\begin{enumerate}[noitemsep, topsep=2pt]
+  \item Requires the global Lipschitz constant $K$ to be known in advance ---
+        which is generally unknown in practice.
+  \item Only applicable to \emph{one-dimensional} problems.
+\end{enumerate}
+
+\textbf{DIRECT addresses both:}
+\begin{enumerate}[noitemsep, topsep=2pt]
+  \item Estimates local Lipschitz constants implicitly per hyper-rectangle by
+        using the $f$-$d$ plot --- no global $K$ is needed.
+  \item Generalises to $n$ dimensions by partitioning $n$-dimensional
+        hyper-rectangles.
+\end{enumerate}
+
+\vspace{4pt}
+\noindent\textbf{(f)} [3 marks]\quad On the $f$-$d$ plot, identify which
+rectangles DIRECT subdivides next when $\varepsilon|f_{\min}|=3$.
+
+\Sol DIRECT selects all rectangles whose sample point $(d_i, f(c_i))$ lies on
+the \emph{lower-right convex hull} of the $f$-$d$ scatter and satisfies:
+\[
+  f(c_i) - K d_i \leq f_{\min} - \varepsilon|f_{\min}| \quad \text{for some } K > 0.
+\]
+With $\varepsilon|f_{\min}|=3$, points are eligible only if their value is within
+3 of $f_{\min}$ after accounting for the hull slope. On the plot: circle all
+points on the lower-right convex hull (points not dominated below-right by any
+other point).
+
+\vspace{4pt}
+\noindent\textbf{(g)} [4 marks]\quad Briefly explain the three main steps in a
+genetic algorithm and discuss the advantages and disadvantages of a binary-coded
+gene versus a real-coded gene.
+
+\Sol
+\textbf{Three steps:}
+\begin{enumerate}[noitemsep, topsep=2pt]
+  \item \textbf{Selection}: choose parents with probability proportional to
+        fitness (e.g.\ roulette-wheel or tournament selection).
+  \item \textbf{Crossover}: combine genetic material of two parents at a random
+        cut point to produce offspring (e.g.\ single-point crossover swaps tails).
+  \item \textbf{Mutation}: randomly flip/alter genes with a small probability to
+        maintain diversity and prevent premature convergence to a local optimum.
+\end{enumerate}
+
+\textbf{Binary vs real-coded:}
+\begin{itemize}[noitemsep, topsep=2pt]
+  \item \textbf{Binary}: simple, well-studied operators; but suffers from the
+        \emph{Hamming cliff} --- numerically adjacent integers can differ in many
+        bits, causing large jumps and disrupting convergence on smooth problems.
+  \item \textbf{Real-coded}: natural for continuous variables; no Hamming cliff;
+        precision is not limited by bit length; better suited to smooth continuous
+        optimisation.
+\end{itemize}
+
+% ==============================================================
+\sectitle{Q1 (2025 variant). Additional Gradient-Free Questions}
+% ==============================================================
+
+\noindent\textbf{(h)} [3 marks]\quad The particle swarm update is:
+\[
+  x^{(i)}_{k+1} = x^{(i)}_k + v^{(i)}_{k+1}\Delta t, \qquad
+  v^{(i)}_{k+1} = \alpha v^{(i)}_k
+    + \beta\frac{x^{(i)}_{\mathrm{best}}-x^{(i)}_k}{\Delta t}
+    + \gamma\frac{x_{\mathrm{best}}-x^{(i)}_k}{\Delta t}.
+\]
+Define all symbols.
+
+\Sol
+\begin{itemize}[noitemsep, topsep=2pt]
+  \item $x^{(i)}_k$: position of particle $i$ at iteration $k$
+  \item $v^{(i)}_k$: velocity of particle $i$ at iteration $k$
+  \item $x^{(i)}_{\mathrm{best}}$: best position ever visited by particle $i$
+        (personal best)
+  \item $x_{\mathrm{best}}$: best position ever found by \emph{any} particle
+        in the swarm (global best)
+  \item $\alpha$: inertia weight (momentum of previous velocity)
+  \item $\beta$: cognitive coefficient (attraction to personal best)
+  \item $\gamma$: social coefficient (attraction to global best)
+  \item $\Delta t$: time step; $k$ = iteration index; $i$ = particle index
+\end{itemize}
+
+% ==============================================================
+\sectitle{Q2. Gradient-Free Optimisation (Part II)}
+% ==============================================================
+
+\noindent\textbf{(a)} [5 marks]\quad Convert to standard LP form
+(minimise, equality constraints, $x\geq0$):
+\[
+  \max\ 2x_1 - x_2 + 8x_3 \quad\text{s.t.}\quad
+  7x_1+5x_2-x_3\leq1,\quad x_1+6x_2\geq4,\quad
+  x_1,x_2\geq0,\ x_3\ \text{free}.
+\]
+
+\Sol Four steps:
+\begin{enumerate}[noitemsep, topsep=2pt]
+  \item \textbf{Objective}: negate $\;\Rightarrow\;$ $\min\ {-2x_1+x_2-8x_3}$
+  \item \textbf{Free variable}: $x_3 = x_3^+ - x_3^-$,\; $x_3^+,x_3^-\geq0$
+  \item \textbf{$\leq$ constraint}: add slack $s_1\geq0$:\;
+        $7x_1+5x_2-x_3^++x_3^-+s_1=1$
+  \item \textbf{$\geq$ constraint}: subtract surplus $s_2\geq0$:\;
+        $x_1+6x_2-s_2=4$
+\end{enumerate}
+
+\textbf{Standard form:}
+\[
+  \min\ -2x_1+x_2-8x_3^++8x_3^-
+  \quad\text{s.t.}\quad
+  \underbrace{\begin{bmatrix}7&5&-1&1&1&0\\1&6&0&0&0&-1\end{bmatrix}}_{A}
+  \begin{bmatrix}x_1\\x_2\\x_3^+\\x_3^-\\s_1\\s_2\end{bmatrix}
+  =\begin{bmatrix}1\\4\end{bmatrix},\quad
+  \text{all variables}\geq0.
+\]
+
+\vspace{4pt}
+\noindent\textbf{(b)} [4 marks]\quad Solve the following optimal assignment
+problem using the Hungarian algorithm (find the assignment with minimum cost):
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+ & Task 1 & Task 2 & Task 3 \\
+\midrule
+Worker A & 100 & 150 & 125 \\
+Worker B & 150 & 175 & 135 \\
+Worker C & 120 & 250 & 140 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\Sol
+\textbf{Step 1 --- row reduction} (subtract row minimum: A=100, B=135, C=120):
+\[
+  \begin{pmatrix}0&50&25\\15&40&0\\0&130&20\end{pmatrix}
+\]
+
+\textbf{Step 2 --- column reduction} (subtract column minimum: col1=0, col2=40, col3=0):
+\[
+  \begin{pmatrix}0&10&25\\15&0&0\\0&90&20\end{pmatrix}
+\]
+
+\textbf{Step 3 --- cover zeros}: zeros at $(A,T_1),(B,T_2),(B,T_3),(C,T_1)$.
+Minimum cover: col~$T_1$ + row~$B$ = 2 lines $< n=3$. Not optimal.
+
+\textbf{Step 4 --- update}: min uncovered element =
+$\min\{10,25,90,20\}=10$. Subtract 10 from uncovered cells; add 10 to
+doubly-covered cell $(B,T_1)$:
+\[
+  \begin{pmatrix}0&0&15\\25&0&0\\0&80&10\end{pmatrix}
+\]
+
+\textbf{Step 5}: zeros at $(A,T_1),(A,T_2),(B,T_2),(B,T_3),(C,T_1)$.
+Cover with row~$A$ + row~$B$ + col~$T_1$ = 3 lines $= n$. Optimal.
+
+\textbf{Step 6 --- assignment} (independent zeros):
+$B\!\to\! T_3$\; (unique zero in $T_3$),\; $C\!\to\! T_1$,\; $A\!\to\! T_2$.
+
+\textbf{Total cost:} $150 + 135 + 120 = \mathbf{405}$.
+
+\vspace{4pt}
+\noindent\textbf{(c)} [2 marks]\quad State the purpose of the relaxation step
+in branch-and-bound \textbf{and} give an example.
+
+\Sol \textbf{Purpose:} solve the LP relaxation (drop integrality constraints)
+to obtain a bound on the optimal integer solution. If the relaxation bound is
+worse than the current best integer solution, the entire branch is pruned.
+
+\textbf{Example:} in a binary programme with $x_i\in\{0,1\}$, relax to
+$0\leq x_i\leq1$ (continuous LP). Solve; if $x_i^*\notin\{0,1\}$, branch
+by adding $x_i\leq0$ and $x_i\geq1$ as two sub-problems.
+
+\vspace{4pt}
+\noindent\textbf{(d)} [3 marks]\quad Define the Pareto front and explain how it
+provides insights into an optimisation problem.
+
+\Sol A solution $x^*$ is \textbf{Pareto-optimal} if no other feasible solution
+simultaneously improves one objective without worsening at least one other. The
+\textbf{Pareto front} is the set of all such non-dominated solutions.
+
+\textbf{Insights:} the front reveals the trade-off structure between competing
+objectives. A decision-maker can inspect the shape of the front to quantify
+trade-offs (e.g.\ how much cost increases per unit reduction in emissions) and
+select a preferred solution. A single-objective optimum lies at one extreme of
+the front.
+
+\vspace{4pt}
+\noindent\textbf{(e)} [6 marks]\quad Show that maximising the log-likelihood is
+equivalent to minimising the sum of squared errors when measurement errors are
+i.i.d.\ $\mathcal{N}(0,\sigma^2)$.
+
+\Sol Let $z_n = g_n - m(c,y_n)$ be the error at measurement $n$, distributed as
+$z_n\sim\mathcal{N}(0,\sigma^2)$. The likelihood is:
+\[
+  L(c) = \prod_{n=1}^{N} \frac{1}{\sqrt{2\pi\sigma^2}}
+         \exp\!\left(-\frac{z_n^2}{2\sigma^2}\right).
+\]
+Taking the log:
+\[
+  \ln L(c) = -\frac{N}{2}\ln(2\pi\sigma^2)
+             - \frac{1}{2\sigma^2}\sum_{n=1}^{N} z_n^2.
+\]
+The first term is a constant (independent of $c$); $\frac{1}{2\sigma^2}>0$ is a
+positive constant. Therefore maximising $\ln L$ over $c$ is equivalent to
+minimising $\sum_{n=1}^N z_n^2$. $\blacksquare$
+
+\vspace{4pt}
+\noindent\textbf{(2025 variant: simulated annealing)} [3 marks]\quad Briefly
+explain simulated annealing, incorporating the terms \textit{acceptance
+probability} and \textit{cooling schedule}.
+
+\Sol Simulated annealing is a stochastic local search. At each iteration a
+candidate $x'$ is generated near the current point $x$:
+\begin{itemize}[noitemsep, topsep=2pt]
+  \item If $f(x') < f(x)$: accept unconditionally.
+  \item If $f(x') \geq f(x)$: accept with \textbf{acceptance probability}
+        $P = \exp\!\bigl(-(f(x')-f(x))/T\bigr)$, where $T$ is the current
+        temperature.
+\end{itemize}
+The \textbf{cooling schedule} reduces $T$ over time (e.g.\ $T_k = T_0\cdot r^k$
+for $r<1$). High $T$ allows uphill moves (exploration); as $T\to0$ the algorithm
+converges to pure descent (exploitation).
+
+% ==============================================================
+\sectitle{Q3. Unconstrained Optimisation}
+% ==============================================================
+
+\noindent\textbf{(a)(i)} [2 marks]\quad Represent $i=1,2,3,4$ in base $b=3$.
+
+\Sol Using $i = a_0 + a_1\cdot3 + a_2\cdot9+\cdots$:
+\[
+  1=(1)_3, \quad 2=(2)_3, \quad 3=(10)_3, \quad 4=(11)_3.
+\]
+
+\vspace{4pt}
+\noindent\textbf{(a)(ii)} [2 marks]\quad Compute $\phi_i(3)$ for $i=1,2,3,4$
+using $\phi_i(b)=\frac{a_0}{b}+\frac{a_1}{b^2}+\cdots$
+
+\Sol
+\[
+  \phi_1(3)=\tfrac{1}{3},\quad
+  \phi_2(3)=\tfrac{2}{3},\quad
+  \phi_3(3)=\tfrac{0}{3}+\tfrac{1}{9}=\tfrac{1}{9},\quad
+  \phi_4(3)=\tfrac{1}{3}+\tfrac{1}{9}=\tfrac{4}{9}.
+\]
+
+\vspace{4pt}
+\noindent\textbf{(b)(i)} [3 marks]\quad Using the second-order Taylor expansion
+of $f(x)$ around $x_{k-1}$, find the Newton update $x_k$.
+
+\Sol Minimise the approximation $q(x)$ by differentiating and setting to zero:
+\[
+  \frac{\partial q}{\partial x}
+  = \nabla f(x_{k-1}) + H(x_{k-1})(x-x_{k-1}) = 0
+  \;\Rightarrow\;
+  \boxed{x_k = x_{k-1} - H(x_{k-1})^{-1}\nabla f(x_{k-1})}.
+\]
+
+\vspace{4pt}
+\noindent\textbf{(b)(ii)} [4 marks]\quad Show that $(x_k-x_{k-1})$ lies in the
+direction of decreasing $f$ when $H(x_{k-1})$ is positive definite.
+
+\Sol Let $d = x_k - x_{k-1} = -H^{-1}\nabla f$. A direction is a descent
+direction if $\nabla f^\top d < 0$:
+\[
+  \nabla f^\top d
+  = \nabla f^\top(-H^{-1}\nabla f)
+  = -\nabla f^\top H^{-1}\nabla f.
+\]
+Since $H$ is positive definite (PD), $H^{-1}$ is also PD, so
+$\nabla f^\top H^{-1}\nabla f > 0$ for $\nabla f\neq0$. Therefore
+$\nabla f^\top d < 0$, confirming $d$ is a descent direction. $\blacksquare$
+
+\vspace{4pt}
+\noindent\textbf{(b)(iii)} [4 marks]\quad Using the quasi-Newton approximation
+$f(x)\approx f(x_k)+\nabla f(x_k)^\top(x-x_k)+\tfrac{1}{2}(x-x_k)^\top
+\tilde{H}(x_k)(x-x_k)$, write out the secant condition.
+
+\Sol Differentiate the approximation with respect to $x$:
+\[
+  \nabla f(x) \approx \nabla f(x_k) + \tilde{H}(x_k)(x - x_k).
+\]
+Set $x = x_{k-1}$:
+\[
+  \nabla f(x_{k-1}) = \nabla f(x_k) + \tilde{H}(x_k)(x_{k-1}-x_k).
+\]
+Define $s_{k-1}=x_k-x_{k-1}$ and $y_{k-1}=\nabla f(x_k)-\nabla f(x_{k-1})$.
+Rearranging:
+\[
+  \boxed{\tilde{H}(x_k)\,s_{k-1} = y_{k-1}.}
+\]
+This is the secant condition: the approximate Hessian must reproduce the
+observed change in gradient over the last step.
+
+\vspace{4pt}
+\noindent\textbf{(c)} [5 marks]\quad Find $x^*$ minimising the ridge regression
+objective $f(x)=\tfrac{1}{2}(y-Ax)^\top(y-Ax)+\tfrac{\lambda}{2}x^\top x$,
+$\lambda>0$.
+
+\Sol Differentiate and set to zero:
+\[
+  \nabla_x f = -A^\top(y-Ax) + \lambda x = A^\top Ax - A^\top y + \lambda x = 0.
+\]
+\[
+  (A^\top A + \lambda I)\,x = A^\top y
+  \;\Rightarrow\;
+  \boxed{x^* = (A^\top A + \lambda I)^{-1}A^\top y.}
+\]
+Since $\lambda>0$, $(A^\top A+\lambda I)$ is positive definite, hence always
+invertible, giving a unique global minimiser.
+
+\vspace{6pt}
+\noindent\rule{\linewidth}{0.4pt}
+\vspace{2pt}
+
+\noindent\textbf{2025 Q3b variant} --- the objective is:
+$L(x) = f(x_0)+\nabla f(x_0)^\top(x-x_0)+\tfrac{1}{2\mu}(x-x_0)^\top(x-x_0)$
+
+\textbf{(i)} Gradient and Hessian:
+\[
+  \nabla_x L = \nabla f(x_0) + \tfrac{1}{\mu}(x-x_0),
+  \qquad
+  H_L = \tfrac{1}{\mu}I.
+\]
+
+\textbf{(ii)} Set $\nabla_x L=0$:\;
+$x^* = x_0 - \mu\,\nabla f(x_0)$ (gradient descent step with step size $\mu$).
+Local minimum since $H_L = \tfrac{1}{\mu}I \succ 0$ for $\mu>0$.
+
+\textbf{(iii)} If $\mu<0$: $H_L = \tfrac{1}{\mu}I \prec 0$ (negative definite)
+--- $L$ is a concave bowl opening downward with no lower bound.
+$\|x\|_2\to\infty$; no bounded solution exists.
+
+% ==============================================================
+\sectitle{Q4. Power Systems Optimisation}
+% ==============================================================
+
+\noindent\textbf{(a)} [4 marks]\quad Estimate the time to solve AC OPF given:
+DC OPF solves in 5 s; 20 generators, 1000 buses, 1000 lines;
+$O((n+n_g+n_h)^3)$ scaling; nonlinearity gives a $5\times$ slowdown.
+
+\Sol \textbf{DC OPF:} $\sim n=1000$ bus angles, $n_h\sim1000$ (power balance),
+$n_g\sim1000$ (line limits). Complexity $\propto(n+n_g+n_h)^3=2000^3$, time = 5 s.
+
+\textbf{AC OPF:} add voltage magnitudes and reactive power --- roughly doubles
+variables and constraints $\Rightarrow$ $n+n_g+n_h\approx4000$:
+\[
+  t_{\text{AC}} = 5\,\text{s} \times \frac{4000^3}{2000^3} \times 5 = 5\times8\times5 = 200\,\text{s}.
+\]
+
+\vspace{4pt}
+\noindent\textbf{(b)} [6 marks]\quad Suggest an algorithm for AC OPF and
+explain its main concepts.
+
+\Sol \textbf{Algorithm: Interior Point Method (IPM)}.
+
+\textbf{Justification:} AC OPF is a large-scale non-convex NLP with both
+equality and inequality constraints. IPMs are efficient for large sparse
+structured problems (e.g.\ IPOPT used in industry).
+
+\textbf{Key concepts:} convert inequality constraints $g(x)\leq0$ to equality
+using slack variables and add a logarithmic barrier:
+\[
+  \min_{x,s}\ f(x) - \mu\sum_i\ln s_i
+  \quad\text{s.t.}\quad h(x)=0,\; g(x)+s=0,\; s>0.
+\]
+As $\mu\to0$ the barrier solution converges to the constrained optimum. Each
+iteration solves a linear KKT system (Newton step on the first-order conditions):
+\[
+  \begin{bmatrix}H_{\mathcal{L}} & J_h^\top & J_g^\top\\
+  J_h & 0 & 0\\ J_g & 0 & -S^{-1}Z\end{bmatrix}
+  \begin{bmatrix}\Delta x\\\Delta\nu\\\Delta\lambda\end{bmatrix}
+  = -r,
+\]
+exploiting sparsity of the power network for efficiency.
+
+\vspace{4pt}
+\noindent\textbf{(c)} [5 marks]\quad What is the difference between SC-OPF and
+regular AC OPF? Why is SC-OPF hard to solve in practice?
+
+\Sol \textbf{Regular AC OPF:} minimise generation cost subject to power flow
+equations, generator limits, and thermal line limits for the base (intact)
+operating case only.
+
+\textbf{SC-OPF (N-1 security constrained):} additionally requires the system
+to remain feasible after any single component outage (any one line or
+generator failure). Adds $N_{\text{components}}$ full sets of contingency
+constraints.
+
+\textbf{Why hard:} for a 1000-bus, 1000-line system this means $\sim10^3$
+additional complete AC OPF problems. Direct formulation has $O(N_{\text{lines}})$
+times more constraints, making it computationally intractable. Non-convexity
+also means each sub-problem may not solve to global optimality.
+
+\vspace{4pt}
+\noindent\textbf{(d)} [2 marks]\quad How are security constraints included in
+industry practice without incurring huge computational costs?
+
+\Sol \textbf{Contingency screening:} quickly rank all $N$ contingency cases
+using a fast DC approximation. Select only the small subset of
+\textit{binding} (worst-case) contingencies, then resolve AC OPF with
+those constraints added. Repeat iteratively until no new binding
+contingencies are found. This avoids solving the full SC-OPF directly.
+
+\vspace{4pt}
+\noindent\textbf{(e)} [8 marks]\quad Formulate a non-linear least squares
+problem to estimate power system states from measurements
+$P_{12},Q_{12},P_{13},Q_{13},P_{32},Q_{32},V_1,V_2$, where:
+\[
+  P_{ij} = V_iV_jB_{ij}\sin(\theta_i-\theta_j),\qquad
+  Q_{ij} = V_i(V_i-V_j\cos(\theta_i-\theta_j))B_{ij}.
+\]
+
+\Sol \textbf{States:} set $\theta_1=0$ as reference. Unknown vector:
+$x = [\theta_2,\,\theta_3,\,V_1,\,V_2,\,V_3]^\top$ (5 unknowns).
+
+\textbf{Measurement model} $h(x)$:
+\[
+  h(x) = \begin{bmatrix}
+    V_1V_2B_{12}\sin(\theta_1-\theta_2)\\
+    V_1(V_1-V_2\cos(\theta_1-\theta_2))B_{12}\\
+    V_1V_3B_{13}\sin(\theta_1-\theta_3)\\
+    V_1(V_1-V_3\cos(\theta_1-\theta_3))B_{13}\\
+    V_3V_2B_{32}\sin(\theta_3-\theta_2)\\
+    V_3(V_3-V_2\cos(\theta_3-\theta_2))B_{32}\\
+    V_1\\ V_2
+  \end{bmatrix},\quad
+  z = \begin{bmatrix}P_{12}\\Q_{12}\\P_{13}\\Q_{13}\\P_{32}\\Q_{32}\\V_1\\V_2\end{bmatrix}.
+\]
+
+\textbf{Optimisation problem} (all meters equal variance $\sigma^2$):
+\[
+  \min_{x}\; \|z - h(x)\|_2^2
+  = \min_{x}\;\sum_{m=1}^{8}(z_m - h_m(x))^2.
+\]
+Solved numerically using Gauss-Newton or Levenberg-Marquardt iteration.
+
+\end{document}
