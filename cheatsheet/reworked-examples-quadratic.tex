@@ -1,0 +1,346 @@
+% !TEX TS-program = xelatex
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[a4paper, left=20mm, right=20mm, top=15mm, bottom=15mm]{geometry}
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Heros}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{array,booktabs}
+\usepackage{enumitem}
+\usepackage{mdframed}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{eso-pic}
+\usepackage[useregional]{datetime2}
+
+% Watermark
+\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow}
+\AddToShipoutPictureBG{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[rotate=90, anchor=north]
+      at ($(current page.north west)+(1.4cm,-13cm)$)
+      {\scriptsize\ttfamily \mymarginlabel};
+  \end{tikzpicture}%
+}
+
+\definecolor{reasonbg}{RGB}{240,248,240}
+\definecolor{boxbg}{RGB}{235,242,252}
+
+\setlength{\parskip}{3pt}
+\setlength{\parindent}{0pt}
+\setlength{\abovedisplayskip}{5pt}
+\setlength{\belowdisplayskip}{5pt}
+\setlength{\abovedisplayshortskip}{3pt}
+\setlength{\belowdisplayshortskip}{3pt}
+
+% Section heading with rule and mark count
+\newcommand{\sectitle}[2]{%
+  \vspace{10pt}\noindent\rule{\linewidth}{0.8pt}\par\vspace{2pt}%
+  {\large\textbf{#1}\hfill\normalsize\textit{[#2 marks]}}\par
+  \vspace{2pt}\rule{\linewidth}{0.4pt}\vspace{4pt}}
+
+% Green reasoning box
+\newcommand{\reason}[1]{%
+  \begin{mdframed}[backgroundcolor=reasonbg, linewidth=0.4pt,
+    innertopmargin=3pt, innerbottommargin=3pt,
+    innerleftmargin=6pt, innerrightmargin=6pt]
+    \small\textit{Reason:} \small #1
+  \end{mdframed}\vspace{2pt}}
+
+% Blue result box
+\newenvironment{resultbox}{%
+  \begin{mdframed}[backgroundcolor=boxbg, linewidth=0.6pt,
+    innertopmargin=5pt, innerbottommargin=5pt,
+    innerleftmargin=8pt, innerrightmargin=8pt]
+}{\end{mdframed}}
+
+\begin{document}
+
+\begin{center}
+  {\large\textbf{ENEL445 --- Worked Examples: Quadratic Optimisation \& Optimality Conditions}}\\[3pt]
+  {\small David Ewing (82171165)\quad|\quad
+   Covers: variable transformation, optimality condition, Van~der~Corput,
+   quadratic gradient, exact line search, optimal step size.}
+\end{center}
+\noindent\rule{\linewidth}{0.8pt}
+
+% ==============================================================
+\sectitle{Q1. Design Variable Transformation via Sigmoid}{5}
+% ==============================================================
+
+\noindent\textbf{Problem.} The $i$-th design variable $x_i$ must satisfy $|x_i|\le a$.
+Eliminate this constraint using the sigmoid $\sigma(t)=\dfrac{1}{1+e^{-t}}$.
+
+\vspace{6pt}
+\textbf{Step 1 --- restate the constraint.}
+
+$|x_i|\le a$ is equivalent to $x_i\in[-a,\,a]$, an interval of width $2a$.
+\[
+  -a \;<\; x_i \;<\; +a
+\]
+
+\textbf{Step 2 --- range of the sigmoid.}
+\[
+  \sigma(t)=\frac{1}{1+e^{-t}},\qquad t\in\mathbb{R}\;\Rightarrow\;\sigma(t)\in(0,1).
+\]
+
+\reason{If $t\to+\infty$, $e^{-t}\to 0$ so $\sigma\to 1$.
+        If $t\to-\infty$, $e^{-t}\to\infty$ so $\sigma\to 0$.
+        The image is strictly $(0,1)$ for all finite $t$.}
+
+\textbf{Step 3 --- scale and shift to $(-a,a)$.}
+
+Multiply by $2a$ to obtain range $(0,2a)$, then shift by $-a$:
+\begin{align*}
+  2a\,\sigma(t_i)             &\in (0,\,2a) \\
+  x_i = -a + 2a\,\sigma(t_i) &\in (-a,\,+a).
+\end{align*}
+
+\reason{Sanity check: $t_i\to-\infty \Rightarrow x_i = -a+0 = -a$.
+        $t_i\to+\infty \Rightarrow x_i = -a+2a = +a$.
+        For all finite $t_i$, $x_i\in(-a,+a)\subseteq[-a,a]$. \checkmark}
+
+\textbf{Step 4 --- explicit bound confirmation.}
+
+For all finite $t_i\in\mathbb{R}$, the transformed variable satisfies:
+\[
+  x_i \in (-a,\,+a).
+\]
+The open interval $(-a,+a)$ is \textbf{always} a subset of the closed constraint set:
+\[
+  (-a,+a) \subseteq [-a,\,a]. \checkmark
+\]
+\reason{The sigmoid never reaches its limits for finite $t_i$, so the image is strictly
+        the open interval $(-a,+a)$, giving margin on both sides. The constraint is
+        therefore satisfied automatically and can be dropped entirely from the optimisation.}
+
+\newpage
+\textbf{Why use $\sigma(t)$?}
+
+The sigmoid is one member of a family of functions that share three key properties
+required for this variable-transformation trick:
+\begin{enumerate}
+  \item \textbf{Bounded range} --- maps $\mathbb{R}$ into a finite interval,
+        so the constraint on $x_i$ is encoded implicitly.
+  \item \textbf{Smooth and differentiable everywhere} --- so the chain rule
+        $\partial f/\partial t_i = (\partial f/\partial x_i)(\partial x_i/\partial t_i)$
+        is well defined, and gradient-based optimisers can be used on $t_i$
+        without modification.
+  \item \textbf{Strictly monotone} --- the mapping $t_i\mapsto x_i$ is one-to-one,
+        so no information is lost and every $x_i\in(-a,a)$ has a unique pre-image.
+\end{enumerate}
+
+\reason{Any smooth, strictly monotone function with bounded range works.
+        Alternatives include $\tanh(t)$ (range $(-1,1)$, scaled by $a$) and
+        $\tfrac{2}{\ \pi}\arctan(t)$ (range $(-1,1)$).
+        The sigmoid is convenient because its range is exactly $(0,1)$,
+        which maps cleanly to $(-a,a)$ with one multiply-and-shift.
+        Without this trick, a constrained method (e.g.\ KKT conditions)
+        would be needed; the transformation converts the problem into
+        an unconstrained one solvable by any standard solver.}
+
+\begin{resultbox}
+Substitute $\displaystyle x_i = -a + \frac{2a}{1+e^{-t_i}}$
+and optimise over unconstrained $t_i\in\mathbb{R}$.
+The constraint $|x_i|\le a$ is then automatically satisfied and can be dropped.
+\smallskip\\
+\textit{Equivalent forms:}\;
+$x_i = a\!\left(\dfrac{2}{1+e^{-t_i}}-1\right) = a\tanh\!\left(\dfrac{t_i}{2}\right)$.
+\end{resultbox}
+
+\newpage
+% ==============================================================
+\sectitle{Q2. First-Order Necessary Optimality Condition}{5}
+% ==============================================================
+
+\noindent\textbf{Problem.} Show that if $x^*$ is a local minimum of $f(x)$,
+then $\nabla f(x^*)=0$.
+\textit{Hint: use the first-order Taylor expansion of $f(x)$.}
+
+\vspace{6pt}
+\textbf{Step 1 --- local-minimum definition.}
+There exists $\delta>0$ such that
+\[
+  f(x^*+d)\ge f(x^*)\quad\text{for all }\|d\|<\delta.
+\]
+
+\textbf{Step 2 --- first-order Taylor expansion about $x^*$.}
+\begin{align*}
+  f(x)     &= f(x^*) + \nabla f(x^*)^\top(x-x^*) + O(\|x-x^*\|^2) \\
+  f(x^*+d) &= f(x^*) + \nabla f(x^*)^\top d       + O(\|d\|^2).
+\end{align*}
+
+\reason{The chain rule gives the linear term $\nabla f(x^*)^\top d$;
+        higher-order terms are $O(\|d\|^2)$.}
+
+\textbf{Step 3 --- substitute into the local-minimum inequality.}
+
+Substituting the Taylor expansion into $f(x^*+d)\ge f(x^*)$:
+\begin{align*}
+  f(x^*) + \nabla f(x^*)^\top d + O(\|d\|^2) &\ge f(x^*) \\
+  \nabla f(x^*)^\top d + O(\|d\|^2)           &\ge 0\quad\text{for all }\|d\|<\delta.
+\end{align*}
+
+\textbf{Step 4 --- choose a test direction (contradiction).}
+Set $d=-\varepsilon\,\nabla f(x^*)$ with $\varepsilon>0$ small:
+\[
+  -\varepsilon\,\|\nabla f(x^*)\|^2 + O(\varepsilon^2)\ge 0.
+\]
+
+\textbf{Step 5 --- divide by $\varepsilon$ and let $\varepsilon\to 0^+$.}
+\reason{Dividing by $\varepsilon>0$ preserves the inequality; the $O(\varepsilon)$ term vanishes.}
+\begin{align*}
+  -\|\nabla f(x^*)\|^2 &\ge 0 \\
+   \|\nabla f(x^*)\|^2 &\le 0
+\intertext{But a squared norm is \textbf{always} non-negative:}
+   \|\nabla f(x^*)\|^2 &\ge 0
+\end{align*}
+\begin{resultbox}
+\[
+  0 \;\le\; \|\nabla f(x^*)\|^2 \;\le\; 0
+  \;\implies\; \|\nabla f(x^*)\|^2 = 0
+  \;\implies\; \nabla f(x^*)=0. \hfill\square
+\]
+\end{resultbox}
+
+%\newpage
+% ==============================================================
+\sectitle{Q3. Van der Corput Sequence, base $b=3$}{10}
+% ==============================================================
+
+\noindent\textbf{Definition.} If $i=a_0 + a_1 b + a_2 b^2+\cdots+a_r b^r$ in base $b$, then
+\[
+  \phi_i(b) = \frac{a_0}{b}+\frac{a_1}{b^2}+\cdots+\frac{a_r}{b^{r+1}}.
+\]
+
+\textbf{Algorithm (three steps for each $i$):}
+\begin{enumerate}[noitemsep]
+  \item Write $i$ in base $b$, reading off digits $a_0, a_1, \ldots, a_r$ least-significant first.
+  \item Each digit $a_k$ contributes $a_k/b^{k+1}$ to the sum.
+  \item Sum all contributions: $\phi_i(b) = \displaystyle\sum_{k=0}^{r} \dfrac{a_k}{b^{k+1}}$.
+\end{enumerate}
+
+\vspace{4pt}
+\begin{center}
+\begin{tabular}{cclll}
+\toprule
+$i$ & Base-3 repr. & Digits $a_0, a_1, \ldots$ & Computation & $\phi_i(3)$ \\
+\midrule
+1 & $(1)_3$  & $a_0=1$           & $1/3$                 & $1/3$ \\
+2 & $(2)_3$  & $a_0=2$           & $2/3$                 & $2/3$ \\
+3 & $(10)_3$ & $a_0=0,\;a_1=1$   & $0/3+1/9$             & $1/9$ \\
+4 & $(11)_3$ & $a_0=1,\;a_1=1$   & $1/3+1/9$             & $4/9$ \\
+5 & $(12)_3$ & $a_0=2,\;a_1=1$   & $2/3+1/9$             & $7/9$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\reason{%
+  $i=1$: $(1)_3$, $a_0=1 \Rightarrow 1/3$. \quad
+  $i=2$: $(2)_3$, $a_0=2 \Rightarrow 2/3$.\\[2pt]
+  $i=3$: $3=(1{\cdot}3+0)=(10)_3$, $a_0=0,\,a_1=1 \Rightarrow 0/3+1/9=1/9$.\\[2pt]
+  $i=4$: $4=(1{\cdot}3+1)=(11)_3$, $a_0=1,\,a_1=1 \Rightarrow 1/3+1/9=4/9$.\\[2pt]
+  $i=5$: $5=(1{\cdot}3+2)=(12)_3$, $a_0=2,\,a_1=1 \Rightarrow 2/3+1/9=7/9$.}
+
+\begin{resultbox}
+Van der Corput sequence in base $b=3$ for $i=1,\ldots,5$:
+\begin{align*}
+  \phi_1(3) &= \tfrac{1}{3} \\
+  \phi_2(3) &= \tfrac{2}{3} \\
+  \phi_3(3) &= \tfrac{1}{9} \\
+  \phi_4(3) &= \tfrac{4}{9} \\
+  \phi_5(3) &= \tfrac{7}{9}.
+\end{align*}
+\end{resultbox}
+
+\newpage
+% ==============================================================
+\sectitle{Q4. Gradient of Quadratic Objective}{3}
+% ==============================================================
+
+\noindent\textbf{Problem.} Let $f(x)=\tfrac{1}{2}x^\top Ax + b^\top x$,
+$A$ symmetric positive definite. Find $\nabla f(c)$.
+
+\textbf{Linear term:} $\partial(b^\top x)/\partial x = b$.
+
+\reason{Standard result: $\partial(a^\top x)/\partial x = a$.}
+
+\textbf{Quadratic term} (using $A=A^\top$):
+\[
+  \frac{\partial}{\partial x}\!\left(\tfrac{1}{2}x^\top Ax\right)
+  = \tfrac{1}{2}(A+A^\top)x = Ax.
+\]
+
+\reason{Product rule gives $(A+A^\top)x/2$; symmetry collapses this to $Ax$.}
+
+\begin{resultbox}
+$\nabla f(x) = Ax + b$,\quad so\quad $\nabla f(c) = Ac + b$.
+\end{resultbox}
+
+%\newpage
+% ==============================================================
+\sectitle{Q5. Exact Line Search Formulation}{5}
+% ==============================================================
+
+\noindent\textbf{Problem.} Formulate the exact line search at $c$ along $-\nabla f(c)$
+as an unconstrained optimisation in $\mu$.
+
+\begin{resultbox}
+\[
+  \min_{\mu\ge 0}\;\phi(\mu) = f\!\bigl(c - \mu\,\nabla f(c)\bigr).
+\]
+\end{resultbox}
+
+\reason{We are at the current point $c$ and search along the steepest-descent
+        direction $-\nabla f(c)$. The scalar $\mu\ge 0$ controls how far we step.
+        For a quadratic with $A\succ 0$, $\phi(\mu)$ is convex with a unique
+        minimiser $\mu^*>0$, so the constraint is automatically satisfied.}
+
+\newpage
+% ==============================================================
+\sectitle{Q6. Optimal Step Size $\mu^*$}{12}
+% ==============================================================
+
+\noindent\textbf{Problem.} Solve the above for $\mu^*$ and write the updated point
+$d = c - \mu^*\nabla f(c)$.
+
+Let $g = \nabla f(c) = Ac + b$ (from Q4).
+
+\medskip
+\textbf{Step 1 --- differentiate $\phi(\mu)$ via chain rule:}
+\begin{align*}
+  \frac{d\phi}{d\mu}
+  &= \bigl(\nabla f(c-\mu g)\bigr)^\top \cdot \frac{d(c-\mu g)}{d\mu} \\
+  &= \bigl(\nabla f(c-\mu g)\bigr)^\top \cdot (-g) \\
+  &= -\nabla f(c-\mu g)^\top\, g = 0.
+\end{align*}
+
+\reason{Chain rule: derivative of the outer function ($\nabla f$ evaluated at $c-\mu g$)
+        times derivative of the inner function ($-g$).}
+
+\textbf{Step 2 --- evaluate $\nabla f(c-\mu g)$ using the result from Q4:}
+\[
+  \nabla f(c-\mu g) = A(c-\mu g)+b = (Ac+b)-\mu Ag = g - \mu Ag.
+\]
+
+\textbf{Step 3 --- set to zero:}
+\begin{align*}
+  -(g-\mu Ag)^\top g &= 0 \\
+  -g^\top g + \mu\,g^\top Ag &= 0 \\
+  \mu^* &= \frac{g^\top g}{g^\top Ag}.
+\end{align*}
+
+\reason{Expand: $-g^\top g + \mu\,g^\top Ag = 0$.
+        Since $A\succ 0$, $g^\top Ag>0$, so we can divide through.}
+
+\begin{resultbox}
+\[
+  \mu^* = \frac{\|\nabla f(c)\|^2}{\nabla f(c)^\top A\,\nabla f(c)},
+  \qquad
+  d = c - \frac{\|\nabla f(c)\|^2}{\nabla f(c)^\top A\,\nabla f(c)}\,\nabla f(c).
+\]
+This is the exact steepest-descent step size for a quadratic objective.
+\end{resultbox}
+
+\end{document}
