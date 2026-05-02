@@ -54,6 +54,13 @@ if ((Test-Path $localFigs) -and ($localFigs -ne $rootFigs)) {
 # -- compile with xelatex (twice for cross-references and ToC)
 # compile inside the archive tex folder to keep all artefacts out of the source folder
 $archiveTexFile = Join-Path $archiveTex "$texBase.tex"
+
+# -- ensure MiKTeX is on PATH (needed when spawned by VS Code LaTeX Workshop)
+$miktexBin = "D:\MiKTeX\miktex\bin\x64"
+if ($env:PATH -notlike "*$miktexBin*") {
+    $env:PATH = "$miktexBin;$env:PATH"
+}
+
 Write-Host ""
 Write-Host "Compiling: $texBase (pass 1)..."
 Push-Location $archiveTex
