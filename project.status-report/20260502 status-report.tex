@@ -698,6 +698,21 @@ Mathematical analysis confirms:
 \newpage
 \subsection*{Next Steps}
 
+\textbf{Immediate coding priority (May 2026):}
+\begin{itemize}
+  \item[\textbf{!}] \textbf{Implement reparameterisation layer in \texttt{vb\_algorithms\_py.py}} before any gradient-based method can run:
+  \begin{itemize}
+    \item Forward transform: $\bm{\Sigma}_\beta \to \bm{L}$ (Cholesky), $L_{ii} \to \tilde\ell_{ii} = \log L_{ii}$, $a_e \to \eta_a = \log a_e$, $b_e \to \eta_b = \log b_e$
+    \item Inverse transform: recover $\bm{\Sigma}_\beta$, $a_e$, $b_e$ from unconstrained variables on every ELBO evaluation
+    \item Gradient transform: chain rule $\nabla_\theta \text{ELBO}$ from $\nabla_\phi \text{ELBO}$ --- formulas in \S Implementation Specifications
+    \item Hessian transform: additionally required for Newton's method
+  \end{itemize}
+  \item Implement gradient ascent with Armijo backtracking line search using $h(\alpha) = \text{ELBO}(\bm{\phi}^{(t)} + \alpha \bm{d}^{(t)})$
+  \item Implement Newton's method with Hessian regularisation
+  \item Implement BFGS with Wolfe conditions
+  \item All formulas are fully derived and ready in \texttt{20260502 status-report.tex} \S Implementation Specifications
+\end{itemize}
+
 \textbf{Week 7 (24-31 March):}
 \begin{itemize}
 \item Implement CAVI baseline in Python with ELBO tracking
