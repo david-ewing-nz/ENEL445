@@ -4,7 +4,9 @@
 \usepackage{fontspec}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{geometry}
-\usepackage{hyperref}
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\usepackage[backend=biber, style=apa, sorting=nyt]{biblatex}
+\addbibresource{D:/github/ENEL445/report/references.bib}
 \usepackage{enumitem}
 \usepackage{mathtools}
 \usepackage{bm}
@@ -37,23 +39,70 @@
 \newcommand{\tr}{\text{tr}}
 \setlength{\parindent}{0pt}
 
-\title{Project Planning Report:\\
-Optimisation Methods for Variational Inference}
-\author{David Ewing (82171165)\\
-ENEL445  \\
-University of Canterbury}
+\title{ 
+Optimisation Methods to Address\\
+Variational Bayesian\\
+Posterior Variance Collapse
+}
+\author{
+  David Ewing (82171165)\\
+%ENEL445  \\
+%University of Canterbury
+}
 \date{3 May 2026}
 
 \begin{document}
 
 \maketitle
 
-\section*{Background and Problem Intuition}
+\begin{abstract}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.7em}
+
+Variational Inference (VI) recasts Bayesian posterior computation as an optimisation problem, making it a natural testbed for comparing the
+gradient-based methods taught in ENEL445. This document provides the mathematical derivations for VI applied to Bayesian linear regression under
+a mean-field Normal--Gamma approximation.
+
+We derive the Evidence Lower Bound (ELBO) in closed form and present the
+analytical Coordinate Ascent VI (CAVI) solution as a baseline. For
+gradient-based methods---gradient ascent, Newton's method, and BFGS---we
+derive full gradient and Hessian expressions for all variational parameters
+($\bm{\mu}_\beta$, $\bm{\Sigma}_\beta$, $a_e$, $b_e$), and formulate a
+quadratic penalty method to enforce minimum-variance constraints that
+prevent posterior variance collapse under the zero-forcing KL divergence.
+
+The entry conditions are stated explicitly for each method.   For line-search methods, a further
+condition must hold before each step is accepted: the search direction
+$\bm{d}^{(t)}$ must satisfy $\nabla\ELBO(\bm{\phi}^{(t)})^T \bm{d}^{(t)}
+> 0$ (ascent direction), ensuring the line search is well-posed.
+
+The step size $\alpha^{(t)}$ is determined by backtracking line
+search. Gradient ascent uses the Armijo sufficient-increase condition. BFGS uses the stronger Wolfe conditions---sufficient
+increase plus a curvature condition---to guarantee the gradient-difference
+vector $\bm{y}_t^T \bm{s}_t > 0$, which is required for the BFGS update
+to maintain positive definiteness of the approximate inverse Hessian.
+
+Exit conditions are defined uniformly across all methods.
+Iteration terminates when any of the following hold: (i) gradient norm
+$\lVert\nabla\ELBO\rVert < \varepsilon_g$; (ii) relative ELBO change
+$\lvert\Delta\ELBO\rvert / \lvert\ELBO\rvert < \varepsilon_r$; (iii)
+parameter change $\lVert\Delta\bm{\phi}\rVert < \varepsilon_\phi$; or
+(iv) a maximum iteration count is reached. CAVI additionally monitors
+$\max_i \lvert\phi_i^{(t+1)} - \phi_i^{(t)}\rvert /
+\lvert\phi_i^{(t+1)}\rvert < \varepsilon$.
+
+Convergence rates and per-iteration costs are compared across all methods.
+BFGS offers the best practical balance of convergence speed and
+computational cost; CAVI remains competitive when conjugate structure can
+be exploited analytically.
+\end{abstract}
+\newpage
+\section*{Introduction}
 
 Bayesian inference provides principled uncertainty quantification but requires computing intractable posterior distributions. For most real-world models, the posterior integral,
 
 \begin{equation*}
-    p(\bm{\theta} \mid \bm{y}) = \frac{p(\bm{y} \mid \bm{\theta})p(\bm{\theta})}{p(\bm{y})},
+    p(\bm{\theta} \mid \bm{y}) = \frac{p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})}{\displaystyle\int p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})\, d\bm{\theta}},
 \end{equation*}
 \noindent 
 cannot be evaluated analytically. 
@@ -61,16 +110,18 @@ Variational Inference (VI) converts this inference problem into an optimisation 
 
 Instead of computing the true posterior, VI finds the ``best'' approximation $q(\bm{\theta})$ from a tractable family 
 by maximising the Evidence Lower Bound (ELBO). 
-This transforms intractable integration into tractable optimisation---I think this is a natural fit for an optimisation course project. \vspace{2em} 
+This transforms intractable integration into tractable optimisation---a natural testbed for the gradient-based methods. \vspace{2em} 
 
 A well-known failure mode of mean-field VI is \emph{posterior variance collapse}: 
 the optimised approximation $q(\bm{\theta})$ is systematically overconfident, 
 underestimating posterior uncertainty. This is a direct consequence of the KL direction minimised during ELBO maximisation, 
-compounded by the mean-field factorisation assumption. \footnote{See Appendix~B for the full mechanistic explanation.}  \vspace{2em} 
+compounded by the mean-field factorisation assumption. \footnote{See \ref{app:vb-collapse} for the full mechanistic explanation.}  \vspace{2em} 
 
 This project addresses variance collapse via two complementary strategies. The first applies new optimisation methods to the \emph{standard} ELBO objective: gradient ascent, Newton's method, and BFGS are compared to determine whether the choice of optimiser affects dispersion quality. The second modifies the objective function itself, augmenting the ELBO with an entropy regularisation term $\lambda H[q(\bm{\beta})]$ to create a new objective $\mathcal{L}_{\mathrm{reg}}(\bm{\phi}) = \mathcal{L}(\bm{\phi}) + \lambda H[q(\bm{\beta})]$ that explicitly incentivises broader posteriors. Both the optimiser-comparison and modified-ELBO strategies are explored.  \vspace{2em} 
 
-Throughout all gradient-based methods, the variational covariance $\bm{\Sigma}_\beta$ must remain symmetric positive definite at every iteration.\footnote{This structural constraint is satisfied automatically via Cholesky reparameterisation; see Appendix~A. For the role of symmetric positive definite covariance matrices in exponential families more broadly, see Wainwright \& Jordan (2008), \S3.4, DOI: \href{https://doi.org/10.1561/2200000001}{10.1561/2200000001}.} Standard gradient steps in Euclidean space can violate this requirement, leading to numerical failure. The solution is to parameterise the optimisation over the Cholesky factor $\bm{L}$ rather than $\bm{\Sigma}_\beta$ directly.
+Throughout all gradient-based methods, the variational covariance $\bm{\Sigma}_\beta$ must remain symmetric positive definite at every 
+iteration~\parencite[Example~3.7, p.~53]{Wainwright2008}.
+\footnote{This structural constraint is satisfied automatically via Cholesky reparameterisation; see Appendix~\ref{app:cholesky}. For the role of symmetric positive definite covariance matrices in exponential families more broadly, see \textcite[Example~3.7, p.~53]{Wainwright2008}.} Standard gradient steps in Euclidean space can violate this requirement, leading to numerical failure. The solution is to parameterise the optimisation over the Cholesky factor $\bm{L}$ rather than $\bm{\Sigma}_\beta$ directly.
 
 \section*{Key Notation}
 
@@ -94,12 +145,18 @@ $\eta_a, \eta_b$ & Log-space parameters for $a_e, b_e$ \\
 \newpage
 \section*{Optimisation Problem Formulation}
 
+Having established that VI converts posterior inference into optimisation, the problem must be stated precisely before any method can be applied. This section identifies the decision variables, the objective function, and the constraints, following the standard form used throughout the course. A well-posed formulation is necessary both for implementation and for meaningful comparison across methods: gradient ascent, Newton's method, and BFGS all operate on the same objective and respect the same constraints, so differences in performance reflect the methods themselves rather than problem differences.
+
 \subsection*{Decision Variables}
 
 For Bayesian linear regression with $p$ predictors, the variational parameters (decision variables) are:
 \begin{itemize}
 \item $\bm{\mu}_\beta \in \R^p$: posterior mean of regression coefficients
-\item $\bm{\Sigma}_\beta \in \R^{p \times p}$: posterior covariance\footnote{\textbf{Covariance} describes how much two variables move together. $\Sigma_{\beta,ij}$ tells you how much component $\beta_i$ and $\beta_j$ of the regression coefficients tend to vary together in the posterior. The diagonal entries $\Sigma_{\beta,ii}$ are the variances (spread) of each individual coefficient.} (symmetric positive definite\footnote{A matrix $\bm{A}$ is \textbf{positive definite} if $\bm{v}^T\bm{A}\bm{v} > 0$ for every non-zero vector $\bm{v}$. Intuitively: the matrix amplifies every direction --- there is no direction in which it squashes things to zero or flips them negative. For a covariance matrix this means every direction in parameter space has genuine positive uncertainty. Written $\bm{A} \succ 0$.})
+\item $\bm{\Sigma}_\beta \in \R^{p \times p}$: posterior covariance (symmetric positive definite\footnote{A matrix $\bm{A}$ is \textbf{positive definite} 
+if $\bm{v}^T\bm{A}\bm{v} > 0$ for every non-zero vector $\bm{v}$. Intuitively: the matrix amplifies every 
+direction --- there is no direction in which it squashes things to zero or flips them negative. For a
+ covariance matrix this means every direction in parameter space has genuine positive uncertainty. 
+ Written $\bm{A} \succ 0$.})
 \item $a_e, b_e > 0$: shape and rate parameters of the variational Gamma factor for precision
 \end{itemize}
 
@@ -235,13 +292,6 @@ Properties: Monotonic ELBO increase\footnote{Monotonic ELBO increase means the o
 
 Comparison will reveal whether general optimisation methods can compete with or outperform problem-specific algorithms.
 
-\newpage
-\section*{Solution Plan}
-
-\subsection*{Phase 1: Mathematical Foundations — COMPLETE}
-
-\textbf{Status: All mathematical derivations and implementation specifications verified and documented.}
-
 \begin{itemize}
 \item[\checkmark] Complete ELBO derivation for Bayesian linear regression
 \item[\checkmark] CAVI closed-form update equations with matrix inversion lemma
@@ -313,7 +363,7 @@ All derivations documented in \texttt{vi\_optimisation\_solution.pdf} with compl
 \newpage
 \section*{Constraint Handling via Reparameterisation}
 
-The variational parameters are not free. $\bm{\Sigma}_\beta$ must remain symmetric positive definite throughout optimisation, and $a_e, b_e$ must remain strictly positive. Four strategies exist for handling these constraints in a gradient-based optimiser: ignore them (the algorithm crashes when $\log|\bm{\Sigma}_\beta|$ becomes undefined); add a penalty term (introduces a tuning parameter and ill-conditioning as $\rho \to \infty$); project back to the feasible set after each step (costs $O(p^3)$ per iteration and is non-differentiable at the boundary, breaking BFGS); or reparameterise so the constraints are encoded structurally and cannot be violated. This work uses reparameterisation throughout---it requires no tuning parameters, no outer loops, and produces a smooth unconstrained problem fully compatible with gradient ascent, Newton, and BFGS. Two transformations are applied: one for the matrix constraint on $\bm{\Sigma}_\beta$, and one for the scalar positivity constraints on $a_e$ and $b_e$.
+The variational parameters are not free. $\bm{\Sigma}_\beta$ must remain symmetric positive definite throughout optimisation,\footnote{$\bm{\Sigma}_\beta$ is the covariance matrix of $q(\bm{\beta}) = \mathcal{N}(\bm{\mu}_\beta,\bm{\Sigma}_\beta)$. A valid covariance matrix must be symmetric positive definite: $\log|\bm{\Sigma}_\beta|$ and $\bm{\Sigma}_\beta^{-1}$ both appear in the ELBO and its gradient, so a non-positive-definite $\bm{\Sigma}_\beta$ causes immediate numerical failure.} and $a_e, b_e$ must remain strictly positive.\footnote{$a_e$ and $b_e$ are the shape and rate of $q(\tau_e)=\mathrm{Gamma}(a_e,b_e)$. The Gamma distribution is only defined for positive parameters; negative or zero values make $\log\Gamma(a_e)$ and $\psi(a_e)$ (digamma) undefined.} Four strategies exist for handling these constraints in a gradient-based optimiser: ignore them (the algorithm crashes when $\log|\bm{\Sigma}_\beta|$ becomes undefined); add a penalty term (introduces a tuning parameter and ill-conditioning as $\rho \to \infty$); project back to the feasible set after each step (costs $O(p^3)$ per iteration and is non-differentiable at the boundary, breaking BFGS); or reparameterise so the constraints are encoded structurally and cannot be violated. This work uses reparameterisation throughout---it requires no tuning parameters, no outer loops, and produces a smooth unconstrained problem fully compatible with gradient ascent, Newton, and BFGS. Two transformations are applied: one for the matrix constraint on $\bm{\Sigma}_\beta$, and one for the scalar positivity constraints on $a_e$ and $b_e$.
 
 \subsection*{Cholesky Reparameterisation}
 
@@ -807,71 +857,89 @@ Mathematical specifications are now complete and documented with full algebraic 
 \end{tabular}
 \end{center}
 
+\printbibliography
+
 \newpage
 \setcounter{secnumdepth}{1}
 \appendix
+\renewcommand{\thesection}{Appendix~\Alph{section}}
 
-\section{Cholesky Reparameterisation: Structural Constraint Satisfaction}
 
-\subsection*{The Problem with Direct Optimisation}
 
-The covariance matrix $\bm{\Sigma}_\beta$ must satisfy $\bm{\Sigma}_\beta \succ 0$ (symmetric positive definite) at every iteration. If the optimiser updates $\bm{\Sigma}_\beta$ directly, a gradient step of the form
-\begin{align}
-  \bm{\Sigma}_\beta^{(t+1)} &= \bm{\Sigma}_\beta^{(t)} + \alpha_t \,\nabla_{\bm{\Sigma}_\beta}\mathcal{L}
-\end{align}
-can produce a matrix that is \emph{not} positive definite. Standard gradient-based methods operate on unconstrained Euclidean space and have no built-in mechanism to respect the positive-definiteness constraint --- the constraint is simply violated as a by-product of the update, leading to numerical failure (negative variances, failed Cholesky in later steps, NaN in the ELBO).
 
-\subsection*{The Cholesky Solution: Structural Guarantee}
 
-Cholesky decomposition eliminates the constraint by parameterising $\bm{\Sigma}_\beta$ in terms of a lower-triangular factor $\bm{L}$:
-\begin{align}
-  \bm{\Sigma}_\beta &= \bm{L}\bm{L}^T, \qquad L_{ii} > 0 \quad \forall i
-\end{align}
 
-The fundamental insight is that \textbf{every} lower-triangular matrix $\bm{L}$ with strictly positive diagonal entries produces a valid symmetric positive definite matrix:
 
-\begin{itemize}
-  \item \textbf{Symmetry:} $(\bm{L}\bm{L}^T)^T = (\bm{L}^T)^T\bm{L}^T = \bm{L}\bm{L}^T$ \quad --- automatically symmetric.
-  \item \textbf{Positive definiteness:} For any non-zero $\bm{v} \in \R^p$,
-  \begin{align}
-    \bm{v}^T \bm{L}\bm{L}^T \bm{v} = \|\bm{L}^T\bm{v}\|^2 > 0
-  \end{align}
-  provided $\bm{L}^T$ has full column rank, which holds whenever all $L_{ii} > 0$ (since $\bm{L}$ is lower triangular, its rank equals the number of non-zero diagonal entries).
-\end{itemize}
 
-It is therefore \emph{structurally impossible} to produce an invalid $\bm{\Sigma}_\beta$ by updating $\bm{L}$, regardless of how large or in what direction the gradient step is taken. The constraint is not enforced by a penalty or projection --- it is encoded into the \emph{form} of the parameterisation itself.
 
-\subsection*{Unconstrained Optimisation Over $\bm{\ell}$}
 
-The remaining difficulty is that $L_{ii} > 0$ is still an inequality constraint. This is resolved by log-parameterising the diagonal:
-\begin{align}
-  L_{ii} &= e^{\ell_{ii}}, \quad \ell_{ii} \in \R \qquad \text{(diagonal)}\\
-  L_{ij} &= \ell_{ij}, \quad \ell_{ij} \in \R \qquad \text{(lower off-diagonal)}
-\end{align}
 
-Since $e^{\ell_{ii}} > 0$ for all $\ell_{ii} \in \R$, the optimisation is now over a \emph{fully unconstrained} parameter vector $\bm{\ell} \in \R^{p(p+1)/2}$. No projection, no clipping, no penalty --- any point in $\R^{p(p+1)/2}$ maps to a valid $\bm{L}$, and hence a valid $\bm{\Sigma}_\beta = \bm{L}\bm{L}^T$.
 
-\subsection*{Analogy with Log-Space Parameterisation}
-
-This is the same idea used for the Gamma parameters $a_e, b_e > 0$: instead of constraining $a_e > 0$ directly, we optimise over unconstrained $\eta_a = \log a_e \in \R$ and recover $a_e = e^{\eta_a}$, which is always positive. Cholesky + log-diagonal does the same thing for the cone of symmetric positive definite matrices: it provides a smooth bijection between unconstrained Euclidean space and the constraint set, so standard optimisation machinery applies without modification.
-
-\subsection*{Why This Is Not in the Course Notes}
-
-Cholesky reparameterisation is a \emph{numerical implementation technique}, not a course-level optimisation concept. The course teaches the optimisation methods (gradient ascent, Newton, BFGS); Cholesky is the domain-specific choice of how to handle the manifold structure of the constraint set $\bm{\Sigma}_\beta \succ 0$ when applying those methods to this problem. It is standard practice in variational inference and Bayesian computation.
-
-\subsection*{Reference}
-
-\noindent\textbf{Wainwright, M.J.\ and Jordan, M.I.} (2008).
-\textit{Graphical Models, Exponential Families, and Variational Inference}.
-Foundations and Trends\textregistered{} in Machine Learning, \textbf{1}(1--2), pp.\ 1--305.
-DOI: \href{https://doi.org/10.1561/2200000001}{10.1561/2200000001}
-\begin{itemize}
-  \item Section 3.4 --- exponential families, natural parameterisation, and covariance structure.
-\end{itemize}
-
-\bigskip
 
 \section{VB Posterior Variance Collapse}
+\label{app:vb-collapse}
+
+\subsection*{Why Variance Collapse Happens}
+
+Variational inference finds $q(\bm{\theta})$ by minimising the KL divergence from $q$ to the true posterior $p(\bm{\theta}\mid\bm{y})$:
+\begin{equation}
+  \mathrm{KL}[q \| p] = \int q(\bm{\theta}) \log \frac{q(\bm{\theta})}{p(\bm{\theta}\mid\bm{y})} \, d\bm{\theta}
+\end{equation}
+This is called the \emph{forward} (or \emph{exclusive}) KL divergence. The critical asymmetry: this expression is large when $q$ places mass where $p$ is small, but contributes \emph{zero} when $q$ places no mass where $p$ is large. The optimiser therefore drives $q$ to avoid regions where $p$ is small --- but has no incentive whatsoever to cover regions where $p$ is large. The result is a $q$ that locks onto the high-probability core of $p$ and ignores the tails, systematically underestimating posterior variance.
+
+This is sometimes called \emph{zero-forcing} behaviour: $q$ is forced to be zero in low-probability regions of $p$, but is not forced to cover high-probability regions. The reverse direction $\mathrm{KL}[p \| q]$ --- called the \emph{reverse} or \emph{inclusive} KL --- would instead force $q$ to cover all regions where $p$ has mass, producing over-dispersed approximations. Neither direction recovers the true posterior exactly; standard VI picks the under-dispersed failure mode.
+
+Mean-field factorisation compounds the problem: by forcing $q(\bm{\beta}, \tau_e) = q(\bm{\beta})\,q(\tau_e)$, any true posterior correlation between $\bm{\beta}$ and $\tau_e$ is set to zero by assumption. Posterior correlations that would otherwise widen the marginals are simply removed, squeezing the approximation tighter.
+
+\subsection*{Observation}
+
+Comparison of the VB posterior against the MCMC (Gibbs sampler) gold standard confirms this: the mean-field VB approximation systematically underestimates posterior variance --- a well-known failure mode of mean-field variational inference. This will be demonstrated empirically as the first Python task, by running both methods on the same synthetic dataset and computing the SD ratio (VB $\sigma$ / Gibbs $\sigma$) for each parameter. Ratios below 1.0 confirm collapse; the magnitude of the shortfall motivates the constraint-handling approaches below.
+
+\subsection*{Three Approaches to Prevent Collapse}
+
+\subsubsection*{1. Informative Prior on $\tau_e$}
+
+Set non-zero prior hyperparameters $(\alpha_e, \gamma_e)$ to place a lower bound on the posterior variance. A tight prior on $\tau_e$ prevents the precision from being driven too high, which in turn keeps $\bm{\Sigma}_\beta$ from collapsing.
+
+\textbf{Mechanism:} The CAVI update for $b_e$ is:
+\begin{align}
+  b_e &\leftarrow \gamma_e + \frac{1}{2}\left[\|\bm{y} - \bm{X}\bm{\mu}_\beta\|^2 + \mathrm{tr}(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)\right]
+\end{align}
+With $\gamma_e > 0$, $b_e$ has a minimum floor, bounding $\mathbb{E}[\tau_e] = a_e/b_e$ from above.
+
+\textbf{Limitation:} Changes the model; requires prior elicitation.
+
+\subsubsection*{2. Variance Lower Bound Constraint}
+
+After each CAVI update, clip $\bm{\Sigma}_\beta$ so its diagonal never falls below a minimum threshold $\sigma^2_{\min}$:
+\begin{align}
+  \Sigma_{\beta,jj} &\leftarrow \max\!\left(\Sigma_{\beta,jj},\; \sigma^2_{\min}\right) \quad \forall j
+\end{align}
+
+This was already noted in the Constraints section as an optional minimum variance constraint. In code:
+\begin{verbatim}
+Sigma_diag = np.diag(self.Sigma_beta)
+np.fill_diagonal(self.Sigma_beta,
+    np.maximum(Sigma_diag, sigma_min))
+\end{verbatim}
+
+\textbf{Limitation:} Ad hoc; does not arise from a principled objective modification.
+
+\subsubsection*{3. Entropy Regularisation of the ELBO}
+
+Add a regularisation term proportional to the entropy $H[q]$ of the variational distribution to the objective:
+\begin{align}
+  \mathcal{L}_{\text{reg}}(\bm{\phi}) &= \mathcal{L}(\bm{\phi}) + \lambda \cdot H[q(\bm{\beta})]
+\end{align}
+
+For $q(\bm{\beta}) = \mathcal{N}(\bm{\mu}_\beta, \bm{\Sigma}_\beta)$, the Gaussian entropy is:
+\begin{align}
+  H[q(\bm{\beta})] &= \frac{1}{2} \log \det(2\pi e\, \bm{\Sigma}_\beta)
+               = \frac{p}{2}(1 + \log 2\pi) + \frac{1}{2}\log\det(\bm{\Sigma}_\beta)
+\end{align}
+\newpage
+\section{VB Posterior Variance Collapse}
+\label{app:vb-collapse}
 
 \subsection*{Why Variance Collapse Happens}
 
@@ -944,6 +1012,77 @@ This directly rewards larger $\bm{\Sigma}_\beta$, counteracting the collapse ten
 \subsection*{Selected Approach for This Project}
 
 Entropy regularisation (Approach 3) will be implemented and compared against the unregularised ELBO. The regularisation parameter $\lambda$ will be treated as a hyperparameter and tuned by comparing posterior interval coverage against the MCMC reference. Results will be presented as a secondary comparison alongside the main method comparison.
+
+\section{Cholesky Reparameterisation: Structural Constraint Satisfaction}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Cholesky Reparameterisation: Structural Constraint Satisfaction}
+\label{app:cholesky}
+
+\subsection*{The Problem with Direct Optimisation}
+
+The covariance matrix $\bm{\Sigma}_\beta$ must satisfy $\bm{\Sigma}_\beta \succ 0$ (symmetric positive definite) at every iteration. If the optimiser updates $\bm{\Sigma}_\beta$ directly, a gradient step of the form
+\begin{align}
+  \bm{\Sigma}_\beta^{(t+1)} &= \bm{\Sigma}_\beta^{(t)} + \alpha_t \,\nabla_{\bm{\Sigma}_\beta}\mathcal{L}
+\end{align}
+can produce a matrix that is \emph{not} positive definite. Standard gradient-based methods operate on unconstrained Euclidean space and have no built-in mechanism to respect the positive-definiteness constraint --- the constraint is simply violated as a by-product of the update, leading to numerical failure (negative variances, failed Cholesky in later steps, NaN in the ELBO).
+
+\subsection*{The Cholesky Solution: Structural Guarantee}
+
+Cholesky decomposition eliminates the constraint by parameterising $\bm{\Sigma}_\beta$ in terms of a lower-triangular factor $\bm{L}$:
+\begin{align}
+  \bm{\Sigma}_\beta &= \bm{L}\bm{L}^T, \qquad L_{ii} > 0 \quad \forall i
+\end{align}
+
+The fundamental insight is that \textbf{every} lower-triangular matrix $\bm{L}$ with strictly positive diagonal entries produces a valid symmetric positive definite matrix:
+
+\begin{itemize}
+  \item \textbf{Symmetry:} $(\bm{L}\bm{L}^T)^T = (\bm{L}^T)^T\bm{L}^T = \bm{L}\bm{L}^T$ \quad --- automatically symmetric.
+  \item \textbf{Positive definiteness:} For any non-zero $\bm{v} \in \R^p$,
+  \begin{align}
+    \bm{v}^T \bm{L}\bm{L}^T \bm{v} = \|\bm{L}^T\bm{v}\|^2 > 0
+  \end{align}
+  provided $\bm{L}^T$ has full column rank, which holds whenever all $L_{ii} > 0$ (since $\bm{L}$ is lower triangular, its rank equals the number of non-zero diagonal entries).
+\end{itemize}
+
+It is therefore \emph{structurally impossible} to produce an invalid $\bm{\Sigma}_\beta$ by updating $\bm{L}$, regardless of how large or in what direction the gradient step is taken. The constraint is not enforced by a penalty or projection --- it is encoded into the \emph{form} of the parameterisation itself.
+
+\subsection*{Unconstrained Optimisation Over $\bm{\ell}$}
+
+The remaining difficulty is that $L_{ii} > 0$ is still an inequality constraint. This is resolved by log-parameterising the diagonal:
+\begin{align}
+  L_{ii} &= e^{\ell_{ii}}, \quad \ell_{ii} \in \R \qquad \text{(diagonal)}\\
+  L_{ij} &= \ell_{ij}, \quad \ell_{ij} \in \R \qquad \text{(lower off-diagonal)}
+\end{align}
+
+Since $e^{\ell_{ii}} > 0$ for all $\ell_{ii} \in \R$, the optimisation is now over a \emph{fully unconstrained} parameter vector $\bm{\ell} \in \R^{p(p+1)/2}$. No projection, no clipping, no penalty --- any point in $\R^{p(p+1)/2}$ maps to a valid $\bm{L}$, and hence a valid $\bm{\Sigma}_\beta = \bm{L}\bm{L}^T$.
+
+\subsection*{Analogy with Log-Space Parameterisation}
+
+This is the same idea used for the Gamma parameters $a_e, b_e > 0$: instead of constraining $a_e > 0$ directly, we optimise over unconstrained $\eta_a = \log a_e \in \R$ and recover $a_e = e^{\eta_a}$, which is always positive. Cholesky + log-diagonal does the same thing for the cone of symmetric positive definite matrices: it provides a smooth bijection between unconstrained Euclidean space and the constraint set, so standard optimisation machinery applies without modification.
+
+\subsection*{Why This Is Not in the Course Notes}
+
+Cholesky reparameterisation is a \emph{numerical implementation technique}, not a course-level optimisation concept. The course teaches the optimisation methods (gradient ascent, Newton, BFGS); Cholesky is the domain-specific choice of how to handle the manifold structure of the constraint set $\bm{\Sigma}_\beta \succ 0$ when applying those methods to this problem. It is standard practice in variational inference and Bayesian computation.
+ 
+ 
+
+\newpage
+
 
 \section*{Summary}
 

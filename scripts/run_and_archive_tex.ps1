@@ -66,7 +66,11 @@ Write-Host "Compiling: $texBase (pass 1)..."
 Push-Location $archiveTex
 try {
     xelatex -interaction=nonstopmode "$archiveTexFile"
+    Write-Host "Running biber: $texBase..."
+    biber "$texBase"
     Write-Host "Compiling: $texBase (pass 2)..."
+    xelatex -interaction=nonstopmode "$archiveTexFile"
+    Write-Host "Compiling: $texBase (pass 3)..."
     xelatex -interaction=nonstopmode "$archiveTexFile"
 }
 finally {
