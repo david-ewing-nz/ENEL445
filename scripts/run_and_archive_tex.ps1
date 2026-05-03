@@ -66,11 +66,18 @@ Write-Host "Compiling: $texBase (pass 1)..."
 Push-Location $archiveTex
 try {
     xelatex -interaction=nonstopmode "$archiveTexFile"
-    Write-Host "Running biber: $texBase..."
-    biber "$texBase"
+
+    # Run biber after first xelatex pass so biblatex entries are processed
+    Write-Host "Running biber for: $texBase ..."
+    if (Get-Command biber -ErrorAction SilentlyContinue) {
+        biber $texBase
+    } elseif (Test-Path (Join-Path $miktexBin 'biber.exe')) {
+        & (Join-Path $miktexBin 'biber.exe') $texBase
+    } else {
+        Write-Host "Warning: biber not found on PATH; bibliography will not be processed."
+    }
+
     Write-Host "Compiling: $texBase (pass 2)..."
-    xelatex -interaction=nonstopmode "$archiveTexFile"
-    Write-Host "Compiling: $texBase (pass 3)..."
     xelatex -interaction=nonstopmode "$archiveTexFile"
 }
 finally {

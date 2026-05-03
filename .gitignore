@@ -42,5 +42,5 @@ figs/
 archive/
 
 # Generated PDF and HTML outputs
-results/pdf/
-results/html/
+#results/pdf/
+#results/html/
