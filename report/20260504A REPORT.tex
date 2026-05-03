@@ -85,14 +85,15 @@ increase plus a curvature condition---to guarantee the gradient-difference
 vector $\bm{y}_t^T \bm{s}_t > 0$, which is required for the BFGS update
 to maintain positive definiteness of the approximate inverse Hessian.
 
-Exit conditions are defined uniformly across all methods.
-Iteration terminates when any of the following hold: (i) gradient norm
-$\lVert\nabla\ELBO\rVert < \varepsilon_g$; (ii) relative ELBO change
-$\lvert\Delta\ELBO\rvert / \lvert\ELBO\rvert < \varepsilon_r$; (iii)
-parameter change $\lVert\Delta\bm{\phi}\rVert < \varepsilon_\phi$; or
-(iv) a maximum iteration count is reached. CAVI additionally monitors
-$\max_i \lvert\phi_i^{(t+1)} - \phi_i^{(t)}\rvert /
-\lvert\phi_i^{(t+1)}\rvert < \varepsilon$.
+Exit conditions are defined uniformly across all methods. Iteration terminates when any of the following hold:
+\begin{enumerate}[label=(\roman*)]
+  \item Gradient norm: $\lVert\nabla\ELBO\rVert < \varepsilon_g$.
+  \item Relative ELBO change: $\lvert\Delta\ELBO\rvert / \lvert\ELBO\rvert < \varepsilon_r$.
+  \item Parameter change: $\lVert\Delta\bm{\phi}\rVert < \varepsilon_\phi$.
+  \item Maximum iterations: $t \ge t_{\max}$.
+\end{enumerate}
+
+CAVI additionally monitors $\max_i \lvert\phi_i^{(t+1)} - \phi_i^{(t)}\rvert / \lvert\phi_i^{(t+1)}\rvert < \varepsilon$.
 
 Convergence rates and per-iteration costs are compared across all methods.
 BFGS offers the best practical balance of convergence speed and
