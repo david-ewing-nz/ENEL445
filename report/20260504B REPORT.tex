@@ -165,15 +165,17 @@ Having established that VI converts posterior inference into optimisation, the p
 For Bayesian linear regression with $p$ predictors, the variational parameters (decision variables) are:
 \begin{itemize}
 \item $\bm{\mu}_\beta \in \R^p$: posterior mean of regression coefficients
-\item $\bm{\Sigma}_\beta \in \R^{p \times p}$: posterior covariance (symmetric positive definite\footnote{A matrix $\bm{A}$ is \textbf{positive definite} 
-if $\bm{v}^T\bm{A}\bm{v} > 0$ for every non-zero vector $\bm{v}$. Intuitively: the matrix amplifies every 
+\item $\bm{\Sigma}_\beta \in \R^{p \times p}$: posterior covariance 
+(symmetric positive definite)\footnote{A matrix $\bm{A}$ is \textbf{positive definite} 
+if $\bm{v}^T\bm{A}\bm{v} > 0$ for every non-zero vector $\bm{v}$. This means that the matrix amplifies every 
 direction --- there is no direction in which it squashes things to zero or flips them negative. For a
- covariance matrix this means every direction in parameter space has genuine positive uncertainty. 
- Written $\bm{A} \succ 0$.})
+ covariance matrix this means every direction in parameter space has \underline{genuine positive uncertainty}. 
+ Written $\bm{A} \succ 0$.}
 \item $a_e, b_e > 0$: shape and rate parameters of the variational Gamma factor for precision
 \end{itemize}
 
-Here, $a_e$ and $b_e$ parameterise $q(\tau_e)=\mathrm{Gamma}(a_e,b_e)$; the model prior on $\tau_e$ is specified in the Test Case section.
+Here, $a_e$ and $b_e$ parameterise $q(\tau_e)=\mathrm{Gamma}(a_e,b_e)$; 
+the model prior on $\tau_e$ is specified in the Test Case section.  \vspace{1em} 
 
 Total dimension: $d = p + \frac{p(p+1)}{2} + 2 = 11$ variables for $p=3$ predictors.
 
@@ -192,7 +194,7 @@ where $\bm{\phi} = (\bm{\mu}_\beta, \bm{\Sigma}_\beta, a_e, b_e)$ are the variat
 \subsection*{Constraints}
 
 \begin{itemize}
-\item $\bm{\Sigma}_\beta \succ 0$: Covariance matrix must be positive definite (see also: positive semidefinite, $\bm{A} \succeq 0$\footnote{\textbf{Positive semidefinite} ($\bm{A} \succeq 0$) allows $\bm{v}^T\bm{A}\bm{v} = 0$ for some non-zero $\bm{v}$, meaning some combination of coefficients has \emph{exactly} zero uncertainty --- the distribution is flat in that direction. A valid covariance matrix only needs to be positive semidefinite, but a semidefinite (not strictly definite) matrix is non-invertible\footnote{A matrix is \textbf{invertible} if $\bm{A}^{-1}$ exists, meaning the equation $\bm{A}\bm{x}=\bm{b}$ has a unique solution for any $\bm{b}$. Equivalently: none of the eigenvalues are zero. The precision matrix $\bm{\Sigma}_\beta^{-1}$ appears in the ELBO and CAVI updates; if $\bm{\Sigma}_\beta$ is not invertible these computations fail.} and leads to degenerate directions.\footnote{A \textbf{degenerate direction} is a direction $\bm{v}$ in which the distribution has zero spread --- the posterior is completely certain that $\bm{v}^T\bm{\beta}$ takes one exact value with no uncertainty. Geometrically: the probability ellipsoid is flat (squashed to zero thickness) along $\bm{v}$. This corresponds to a zero eigenvalue and makes the covariance matrix singular (non-invertible). It usually signals numerical collapse or that the data perfectly determines some linear combination of $\bm{\beta}$.}})
+\item $\bm{\Sigma}_\beta \succ 0$: Covariance matrix must be positive definite (see also: positive semidefinite, $\bm{A} \succeq 0)$\footnote{\textbf{Positive semidefinite} ($\bm{A} \succeq 0$) allows $\bm{v}^T\bm{A}\bm{v} = 0$ for some non-zero $\bm{v}$, meaning some combination of coefficients has \emph{exactly} zero uncertainty --- the distribution is flat in that direction. A valid covariance matrix only needs to be positive semidefinite, but a semidefinite (not strictly definite) matrix is non-invertible (a matrix is \textbf{invertible} if $\bm{A}^{-1}$ exists, meaning the equation $\bm{A}\bm{x}=\bm{b}$ has a unique solution for any $\bm{b}$; equivalently, none of the eigenvalues are zero). The precision matrix $\bm{\Sigma}_\beta^{-1}$ appears in the ELBO and CAVI updates, so a non-invertible covariance causes those computations to fail. Such a semidefinite matrix also leads to \emph{degenerate directions}: a \textbf{degenerate direction} is one in which the distribution has zero spread (the probability ellipsoid is flat along that direction), which corresponds to a zero eigenvalue and makes the covariance singular.}
 \item $a_e, b_e > 0$: Gamma parameters must be positive
 \item Optional: Minimum variance constraints $\sigma^2_{\beta_j} \geq \sigma^2_{\text{min}}$ to prevent underdispersion
 \end{itemize}
