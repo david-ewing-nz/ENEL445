@@ -1,0 +1,19 @@
+[0] Config.pm:328> INFO - This is Biber 2.21
+[0] Config.pm:331> INFO - Logfile is '20260505C REPORT.blg'
+[111] biber-MSWIN64:342> INFO - === 
+[220] Biber.pm:421> INFO - Reading '20260505C REPORT.bcf'
+[364] Biber.pm:999> INFO - Using all citekeys in bib section 0
+[389] Biber.pm:4487> INFO - Processing section 0
+[415] Biber.pm:4678> INFO - Looking for bibtex file 'D:/github/ENEL445/report/references.bib' for section 0
+[434] bibtex.pm:1713> INFO - LaTeX decoding ...
+[448] bibtex.pm:1519> INFO - Found BibTeX data source 'D:/github/ENEL445/report/references.bib'
+[539] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'normalization = NFD' with 'normalization = prenormalized'
+[539] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'variable = shifted' with 'variable = non-ignorable'
+[540] Biber.pm:4307> INFO - Sorting list 'nyt/apasortcite//global/global/global' of type 'entry' with template 'nyt' and locale 'en-US'
+[540] Biber.pm:4313> INFO - No sort tailoring available for locale 'en-US'
+[552] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'normalization = NFD' with 'normalization = prenormalized'
+[552] UCollate.pm:68> INFO - Overriding locale 'en-US' defaults 'variable = shifted' with 'variable = non-ignorable'
+[553] Biber.pm:4307> INFO - Sorting list 'nyt/global//global/global/global' of type 'entry' with template 'nyt' and locale 'en-US'
+[553] Biber.pm:4313> INFO - No sort tailoring available for locale 'en-US'
+[599] bbl.pm:676> INFO - Writing '20260505C REPORT.bbl' with encoding 'UTF-8'
+[603] bbl.pm:779> INFO - Output to 20260505C REPORT.bbl

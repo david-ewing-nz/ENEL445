@@ -9,6 +9,7 @@
 \usepackage{bm}
 \usepackage[useregional]{datetime2}
 \usepackage{enumitem}
+\usepackage{booktabs}
 \usepackage{float}
 \usepackage{framed}
 \usepackage[a4paper, margin=2.5cm]{geometry}
@@ -213,20 +214,52 @@ with dimension $d=p+p(p+1)/2+2$. For $p=3$, this gives $d=3+6+2=11$ parameters t
 \subsection{Key Notation}
 
 \begin{center}
-\begin{tabular}{ll}
-\hline
+\begin{tabular}{@{}ll@{}}
+\toprule
 Symbol & Meaning \\
-\hline
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Bayesian model}} \\
+$\bm{X}$ & Design matrix ($n \times p$) \\
+$\bm{y}$ & Response vector \\
 $\bm{\beta}$ & Regression coefficient vector \\
-$\bm{u}$ & Random effects vector (hierarchical model) \\
-$\bm{\varepsilon}$ & Observation noise vector \\
 $\tau_e$ & Observation-noise precision \\
-$\tau_u$ & Random-effects precision \\
+$\alpha_e,\,\gamma_e$ & Shape and rate of the prior on $\tau_e$ \\
+$p$ & Number of predictors \\
+$n$ & Number of observations \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Variational approximation}} \\
+$q(\cdot)$ & Variational approximating distribution \\
+$\bm{\phi}$ & Full variational parameter vector $(\bm{\mu}_\beta,\bm{\Sigma}_\beta,a_e,b_e)$ \\
 $\bm{\mu}_\beta$ & Mean of variational posterior $q(\bm{\beta})$ \\
 $\bm{\Sigma}_\beta$ & Covariance of variational posterior $q(\bm{\beta})$ \\
-$\bm{L}$ & Lower-triangular Cholesky factor of $\bm{\Sigma}_\beta$ \\
-$\eta_a, \eta_b$ & Log-space parameters for $a_e, b_e$ \\
-\hline
+$a_e,\,b_e$ & Shape and rate of variational $q(\tau_e)=\mathrm{Gamma}(a_e,b_e)$ \\
+$\mathcal{L}(\bm{\phi})$ & Evidence Lower Bound (ELBO) \\
+$H[q(\bm{\beta})]$ & Differential entropy of $q(\bm{\beta})$ \\
+$\lambda$ & Entropy regularisation weight \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Reparameterisation}} \\
+$\bm{L}$ & Lower-triangular Cholesky factor, $\bm{\Sigma}_\beta=\bm{L}\bm{L}^T$ \\
+$\tilde{\ell}_{ii}$ & Log-diagonal entry, $L_{ii}=e^{\tilde{\ell}_{ii}}$ (ensures $L_{ii}>0$) \\
+$\bm{\xi}$ & Unconstrained optimisation vector $(\bm{\mu}_\beta,\tilde{\ell}_{11},\ell_{21},\ldots,\eta_a,\eta_b)$ \\
+$\eta_a,\,\eta_b$ & Log-space parameters, $a_e=e^{\eta_a}$, $b_e=e^{\eta_b}$ \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Optimisation}} \\
+$\bm{d}^{(t)}$ & Search direction at iteration $t$ \\
+$\alpha_t$ & Step size (line-search parameter) at iteration $t$ \\
+$\nabla\mathcal{L}$ & Gradient of the ELBO w.r.t.\ $\bm{\xi}$ \\
+$\nabla^2\mathcal{L}$ & Hessian of the ELBO w.r.t.\ $\bm{\xi}$ \\
+$\bm{B}_t$ & BFGS inverse-Hessian approximation at iteration $t$ \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Special functions}} \\
+$\psi(x)$ & Digamma function, $\psi(x)=\tfrac{d}{dx}\log\Gamma(x)$ \\
+$\psi^{(1)}(x)$ & Trigamma function, $\psi^{(1)}(x)=\tfrac{d}{dx}\psi(x)$ \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Lecture correspondence} (Prof.\ R.\,S.\ Smith, ENEL445 2026)} \\
+$\Phi$ & Regressor matrix $=\bm{X}$ in this report \\
+$\theta$ & Coefficient vector $=\bm{\beta}$ in this report \\
+$d$ & Number of parameters $=p$ in this report \\
+$J(\theta)$ & Cost function $=\mathcal{L}(\bm{\phi})$ (ELBO) in this report \\
+\bottomrule
 \end{tabular}
 \end{center}
 \section{Optimisation Problem Formulation}
