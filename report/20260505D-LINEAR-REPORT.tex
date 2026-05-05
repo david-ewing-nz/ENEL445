@@ -370,7 +370,7 @@ The numerical experiments compare the variational posterior against a Gibbs samp
 \begin{align}
 \frac{\sigma_{\mathrm{VB}}}{\sigma_{\mathrm{Gibbs}}}
 \end{align}
-is used as a direct diagnostic. Ratios below one indicate that the variational approximation is narrower than the Gibbs reference.
+is used as a direct diagnostic. Ratios below one indicate that the variational approximation is narrower than the Gibbs reference (i.e., \emph{posterior variance collapse}).
 
 \subsection{Approaches Considered}
 
@@ -408,17 +408,17 @@ The regularised gradient with respect to the covariance matrix gains the additio
 + \frac{\lambda}{2}\bm{\Sigma}_\beta^{-1}.
 \end{align}
 This term rewards broader covariance estimates and directly counters the tendency toward overly narrow posterior approximations.
-\section{Constraint Handling via Reparameterisation}
+\section{Constraint Handling via Reparameterisation (a Variable Transformation)}
 
 The variational parameters are not free. $\bm{\Sigma}_\beta$ must remain symmetric positive definite throughout optimisation,\footnote{$\bm{\Sigma}_\beta$ is the covariance matrix of $q(\bm{\beta}) = \mathcal{N}(\bm{\mu}_\beta,\bm{\Sigma}_\beta)$. A valid covariance matrix must be symmetric positive definite: $\log|\bm{\Sigma}_\beta|$ and $\bm{\Sigma}_\beta^{-1}$ both appear in the ELBO and its gradient, so a non-positive-definite $\bm{\Sigma}_\beta$ causes immediate numerical failure.} and $a_e, b_e$ must remain strictly positive.\footnote{$a_e$ and $b_e$ are the shape and rate of $q(\tau_e)=\mathrm{Gamma}(a_e,b_e)$. The Gamma distribution is only defined for positive parameters; negative or zero values make $\log\Gamma(a_e)$ and $\psi(a_e)$ (digamma) undefined.} Four strategies exist for handling these constraints in a gradient-based optimiser: ignore them (the algorithm crashes when $\log|\bm{\Sigma}_\beta|$ becomes undefined); add a penalty term (introduces a tuning parameter and ill-conditioning as $\rho \to \infty$); project back to the feasible set after each step (costs $O(p^3)$ per iteration and is non-differentiable at the boundary, breaking BFGS); or reparameterise so the constraints are encoded structurally and cannot be violated. This work uses reparameterisation throughout---it requires no tuning parameters, no outer loops, and produces a smooth unconstrained problem fully compatible with gradient ascent, Newton, and BFGS. Two transformations are applied: one for the matrix constraint on $\bm{\Sigma}_\beta$, and one for the scalar positivity constraints on $a_e$ and $b_e$.
 
-\subsection*{Cholesky Reparameterisation}
+\subsection*{Cholesky Reparameterisation (a Matrix Transformation)}
 
 $\bm{\Sigma}_\beta$ is the covariance matrix of the variational distribution $q(\bm{\beta}) = \N(\bm{\mu}_\beta, \bm{\Sigma}_\beta)$, and must therefore remain symmetric positive definite (SPD) at every iteration. A gradient step has no awareness of this constraint: nothing stops an update from producing a matrix with a negative eigenvalue, after which $\log|\bm{\Sigma}_\beta|$ and $\bm{\Sigma}_\beta^{-1}$ are undefined and the algorithm crashes.
 
 The transformation is $\bm{\Sigma}_\beta = \bm{L}\bm{L}^T$, where $\bm{L}$ is lower triangular. Optimising over $\bm{L}$ instead of $\bm{\Sigma}_\beta$ directly ensures any $\bm{L}$ produces a valid symmetric positive semidefinite matrix by construction. However, a residual constraint remains: the diagonal entries $\ell_{ii}$ must be strictly positive for $\bm{\Sigma}_\beta$ to be positive definite rather than merely positive semidefinite. Three options exist: ignore the diagonal constraint (positivity can still be violated, recovering the original problem); apply a softplus function $\ell_{ii} = \log(1 + e^{u_i})$ (valid but less standard); or apply a log-space transformation $\ell_{ii} = e^{\tilde{\ell}_{ii}}$, keeping $\tilde{\ell}_{ii} \in \R$ unconstrained. The log-space option is used here. The parameter count is unchanged at $p(p+1)/2$ free entries: $p$ log-diagonal entries $\tilde{\ell}_{ii}$ and $p(p-1)/2$ unconstrained off-diagonal entries $\ell_{ij}$, $i > j$.
 
-\subsection*{Log-Space Reparameterisation}
+\subsection*{Log-Space Reparameterisation (a Scalar Transformation)}
 
 The Gamma shape and rate parameters $a_e, b_e > 0$ carry a scalar positivity constraint. The same reparameterisation principle applies: define $\eta_a = \log a_e$ and $\eta_b = \log b_e$, so that $a_e = e^{\eta_a}$ and $b_e = e^{\eta_b}$. Since the exponential function maps $\R$ onto $(0, \infty)$, the optimiser moves $\eta_a, \eta_b$ freely over the real line and the positivity constraint is structurally impossible to violate. This is the scalar analogue of the Cholesky diagonal transformation, and the same principle as substituting $x = e^t$ to eliminate $x > 0$ in single-variable optimisation.
 
@@ -768,10 +768,10 @@ Given initial $\bm{\Sigma}_\beta^{(0)}$, compute Cholesky:
 \STATE $\text{max\_iter} \leftarrow 50$
 \STATE $k \leftarrow 0$
 \WHILE{$k < \text{max\_iter}$}
-    \STATE Compute trial point: $\bm{\xi}_{\text{trial}} \leftarrow \bm{\xi}^{(t)} + \alpha \bm{d}^{(t)}$
-    \STATE Evaluate: $\mathcal{L}_{\text{trial}} \leftarrow \mathcal{L}(\bm{\xi}_{\text{trial}})$
-    \STATE Compute sufficient decrease threshold: $\mathcal{L}_{\text{threshold}} \leftarrow \mathcal{L}(\bm{\xi}^{(t)}) + c_1 \alpha (\nabla \mathcal{L}^{(t)})^T \bm{d}^{(t)}$
-    \IF{$\mathcal{L}_{\text{trial}} \geq \mathcal{L}_{\text{threshold}}$}
+    \STATE Compute trial point: $\hat{\bm{\xi}} \leftarrow \bm{\xi}^{(t)} + \alpha \bm{d}^{(t)}$
+    \STATE Evaluate: $\hat{\mathcal{L}} \leftarrow \mathcal{L}(\hat{\bm{\xi}})$
+    \STATE Compute sufficient decrease threshold: $\mathcal{L}_{\text{thr}} \leftarrow \mathcal{L}(\bm{\xi}^{(t)}) + c_1 \alpha (\nabla \mathcal{L}^{(t)})^T \bm{d}^{(t)}$
+    \IF{$\hat{\mathcal{L}} \geq \mathcal{L}_{\text{thr}}$}
         \RETURN $\alpha$ \quad \textcolor{blue}{// Armijo condition satisfied}
     \ENDIF
     \STATE $\alpha \leftarrow \rho \alpha$ \quad \textcolor{blue}{// Reduce step size}
