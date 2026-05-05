@@ -36,3 +36,7 @@ System Python at `D:\Python`. Packages in use: `numpy`, `scipy` (`stats`, `speci
   - Examples: optimisation, colour, behaviour, modelled, licence, analyse, centre, fibre
 - **Exception**: external library API arguments and parameter names (numpy, scipy, matplotlib, polars, etc.) must keep their original American English spelling — do NOT change `color=`, `normalize=`, `gray`, `optimize`, etc.
 - Preferred report format: IEEE two-column. LaTeX compiler: `xelatex`. MiKTeX at `D:\MiKTeX`.
+
+## Live Project State
+
+See [README-WHEN-YOU-RETURN.md](../README-WHEN-YOU-RETURN.md) for current git status, file counts, and recently modified files.
