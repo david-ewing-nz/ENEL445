@@ -1689,11 +1689,54 @@ class="math inline">\(\mathbb{R}^{p(p+1)/2}\)</span>, so standard
 gradient steps always remain valid. It is standard practice in
 variational inference and Bayesian computation.</p>
 <h1 id="app:python-code">Python Implementation Structure</h1>
-<p>The numerical experiments are implemented across three Python files.
-<code>vb_algorithms_py.py</code> contains all algorithm logic.
-<code>vb_utils_py.py</code> contains data generation, plotting, parquet
-I/O, and table rendering utilities. <code>linear_run.ipynb</code> is the
-interactive notebook that drives the linear case end to end.</p>
+<p>The implementation follows a top-down sequential process across five
+stages. Each stage depends on the outputs of the previous one and saves
+its results to parquet before proceeding, so that any stage can be
+re-run independently without repeating expensive computation.</p>
+<pre><code># Stage 1: Data generation
+#    - generate_linear_case  -&gt;  data/linear_data.parquet
+#                                figs/linear_data_scatter.png
+
+# Stage 2: ELBO evaluation
+#    - unpack unconstrained parameters (mu_beta, L_chol, log_ae, log_be)
+#    - reconstruct Sigma_beta via Cholesky: Sigma = L @ L.T
+#    - reconstruct a_e, b_e via exp transforms
+#    - evaluate standard or entropy-regularised ELBO
+#    - verify analytical gradient against finite differences (&lt;= 1e-5)
+#                                figs/linear_elbo_gradient_check.png
+#                                figs/linear_elbo_landscape.png
+#                                results/tables/linear_gradient_check.tex
+
+# Stage 3: Optimisation methods
+#    - run_cavi
+#    - run_gradient_ascent    (step-size history recorded)
+#    - run_newton             (Hessian condition number tracked)
+#    - run_bfgs               (via scipy.optimize.minimize)
+#                            -&gt;  data/linear_opt.parquet
+#                                figs/linear_elbo_convergence.png
+#                                figs/linear_gradient_stepsize.png
+#                                figs/linear_newton_condition.png
+
+# Stage 4: Reference sampler
+#    - run_gibbs_sampler      (3 chains, configurable burn-in)
+#                            -&gt;  data/linear_gibbs.parquet
+#                                figs/linear_gibbs_trace_{beta0,beta1,taue}.png
+#                                figs/linear_gibbs_acf_{beta0,beta1,taue}.png
+#                                figs/linear_gibbs_rhat.png
+
+# Stage 5: Diagnostics and comparison
+#    - final ELBO per method
+#    - number of iterations / runtime / convergence status
+#    - posterior mean error:  |mu_VB - mu_Gibbs|
+#    - posterior SD ratio:    sigma_VB / sigma_Gibbs  (variance collapse)
+#    - VB vs Gibbs overlay:   figs/linear_comparison_{beta0,beta1,taue}.png
+#    - VB vs Gibbs density:   figs/linear_vb_gibbs_{beta0,beta1,taue}.png
+#                            -&gt;  figs/linear_sd_ratios.png
+#                                figs/linear_mean_errors.png
+#                                results/tables/linear_performance.tex
+#                                results/tables/linear_posterior_summary.tex</code></pre>
+<p>The three Python files that implement the above are described
+below.</p>
 <h2 class="unnumbered" id="file-vb_algorithms_py.py">File:
 <code>vb_algorithms_py.py</code></h2>
 <ul>

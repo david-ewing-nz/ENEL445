@@ -1114,10 +1114,56 @@ Cholesky reparameterisation is a numerical implementation technique .   Cholesky
 \section{Python Implementation Structure}
 \label{app:python-code}
 
-The numerical experiments are implemented across three Python files.
-\texttt{vb\_algorithms\_py.py} contains all algorithm logic.
-\texttt{vb\_utils\_py.py} contains data generation, plotting, parquet I/O, and table rendering utilities.
-\texttt{linear\_run.ipynb} is the interactive notebook that drives the linear case end to end.
+The implementation follows a top-down sequential process across five stages.
+Each stage depends on the outputs of the previous one and saves its results to parquet before proceeding,
+so that any stage can be re-run independently without repeating expensive computation.
+
+\begin{verbatim}
+# Stage 1: Data generation
+#    - generate_linear_case  ->  data/linear_data.parquet
+#                                figs/linear_data_scatter.png
+
+# Stage 2: ELBO evaluation
+#    - unpack unconstrained parameters (mu_beta, L_chol, log_ae, log_be)
+#    - reconstruct Sigma_beta via Cholesky: Sigma = L @ L.T
+#    - reconstruct a_e, b_e via exp transforms
+#    - evaluate standard or entropy-regularised ELBO
+#    - verify analytical gradient against finite differences (<= 1e-5)
+#                                figs/linear_elbo_gradient_check.png
+#                                figs/linear_elbo_landscape.png
+#                                results/tables/linear_gradient_check.tex
+
+# Stage 3: Optimisation methods
+#    - run_cavi
+#    - run_gradient_ascent    (step-size history recorded)
+#    - run_newton             (Hessian condition number tracked)
+#    - run_bfgs               (via scipy.optimize.minimize)
+#                            ->  data/linear_opt.parquet
+#                                figs/linear_elbo_convergence.png
+#                                figs/linear_gradient_stepsize.png
+#                                figs/linear_newton_condition.png
+
+# Stage 4: Reference sampler
+#    - run_gibbs_sampler      (3 chains, configurable burn-in)
+#                            ->  data/linear_gibbs.parquet
+#                                figs/linear_gibbs_trace_{beta0,beta1,taue}.png
+#                                figs/linear_gibbs_acf_{beta0,beta1,taue}.png
+#                                figs/linear_gibbs_rhat.png
+
+# Stage 5: Diagnostics and comparison
+#    - final ELBO per method
+#    - number of iterations / runtime / convergence status
+#    - posterior mean error:  |mu_VB - mu_Gibbs|
+#    - posterior SD ratio:    sigma_VB / sigma_Gibbs  (variance collapse)
+#    - VB vs Gibbs overlay:   figs/linear_comparison_{beta0,beta1,taue}.png
+#    - VB vs Gibbs density:   figs/linear_vb_gibbs_{beta0,beta1,taue}.png
+#                            ->  figs/linear_sd_ratios.png
+#                                figs/linear_mean_errors.png
+#                                results/tables/linear_performance.tex
+#                                results/tables/linear_posterior_summary.tex
+\end{verbatim}
+
+The three Python files that implement the above are described below.
 
 \subsection*{File: \texttt{vb\_algorithms\_py.py}}
 
