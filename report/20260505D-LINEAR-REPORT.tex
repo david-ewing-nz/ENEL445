@@ -422,6 +422,36 @@ The Gamma shape and rate parameters $a_e, b_e > 0$ carry a scalar positivity con
 After both transformations, the effective optimisation variables are $(\bm{\mu}_\beta,\, \tilde{\ell}_{11}, \ell_{21}, \tilde{\ell}_{22}, \ldots,\, \eta_a, \eta_b)$---all unconstrained reals. The quantities $\bm{\Sigma}_\beta$, $a_e$, $b_e$ are recovered on demand when evaluating the ELBO and its gradients.
 
 
+\section{ELBO Evaluation}
+\label{sec:elbo-evaluation}
+
+Before running any optimiser, the ELBO and its analytical gradient are verified numerically.
+This ensures that the objective function being maximised is correctly implemented and that all
+reparameterisations are consistent.
+
+\subsection{Gradient Verification}
+
+The analytical gradient $\nabla_{\bm{\theta}}\mathcal{L}$ is computed with respect to all unconstrained
+parameters $\bm{\theta} = (\bm{\mu}_\beta,\, \tilde{\ell}_{11}, \ell_{21}, \tilde{\ell}_{22},\, \eta_a, \eta_b)$.
+Each component is checked against a central finite-difference approximation:
+\begin{align}
+  \frac{\partial \mathcal{L}}{\partial \theta_i} \approx \frac{\mathcal{L}(\bm{\theta} + h\bm{e}_i) - \mathcal{L}(\bm{\theta} - h\bm{e}_i)}{2h}, \qquad h = 10^{-5}.
+\end{align}
+The relative error between the analytical and numerical gradient must satisfy
+$\|\nabla_{\mathrm{analytical}} - \nabla_{\mathrm{FD}}\|_\infty / \|\nabla_{\mathrm{analytical}}\|_\infty \leq 10^{-5}$
+for all components before any optimiser is run.
+The result is displayed as a bar chart (\texttt{linear\_elbo\_gradient\_check.png}) comparing analytical and
+finite-difference values side by side for each unconstrained parameter.
+The gradient check table is saved to \texttt{results/tables/linear\_gradient\_check.tex}.
+
+\subsection{ELBO Landscape}
+
+A two-dimensional slice of the ELBO surface is computed by varying $\mu_{\beta_0}$ and $\mu_{\beta_1}$
+over a grid while holding all other parameters fixed at their CAVI optimum.
+This visualises the objective surface that the gradient-based optimisers are navigating and confirms
+that the CAVI solution lies at the maximum.
+The result is saved as \texttt{linear\_elbo\_landscape.png}.
+
 \section{Optimisation Methods}
 
 The optimisation methods are used to investigate posterior variance collapse, not merely to solve the ELBO maximisation problem. Each method is assessed both as a numerical optimiser and as a mechanism for producing a variational posterior whose uncertainty can be compared against a Gibbs sampler reference.

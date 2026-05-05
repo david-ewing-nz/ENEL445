@@ -426,7 +426,7 @@ Bayesian regression problem and a quadratic Bayesian regression problem.
 These are introduced here only to identify the experimental scope; their
 full mathematical definitions and code implementations are given in
 Section <a href="#sec:implementation-details" data-reference-type="ref"
-data-reference="sec:implementation-details">5</a>. The linear case
+data-reference="sec:implementation-details">6</a>. The linear case
 provides the baseline regression setting, while the quadratic case tests
 the same optimisation methods after feature expansion through the
 nonlinear term <span class="math inline">\(x^2\)</span>.</p>
@@ -837,6 +837,41 @@ class="math inline">\(\bm{\Sigma}_\beta\)</span>, <span
 class="math inline">\(a_e\)</span>, <span
 class="math inline">\(b_e\)</span> are recovered on demand when
 evaluating the ELBO and its gradients.</p>
+<h1 id="sec:elbo-evaluation">ELBO Evaluation</h1>
+<p>Before running any optimiser, the ELBO and its analytical gradient
+are verified numerically. This ensures that the objective function being
+maximised is correctly implemented and that all reparameterisations are
+consistent.</p>
+<h2 id="gradient-verification">Gradient Verification</h2>
+<p>The analytical gradient <span
+class="math inline">\(\nabla_{\bm{\theta}}\mathcal{L}\)</span> is
+computed with respect to all unconstrained parameters <span
+class="math inline">\(\bm{\theta} = (\bm{\mu}_\beta,\,
+\tilde{\ell}_{11}, \ell_{21}, \tilde{\ell}_{22},\, \eta_a,
+\eta_b)\)</span>. Each component is checked against a central
+finite-difference approximation: <span
+class="math display">\[\begin{aligned}
+  \frac{\partial \mathcal{L}}{\partial \theta_i} \approx
+\frac{\mathcal{L}(\bm{\theta} + h\bm{e}_i) - \mathcal{L}(\bm{\theta} -
+h\bm{e}_i)}{2h}, \qquad h = 10^{-5}.
+\end{aligned}\]</span> The relative error between the analytical and
+numerical gradient must satisfy <span
+class="math inline">\(\|\nabla_{\mathrm{analytical}} -
+\nabla_{\mathrm{FD}}\|_\infty / \|\nabla_{\mathrm{analytical}}\|_\infty
+\leq 10^{-5}\)</span> for all components before any optimiser is run.
+The result is displayed as a bar chart
+(<code>linear_elbo_gradient_check.png</code>) comparing analytical and
+finite-difference values side by side for each unconstrained parameter.
+The gradient check table is saved to
+<code>results/tables/linear_gradient_check.tex</code>.</p>
+<h2 id="elbo-landscape">ELBO Landscape</h2>
+<p>A two-dimensional slice of the ELBO surface is computed by varying
+<span class="math inline">\(\mu_{\beta_0}\)</span> and <span
+class="math inline">\(\mu_{\beta_1}\)</span> over a grid while holding
+all other parameters fixed at their CAVI optimum. This visualises the
+objective surface that the gradient-based optimisers are navigating and
+confirms that the CAVI solution lies at the maximum. The result is saved
+as <code>linear_elbo_landscape.png</code>.</p>
 <h1 id="optimisation-methods">Optimisation Methods</h1>
 <p>The optimisation methods are used to investigate posterior variance
 collapse, not merely to solve the ELBO maximisation problem. Each method
@@ -916,7 +951,7 @@ methods using gradient norm, relative ELBO change, parameter change, and
 maximum iteration count. The detailed implementation of these conditions
 is given in Section <a href="#sec:implementation-details"
 data-reference-type="ref"
-data-reference="sec:implementation-details">5</a>.</p>
+data-reference="sec:implementation-details">6</a>.</p>
 <h1 id="sec:implementation-details">Test Cases and Implementation
 Details</h1>
 <p>This section defines the two numerical test cases and gives the
@@ -925,7 +960,7 @@ snippets shown here define the data-generation components of the
 experiments. The full implementation structure, including ELBO
 evaluation, CAVI, gradient ascent, Newton’s method, BFGS, and Gibbs
 sampling, is provided in Appendix <a href="#app:python-code"
-data-reference-type="ref" data-reference="app:python-code">11</a>.</p>
+data-reference-type="ref" data-reference="app:python-code">12</a>.</p>
 <h2 id="test-case-1-linear-bayesian-regression">Test Case 1: Linear
 Bayesian Regression</h2>
 <p>The first test case is a linear Bayesian regression problem. It
@@ -1860,12 +1895,12 @@ role="doc-endnotes">
 <hr />
 <ol>
 <li id="fn1"><p>See <a href="#app:vb-collapse" data-reference-type="ref"
-data-reference="app:vb-collapse">9</a> for the full mechanistic
+data-reference="app:vb-collapse">10</a> for the full mechanistic
 explanation.<a href="#fnref1" class="footnote-back"
 role="doc-backlink">↩︎</a></p></li>
 <li id="fn2"><p>This structural constraint is satisfied automatically
 via Cholesky reparameterisation; see <a href="#app:cholesky"
-data-reference-type="ref" data-reference="app:cholesky">10</a>.<a
+data-reference-type="ref" data-reference="app:cholesky">11</a>.<a
 href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
 <li id="fn3"><p>Denoted <span class="math inline">\(\Phi\)</span> and
 called the <em>regressor matrix</em> in lectures (Prof. R. S. Smith,
