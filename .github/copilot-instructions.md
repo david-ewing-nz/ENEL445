@@ -41,6 +41,24 @@ System Python at `D:\Python`. Packages in use: `numpy`, `scipy` (`stats`, `speci
 
 See [README-WHEN-YOU-RETURN.md](../README-WHEN-YOU-RETURN.md) for current git status, file counts, and recently modified files.
 
+## VS Code Keybindings
+
+The following user keybinding is stored at `D:\VSCode\data\user-data\User\keybindings.json` (user-scoped, not workspace). It is **not** reset by VS Code updates but may be lost on a new machine or a clean install.
+
+```json
+{
+    "key": "ctrl+alt+b",
+    "command": "latex-workshop.build",
+    "when": "editorTextFocus && resourceExtname == '.tex'"
+}
+```
+
+**To restore after a VS Code update or on a new machine:**
+1. Open `D:\VSCode\data\user-data\User\keybindings.json` (or File → Preferences → Keyboard Shortcuts → open JSON)
+2. Add the entry above if it is missing
+
+The workspace also has `.vscode/tasks.json` defining a build task that calls `scripts/archive_tex.py` directly, as a fallback.
+
 ## File Execution Rules
 
 ### Python files in `python/`

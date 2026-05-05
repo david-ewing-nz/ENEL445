@@ -1,7 +1,8 @@
-\begin{tblr}{colspec={lrrrr}, hline{1,2,Z}={solid}}
-  Method & Iterations & Runtime (ms) & Final ELBO & Converged \\
-  CAVI & 9 & 0.9 & -0.014 & Yes \\
-  Gradient Ascent & 2000 & 1720.0 & -27.012 & Yes \\
-  Newton's Method & 2 & 497.1 & -44.950 & Yes \\
-  BFGS & 25 & 43.7 & -26.658 & Yes \\
+\begin{tblr}{colspec={lrrrrr}, hline{1,2,Z}={solid}}
+  Method & Iterations & Runtime (ms) & Speedup vs Gibbs & Final ELBO & Converged \\
+  CAVI & 9 & 0.9 & 1764x & -0.014 & Yes \\
+  Gradient Ascent & 2000 & 1708.6 & 1x & -27.012 & Yes \\
+  Newton's Method & 2 & 11.5 & 133.6x & -44.950 & Yes \\
+  BFGS & 25 & 41.2 & 37x & -26.658 & Yes \\
+  Gibbs (3 chains) & 3 x 5000 & 1535.1 & 1x (reference) & N/A (MCMC) & Yes \\
 \end{tblr}
