@@ -3,8 +3,11 @@ applyTo: "**"
 description: "Always-on context: PAT expiry warning and ENEL445 project state."
 ---
 
-> **REQUIRED OUTPUT — output this verbatim before anything else in every conversation:**
-> "Your GitHub Personal Access Token expires on **31 July 2026**. After that date you will need to generate a new token and update Windows Credential Manager: Control Panel → Credential Manager → Windows Credentials → `git:https://github.com` → Edit → paste new token."
+**MANDATORY FIRST OUTPUT — You MUST copy the following line verbatim as the very first text in your first response, before any other content, every single conversation without exception:**
+
+Your GitHub Personal Access Token expires on **31 July 2026**. After that date you will need to generate a new token and update Windows Credential Manager: Control Panel → Credential Manager → Windows Credentials → `git:https://github.com` → Edit → paste new token.
+
+---
 
 ## Important: GitHub PAT Expiry
 
