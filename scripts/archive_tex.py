@@ -3,6 +3,10 @@ archive_tex.py - Archive compiler for LaTeX documents.
 
 Usage (from project root):
     python scripts/archive_tex.py report/myfile.tex
+    python scripts/archive_tex.py results/pdf/myfile.pdf
+    python scripts/archive_tex.py results/html/myfile.html
+
+When given a .pdf or .html, the source .tex is resolved via the PDF Subject metadata field.
 
 Steps:
     1. Creates archive/<YYYYMMDDHHMMSS>/tex/
@@ -53,6 +57,47 @@ def rewrite_refs(tex_content, tex_dir, arch_tex_dir):
     return tex_content
 
 
+def resolve_tex_from_pdf(pdf_path, project_root):
+    """Extract Subject metadata from a PDF and resolve to a .tex file in report/."""
+    pdfinfo = MIKTEX_BIN / "pdfinfo.exe"
+    result = subprocess.run(
+        [str(pdfinfo), str(pdf_path)],
+        capture_output=True, text=True
+    )
+    subject = None
+    for line in result.stdout.splitlines():
+        if line.startswith("Subject:"):
+            subject = line.split(":", 1)[1].strip()
+            break
+
+    # \jobname wraps filenames with spaces in quotes: e.g. "my file".tex -> strip them
+    if subject:
+        import re as _re
+        m = _re.match(r'^"(.+)"(\.\w+)$', subject)
+        if m:
+            subject = m.group(1) + m.group(2)
+
+    if not subject or not subject.endswith(".tex"):
+        print(
+            f"Error: Cannot resolve source .tex file.\n"
+            f"  PDF Subject field contains: {subject!r}\n"
+            f"  To fix: add the following to your .tex preamble and recompile:\n"
+            f"    \\hypersetup{{pdfsubject = {{\\jobname.tex}}}}"
+        )
+        sys.exit(1)
+
+    tex_candidate = project_root / "report" / subject
+    if not tex_candidate.exists():
+        print(
+            f"Error: Source .tex '{subject}' not found in report/.\n"
+            f"  Expected: {tex_candidate}"
+        )
+        sys.exit(1)
+
+    print(f"Resolved source .tex: {tex_candidate}")
+    return tex_candidate
+
+
 def run(cmd, cwd=None):
     print(f"  $ {' '.join(str(c) for c in cmd)}")
     return subprocess.run(cmd, cwd=cwd)
@@ -69,6 +114,16 @@ def main():
     if not target.exists():
         print(f"Error: {target} not found.")
         sys.exit(1)
+
+    # Resolve .pdf or .html to source .tex via PDF metadata
+    if target.suffix.lower() == ".html":
+        pdf_candidate = project_root / "results" / "pdf" / (target.stem + ".pdf")
+        if not pdf_candidate.exists():
+            print(f"Error: no matching PDF found for '{target.name}' in results/pdf/")
+            sys.exit(1)
+        target = resolve_tex_from_pdf(pdf_candidate, project_root)
+    elif target.suffix.lower() == ".pdf":
+        target = resolve_tex_from_pdf(target, project_root)
 
     tex_dir  = target.parent
     tex_base = target.stem
