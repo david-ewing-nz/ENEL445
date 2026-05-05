@@ -11,6 +11,8 @@
 \usepackage{enumitem}
 \usepackage{booktabs}
 \usepackage{float}
+\usepackage{graphicx}
+\usepackage{tabularray}
 \usepackage{framed}
 \usepackage[a4paper, margin=2.5cm]{geometry}
 \usepackage{eso-pic}
@@ -21,6 +23,7 @@
 
 \usepackage[backend=biber, style=apa, sorting=nyt]{biblatex}
 \addbibresource{D:/github/ENEL445/report/references.bib}
+\graphicspath{{D:/github/ENEL445/figs/}}
 
 \usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
 \hypersetup{
@@ -57,7 +60,7 @@ Variational Bayesian Regression
 %ENEL445  \\
 %University of Canterbury
 }
-\date{3 May 2026}
+\date{5 May 2026}
 
 \begin{document}
 
@@ -950,18 +953,241 @@ Acceptable if $\text{error}_i < 10^{-5}$ for all $i$.
  
 
 \section{Results and Discussion}
+\label{sec:results}
 
-The results are organised around the primary question of posterior variance collapse. For each test case, the optimisation methods should be compared using both optimisation diagnostics and posterior-uncertainty diagnostics.
+\subsection{Test Case: Linear Bayesian Regression}
 
-The optimisation diagnostics include final ELBO value, number of iterations, total runtime, line-search behaviour, and convergence status. These quantities determine whether each method successfully solves the numerical optimisation problem.
+The test case uses $n=50$ observations generated from
+$y_i = \beta_0 + \beta_1 x_i + \varepsilon_i$
+with true parameters $\beta_0=2.0$, $\beta_1=1.5$, and noise precision $\tau_e=4.0$
+(noise standard deviation $\sigma_e = 0.5$). Figure~\ref{fig:data} shows the generated dataset.
 
-The posterior diagnostics include posterior mean accuracy and posterior standard deviation relative to the Gibbs sampler. The key variance-collapse diagnostic is the ratio
-\begin{align}
-\frac{\sigma_{\mathrm{VB}}}{\sigma_{\mathrm{Gibbs}}}.
-\end{align}
-A ratio below one indicates that the variational posterior is narrower than the Gibbs reference. The comparison should therefore distinguish between numerical convergence and uncertainty accuracy: a method may converge successfully while still producing an under-dispersed variational posterior.
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\linewidth]{linear_data_scatter.png}
+  \caption{Generated linear regression data ($n=50$). The solid line is the true regression
+    function $\beta_0 + \beta_1 x$; the shaded band is $\pm\sigma_e$.}
+  \label{fig:data}
+\end{figure}
 
-The linear test case provides the baseline comparison. The quadratic test case examines whether the same optimisation and variance-collapse behaviour persists when the design matrix is expanded to include a nonlinear feature.
+\subsubsection{Gradient Verification}
+
+Before running any optimiser, the analytical gradient $\nabla_{\bm{\xi}}\ELBO$ was
+verified by comparison with central finite differences at a non-trivial starting point.
+Table~\ref{tab:gradcheck} reports both gradient values and their relative error.
+For parameters with non-negligible gradient magnitude ($\eta_a$, $\eta_b$), the relative
+error is below $10^{-7}$, confirming that the analytical gradient is correctly implemented.
+The large apparent errors for $\mu_0$, $\mu_1$, and $u_{ij}$ reflect the fact that
+the OLS initialisation places those parameters near the optimum (both values are
+numerically zero; dividing near-zero by near-zero produces an unstable ratio).
+
+\begin{table}[H]
+  \centering
+  \caption{Gradient check at initial point. Relative error is
+    $|g^{\text{analytic}} - g^{\text{FD}}| / \max(|g^{\text{analytic}}|, 10^{-8})$.}
+  \label{tab:gradcheck}
+  \input{../results/tables/linear_gradient_check.tex}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{linear_elbo_gradient_check.png}
+  \caption{Analytical vs.\ finite-difference gradient components. Bars coincide
+    visually for all components, confirming gradient correctness.}
+  \label{fig:gradcheck}
+\end{figure}
+
+\subsubsection{ELBO Landscape}
+
+Figure~\ref{fig:landscape} shows a two-dimensional slice of the ELBO surface
+varying $\mu_{\beta_0}$ and $\mu_{\beta_1}$ while holding all other parameters at
+the CAVI optimum. The surface is smooth and unimodal, with the maximum at the
+CAVI solution, confirming that CAVI has found the global optimum of the variational
+objective within the mean-field family.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.65\linewidth]{linear_elbo_landscape.png}
+  \caption{Two-dimensional ELBO slice varying $\mu_{\beta_0}$ and $\mu_{\beta_1}$
+    at the CAVI optimum. The cross marks the CAVI solution.}
+  \label{fig:landscape}
+\end{figure}
+
+\subsubsection{Optimisation Performance}
+
+Table~\ref{tab:performance} summarises the performance of all four VB methods and
+the Gibbs reference.
+CAVI converges in 9~iterations at 0.9~ms, making it 1764$\times$ faster than the
+Gibbs sampler (1535~ms for $3\times5000$ samples).
+Newton's Method converges in 2~iterations (11.5~ms, 133$\times$ speedup) but reaches
+a worse final ELBO ($-44.95$), indicating it did not find the CAVI optimum.
+BFGS takes 25~iterations (41~ms, 37$\times$) and achieves a better ELBO than Newton
+but still falls short of CAVI.
+Gradient Ascent (2000~iterations, 1709~ms) offers no practical speed advantage over
+Gibbs: the finite-difference gradient overhead dominates on this small problem.
+
+\begin{table}[H]
+  \centering
+  \caption{Optimisation performance summary. Speedup is relative to Gibbs runtime.
+    All VB methods used the same stopping criteria.}
+  \label{tab:performance}
+  \input{../results/tables/linear_performance.tex}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{linear_timing_comparison.png}
+  \caption{Computational cost on a log scale. Annotations show speedup relative to
+    the Gibbs reference (dashed line). CAVI is the clear winner; Gradient Ascent
+    with finite-difference gradients loses its speed advantage entirely.}
+  \label{fig:timing}
+\end{figure}
+
+\subsubsection{ELBO Convergence}
+
+Figure~\ref{fig:elbocv} shows the ELBO trajectory for each method.
+CAVI increases monotonically and converges within 9~iterations.
+Gradient Ascent improves slowly over 2000~iterations and plateaus at a much lower
+ELBO value ($-27.0$) than CAVI ($-0.014$).
+BFGS converges more rapidly than Gradient Ascent but still does not match the CAVI
+solution, suggesting the approximate Hessian is not sufficiently accurate near the optimum.
+Newton's Method reaches its (poor) optimum in 2~steps, consistent with the Hessian
+being ill-conditioned at the true maximum.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{linear_elbo_convergence.png}
+  \caption{ELBO vs.\ iteration for each method. Only methods that update
+    the ELBO iteratively are shown. The dashed horizontal line is the CAVI optimum.}
+  \label{fig:elbocv}
+\end{figure}
+
+\subsubsection{Posterior Accuracy and Variance Collapse}
+
+Table~\ref{tab:posterior} reports posterior means and standard-deviation ratios
+$\sigma_{\mathrm{VB}}/\sigma_{\mathrm{Gibbs}}$ for all methods.
+All methods recover the posterior means accurately: the largest mean error is less
+than 0.01 relative to the Gibbs reference.
+The SD~ratios reveal the degree of variance collapse. CAVI achieves near-unity ratios
+($0.98$--$0.98$) for $\beta_0$ and $\beta_1$, indicating minimal collapse in this
+conjugate linear setting. Newton's Method and Gradient Ascent show larger deviations,
+particularly for $\tau_e$, consistent with their failure to reach the CAVI optimum.
+
+\begin{table}[H]
+  \centering
+  \caption{Posterior summary. SD ratio $= \sigma_{\mathrm{VB}}/\sigma_{\mathrm{Gibbs}}$;
+    values below~1 indicate variance collapse.}
+  \label{tab:posterior}
+  \input{../results/tables/linear_posterior_summary.tex}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{linear_sd_ratios.png}
+  \caption{Standard-deviation ratios $\sigma_{\mathrm{VB}}/\sigma_{\mathrm{Gibbs}}$
+    for each parameter and method. The dashed line at~1 is the Gibbs reference.
+    Ratios below~1 indicate underestimated uncertainty.}
+  \label{fig:sdratios}
+\end{figure}
+
+Figures~\ref{fig:comp_b0}--\ref{fig:comp_tau} compare VB posterior means
+(bars) against the Gibbs mean (pink dashed) and the true parameter value
+(black dotted) for each parameter. All VB methods recover the correct location;
+the dotted True line lies at or near the top of every bar.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{linear_comparison_beta0.png}
+  \caption{Posterior mean (left) and standard deviation (right) for $\beta_0$.
+    Dashed pink: Gibbs mean/SD. Dotted black: true value.}
+  \label{fig:comp_b0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{linear_comparison_beta1.png}
+  \caption{Posterior mean and SD for $\beta_1$.}
+  \label{fig:comp_b1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{linear_comparison_tau_e.png}
+  \caption{Posterior mean and SD for $\tau_e$.}
+  \label{fig:comp_tau}
+\end{figure}
+
+Figures~\ref{fig:vbg_b0}--\ref{fig:vbg_tau} overlay the full posterior
+densities from VB and Gibbs for each parameter, illustrating that the
+variational distributions are centred correctly but narrower than the
+MCMC reference.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{linear_vb_gibbs_beta0.png}
+  \caption{VB and Gibbs posterior densities for $\beta_0$. The vertical dotted
+    line is the true value.}
+  \label{fig:vbg_b0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{linear_vb_gibbs_beta1.png}
+  \caption{VB and Gibbs posterior densities for $\beta_1$.}
+  \label{fig:vbg_b1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{linear_vb_gibbs_tau_e.png}
+  \caption{VB and Gibbs posterior densities for $\tau_e$.}
+  \label{fig:vbg_tau}
+\end{figure}
+
+\subsubsection{Gibbs Sampler Diagnostics}
+
+Figures~\ref{fig:trace_b0}--\ref{fig:rhat} show the Gibbs convergence diagnostics.
+All chains mix well within the first 500~iterations; trace plots show no trend or
+sticking. The Gelman--Rubin $\hat{R}$ statistic is below $1.01$ for all parameters,
+indicating that the 3~chains have converged to the same posterior.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{linear_gibbs_trace_beta0.png}
+  \caption{Gibbs trace plot for $\beta_0$ across 3~chains.}
+  \label{fig:trace_b0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{linear_gibbs_rhat.png}
+  \caption{Gelman--Rubin $\hat{R}$ statistic for all parameters. All values are
+    below the standard convergence threshold of~1.01.}
+  \label{fig:rhat}
+\end{figure}
+
+\subsection{Discussion}
+
+The linear test case is the most favourable setting for mean-field VI.
+The true posterior is unimodal and nearly Gaussian, so the mean-field factorisation
+$q(\bm{\beta},\tau_e) = q(\bm{\beta})\,q(\tau_e)$ loses little information.
+CAVI exploits the conjugate structure to find the optimal mean-field approximation
+in closed form, achieving SD~ratios of 0.98--0.98 — close to one despite the
+factorisation assumption.
+
+The gradient-based methods reveal two distinct failure modes. First, Newton's Method
+and BFGS converge to local optima that are substantially worse than the CAVI solution,
+demonstrating that generic optimisers without analytical gradients can fail even
+on a convex ELBO landscape. Second, Gradient Ascent with finite-difference gradients
+offers no speed advantage over Gibbs on small problems: the $O(2d)$ function evaluations
+per gradient step dominate the total cost at $d=7$ unconstrained parameters.
+
+These results motivate two conclusions for the broader study. First, when conjugacy
+is available, CAVI is the optimal strategy and the generic gradient methods cannot
+improve upon it. Second, when conjugacy is unavailable (non-conjugate likelihoods,
+deeper models), gradient-based ELBO optimisation becomes the only viable VI route ---
+but analytical gradients (via automatic differentiation) will be essential to recover
+competitive runtime.
 
 \section{Conclusion}
 
@@ -971,9 +1197,6 @@ The central issue is not only whether the methods converge, but whether the resu
 
 The report therefore uses optimisation methods as both computational tools and diagnostic tools. Even when ELBO optimisation is successful, the mean-field approximation may still underestimate posterior variance. This distinction is essential: convergence of the ELBO does not by itself guarantee accurate Bayesian uncertainty quantification.
 
-ewpage
-\nocite{*}
-\printbibliography
 \newpage
 \nocite{*}
 \printbibliography
