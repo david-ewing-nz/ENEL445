@@ -1148,9 +1148,9 @@ Each stage saves its outputs before proceeding so that individual stages can be 
 
 \begin{enumerate}
   \item \textbf{Data generation} — generates and saves \texttt{linear\_data.parquet}; produces \texttt{linear\_data\_scatter.png} (1 figure).
-  \item \textbf{Reference sampler} — runs Gibbs sampler (3 chains); saves \texttt{linear\_gibbs.parquet}; produces trace plots, ACF plots, $\hat{R}$ bar, and per-component distribution plots (7 figures).
-  \item \textbf{ELBO evaluation} — verifies analytical gradient against finite differences; produces gradient-check bar and ELBO landscape slice (2 figures).
+  \item \textbf{ELBO evaluation} — verifies analytical gradient against finite differences at the CAVI optimum; produces gradient-check bar and ELBO landscape slice (2 figures). Must pass before any optimiser is run.
   \item \textbf{Optimisation methods} — runs CAVI, gradient ascent, Newton, and BFGS; saves \texttt{linear\_opt.parquet}; produces ELBO convergence curves, step-size history, and Hessian condition-number history (3 figures).
+  \item \textbf{Reference sampler} — runs Gibbs sampler (3 chains); saves \texttt{linear\_gibbs.parquet}; produces trace plots, ACF plots, $\hat{R}$ bar, and per-component distribution plots (7 figures).
   \item \textbf{Diagnostics and comparison} — loads all parquet files; produces VB/Gibbs overlay plots, SD-ratio bar, and posterior mean-error bar; renders the three \texttt{tblr} tables to \texttt{results/tables/} and displays inline PNG previews (8 figures, 3 tables).
 \end{enumerate}
 

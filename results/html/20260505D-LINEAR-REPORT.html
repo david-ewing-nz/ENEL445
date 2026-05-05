@@ -1758,17 +1758,18 @@ independently.</p>
 <li><p><strong>Data generation</strong> — generates and saves
 <code>linear_data.parquet</code>; produces
 <code>linear_data_scatter.png</code> (1 figure).</p></li>
-<li><p><strong>Reference sampler</strong> — runs Gibbs sampler (3
-chains); saves <code>linear_gibbs.parquet</code>; produces trace plots,
-ACF plots, <span class="math inline">\(\hat{R}\)</span> bar, and
-per-component distribution plots (7 figures).</p></li>
 <li><p><strong>ELBO evaluation</strong> — verifies analytical gradient
-against finite differences; produces gradient-check bar and ELBO
-landscape slice (2 figures).</p></li>
+against finite differences at the CAVI optimum; produces gradient-check
+bar and ELBO landscape slice (2 figures). Must pass before any optimiser
+is run.</p></li>
 <li><p><strong>Optimisation methods</strong> — runs CAVI, gradient
 ascent, Newton, and BFGS; saves <code>linear_opt.parquet</code>;
 produces ELBO convergence curves, step-size history, and Hessian
 condition-number history (3 figures).</p></li>
+<li><p><strong>Reference sampler</strong> — runs Gibbs sampler (3
+chains); saves <code>linear_gibbs.parquet</code>; produces trace plots,
+ACF plots, <span class="math inline">\(\hat{R}\)</span> bar, and
+per-component distribution plots (7 figures).</p></li>
 <li><p><strong>Diagnostics and comparison</strong> — loads all parquet
 files; produces VB/Gibbs overlay plots, SD-ratio bar, and posterior
 mean-error bar; renders the three <code>tblr</code> tables to
