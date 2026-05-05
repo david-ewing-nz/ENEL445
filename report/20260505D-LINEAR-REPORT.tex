@@ -1163,9 +1163,32 @@ so that any stage can be re-run independently without repeating expensive comput
 #                                results/tables/linear_posterior_summary.tex
 \end{verbatim}
 
-The three Python files that implement the above are described below.
+The implementation uses three files. \texttt{linear\_run.ipynb} is the development environment:
+functions are written and debugged interactively in the notebook first, then migrated to the
+shared \texttt{.py} files once they are working correctly. This keeps the \texttt{.py} files
+as stable, tested code while the notebook serves as the exploratory workspace.
+
+\subsection*{Notebook: \texttt{linear\_run.ipynb}}
+
+New functions are developed and debugged here cell by cell before being committed to the
+\texttt{.py} files. The notebook imports from \texttt{vb\_algorithms\_py} and
+\texttt{vb\_utils\_py} once a function has been migrated, so it gradually thins to a pure
+runner. Each of the five stage blocks saves its outputs to parquet before proceeding, so any
+stage can be re-run independently without repeating earlier computation.
+
+\begin{enumerate}
+  \item \textbf{Data generation} — generates and saves \texttt{linear\_data.parquet}; produces \texttt{linear\_data\_scatter.png} (1 figure).
+  \item \textbf{ELBO evaluation} — verifies analytical gradient against finite differences at the CAVI optimum; produces gradient-check bar and ELBO landscape slice (2 figures). Must pass before any optimiser is run.
+  \item \textbf{Optimisation methods} — runs CAVI, gradient ascent, Newton, and BFGS; saves \texttt{linear\_opt.parquet}; produces ELBO convergence curves, step-size history, and Hessian condition-number history (3 figures).
+  \item \textbf{Reference sampler} — runs Gibbs sampler (3 chains); saves \texttt{linear\_gibbs.parquet}; produces trace plots, ACF plots, $\hat{R}$ bar, and per-component distribution plots (7 figures).
+  \item \textbf{Diagnostics and comparison} — loads all parquet files; produces VB/Gibbs overlay plots, SD-ratio bar, and posterior mean-error bar; renders the three \texttt{tblr} tables to \texttt{results/tables/} and displays inline PNG previews (8 figures, 3 tables).
+\end{enumerate}
+
+\noindent Total outputs for the linear case: \textbf{21 figures} saved to \texttt{figs/} and \textbf{3 tables} saved to \texttt{results/tables/}.
 
 \subsection*{File: \texttt{vb\_algorithms\_py.py}}
+
+Contains all algorithm logic. Functions are migrated here from the notebook once verified.
 
 \begin{itemize}
   \item \textbf{ELBO evaluation} — unpacks unconstrained parameter vector, reconstructs $\bm{\Sigma}_\beta$ via Cholesky lower-triangular factor, reconstructs $a_e$ and $b_e$ via exp transforms, evaluates standard or entropy-regularised ELBO.
@@ -1180,27 +1203,14 @@ The three Python files that implement the above are described below.
 
 \subsection*{File: \texttt{vb\_utils\_py.py}}
 
+Contains data generation, plotting, parquet I/O, and table rendering utilities. Functions are migrated here from the notebook once verified.
+
 \begin{itemize}
   \item \textbf{Data generation} — \texttt{generate\_linear\_case}: generates design matrix $\bm{X}$, response $\bm{y}$, and true parameter values for the linear Bayesian regression test case.
   \item \textbf{Parquet I/O} — \texttt{save\_results\_parquet}: writes numerical results to \texttt{results/data/*.parquet} as the source of truth; \texttt{load\_results\_parquet}: reloads without rerunning computation.
   \item \textbf{Table rendering} — \texttt{render\_table\_tex}: reads a polars DataFrame, formats values, writes a \texttt{tabularray} (\texttt{tblr}) snippet to \texttt{results/tables/*.tex} for \verb|\input{}| inclusion in the report; also compiles a standalone preview PNG for inline notebook display.
   \item \textbf{Plot helpers} — \texttt{save\_fig}: saves to \texttt{figs/} with consistent style; helpers for scatter plots, KDE overlays, bar charts, ACF, trace plots, ELBO curves, step-size histories, Hessian condition-number histories.
 \end{itemize}
-
-\subsection*{Notebook: \texttt{linear\_run.ipynb}}
-
-The notebook executes the linear case in five stages, one \texttt{\#~\%\%} cell block per stage.
-Each stage saves its outputs before proceeding so that individual stages can be re-run independently.
-
-\begin{enumerate}
-  \item \textbf{Data generation} — generates and saves \texttt{linear\_data.parquet}; produces \texttt{linear\_data\_scatter.png} (1 figure).
-  \item \textbf{ELBO evaluation} — verifies analytical gradient against finite differences at the CAVI optimum; produces gradient-check bar and ELBO landscape slice (2 figures). Must pass before any optimiser is run.
-  \item \textbf{Optimisation methods} — runs CAVI, gradient ascent, Newton, and BFGS; saves \texttt{linear\_opt.parquet}; produces ELBO convergence curves, step-size history, and Hessian condition-number history (3 figures).
-  \item \textbf{Reference sampler} — runs Gibbs sampler (3 chains); saves \texttt{linear\_gibbs.parquet}; produces trace plots, ACF plots, $\hat{R}$ bar, and per-component distribution plots (7 figures).
-  \item \textbf{Diagnostics and comparison} — loads all parquet files; produces VB/Gibbs overlay plots, SD-ratio bar, and posterior mean-error bar; renders the three \texttt{tblr} tables to \texttt{results/tables/} and displays inline PNG previews (8 figures, 3 tables).
-\end{enumerate}
-
-\noindent Total outputs for the linear case: \textbf{21 figures} saved to \texttt{figs/} and \textbf{3 tables} saved to \texttt{results/tables/}.
 \section{Project Status and Course Alignment}
 
 The following material is retained from the working report draft as project-status and course-alignment documentation. It is placed in the appendix so that the main body remains report-focused while preserving the planning details.

@@ -1735,10 +1735,50 @@ re-run independently without repeating expensive computation.</p>
 #                                figs/linear_mean_errors.png
 #                                results/tables/linear_performance.tex
 #                                results/tables/linear_posterior_summary.tex</code></pre>
-<p>The three Python files that implement the above are described
-below.</p>
+<p>The implementation uses three files. <code>linear_run.ipynb</code> is
+the development environment: functions are written and debugged
+interactively in the notebook first, then migrated to the shared
+<code>.py</code> files once they are working correctly. This keeps the
+<code>.py</code> files as stable, tested code while the notebook serves
+as the exploratory workspace.</p>
+<h2 class="unnumbered" id="notebook-linear_run.ipynb">Notebook:
+<code>linear_run.ipynb</code></h2>
+<p>New functions are developed and debugged here cell by cell before
+being committed to the <code>.py</code> files. The notebook imports from
+<code>vb_algorithms_py</code> and <code>vb_utils_py</code> once a
+function has been migrated, so it gradually thins to a pure runner. Each
+of the five stage blocks saves its outputs to parquet before proceeding,
+so any stage can be re-run independently without repeating earlier
+computation.</p>
+<ol>
+<li><p><strong>Data generation</strong> — generates and saves
+<code>linear_data.parquet</code>; produces
+<code>linear_data_scatter.png</code> (1 figure).</p></li>
+<li><p><strong>ELBO evaluation</strong> — verifies analytical gradient
+against finite differences at the CAVI optimum; produces gradient-check
+bar and ELBO landscape slice (2 figures). Must pass before any optimiser
+is run.</p></li>
+<li><p><strong>Optimisation methods</strong> — runs CAVI, gradient
+ascent, Newton, and BFGS; saves <code>linear_opt.parquet</code>;
+produces ELBO convergence curves, step-size history, and Hessian
+condition-number history (3 figures).</p></li>
+<li><p><strong>Reference sampler</strong> — runs Gibbs sampler (3
+chains); saves <code>linear_gibbs.parquet</code>; produces trace plots,
+ACF plots, <span class="math inline">\(\hat{R}\)</span> bar, and
+per-component distribution plots (7 figures).</p></li>
+<li><p><strong>Diagnostics and comparison</strong> — loads all parquet
+files; produces VB/Gibbs overlay plots, SD-ratio bar, and posterior
+mean-error bar; renders the three <code>tblr</code> tables to
+<code>results/tables/</code> and displays inline PNG previews (8
+figures, 3 tables).</p></li>
+</ol>
+<p>Total outputs for the linear case: <strong>21 figures</strong> saved
+to <code>figs/</code> and <strong>3 tables</strong> saved to
+<code>results/tables/</code>.</p>
 <h2 class="unnumbered" id="file-vb_algorithms_py.py">File:
 <code>vb_algorithms_py.py</code></h2>
+<p>Contains all algorithm logic. Functions are migrated here from the
+notebook once verified.</p>
 <ul>
 <li><p><strong>ELBO evaluation</strong> — unpacks unconstrained
 parameter vector, reconstructs <span
@@ -1770,6 +1810,9 @@ chains with configurable burn-in.</p></li>
 </ul>
 <h2 class="unnumbered" id="file-vb_utils_py.py">File:
 <code>vb_utils_py.py</code></h2>
+<p>Contains data generation, plotting, parquet I/O, and table rendering
+utilities. Functions are migrated here from the notebook once
+verified.</p>
 <ul>
 <li><p><strong>Data generation</strong> —
 <code>generate_linear_case</code>: generates design matrix <span
@@ -1791,37 +1834,6 @@ display.</p></li>
 overlays, bar charts, ACF, trace plots, ELBO curves, step-size
 histories, Hessian condition-number histories.</p></li>
 </ul>
-<h2 class="unnumbered" id="notebook-linear_run.ipynb">Notebook:
-<code>linear_run.ipynb</code></h2>
-<p>The notebook executes the linear case in five stages, one
-<code># %%</code> cell block per stage. Each stage saves its outputs
-before proceeding so that individual stages can be re-run
-independently.</p>
-<ol>
-<li><p><strong>Data generation</strong> — generates and saves
-<code>linear_data.parquet</code>; produces
-<code>linear_data_scatter.png</code> (1 figure).</p></li>
-<li><p><strong>ELBO evaluation</strong> — verifies analytical gradient
-against finite differences at the CAVI optimum; produces gradient-check
-bar and ELBO landscape slice (2 figures). Must pass before any optimiser
-is run.</p></li>
-<li><p><strong>Optimisation methods</strong> — runs CAVI, gradient
-ascent, Newton, and BFGS; saves <code>linear_opt.parquet</code>;
-produces ELBO convergence curves, step-size history, and Hessian
-condition-number history (3 figures).</p></li>
-<li><p><strong>Reference sampler</strong> — runs Gibbs sampler (3
-chains); saves <code>linear_gibbs.parquet</code>; produces trace plots,
-ACF plots, <span class="math inline">\(\hat{R}\)</span> bar, and
-per-component distribution plots (7 figures).</p></li>
-<li><p><strong>Diagnostics and comparison</strong> — loads all parquet
-files; produces VB/Gibbs overlay plots, SD-ratio bar, and posterior
-mean-error bar; renders the three <code>tblr</code> tables to
-<code>results/tables/</code> and displays inline PNG previews (8
-figures, 3 tables).</p></li>
-</ol>
-<p>Total outputs for the linear case: <strong>21 figures</strong> saved
-to <code>figs/</code> and <strong>3 tables</strong> saved to
-<code>results/tables/</code>.</p>
 <h1 id="project-status-and-course-alignment">Project Status and Course
 Alignment</h1>
 <p>The following material is retained from the working report draft as
