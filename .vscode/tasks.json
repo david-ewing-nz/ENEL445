@@ -32,6 +32,20 @@
                     }
                 }
             ]
+        },
+        {
+            "label": "PAT Expiry Reminder",
+            "type": "shell",
+            "command": "Write-Host '========================================' -ForegroundColor Yellow; Write-Host 'GitHub PAT expires 31 July 2026.' -ForegroundColor Red; Write-Host 'To renew: Control Panel -> Credential Manager -> Windows Credentials -> git:https://github.com -> Edit -> paste new token.' -ForegroundColor Yellow; Write-Host '========================================' -ForegroundColor Yellow",
+            "runOptions": {
+                "runOn": "folderOpen"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "showReuseMessage": false
+            },
+            "problemMatcher": []
         }
     ]
 }
