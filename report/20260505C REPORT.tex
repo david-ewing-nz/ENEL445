@@ -23,10 +23,14 @@
 \addbibresource{D:/github/ENEL445/report/references.bib}
 
 \usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
- 
+\hypersetup{
+  pdfauthor   = {David Ewing},
+  pdfsubject  = {\jobname.tex},
+  pdfkeywords = {source: \jobname.tex}
+}
 
 % Running margin label
-\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow}
+\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
 \AddToShipoutPictureBG{%
   \begin{tikzpicture}[remember picture,overlay]
     \node[rotate=90, anchor=north]

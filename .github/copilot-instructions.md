@@ -40,3 +40,31 @@ System Python at `D:\Python`. Packages in use: `numpy`, `scipy` (`stats`, `speci
 ## Live Project State
 
 See [README-WHEN-YOU-RETURN.md](../README-WHEN-YOU-RETURN.md) for current git status, file counts, and recently modified files.
+
+## File Execution Rules
+
+### Python files in `python/`
+- Always invoke via `python scripts/archive_py.py python/<script>.py` — never run directly.
+- This applies only to files in `python/`. Scripts in `scripts/` are utility/logistics files and are exempt — run them directly.
+
+### LaTeX files
+- When a `.tex`, `.pdf`, or `.html` file is in context, compile the associated `.tex` source using `python scripts/archive_tex.py <path/to/file.tex>`.
+- For `.pdf` or `.html` in context, identify the source `.tex` by reading its PDF metadata field `Subject` (set at compile time to the source filename). Look for the `.tex` in `report/`.
+- The archive copy at `archive/<ts>/tex/` does NOT count as a duplicate — only source-folder copies are checked.
+
+### Pre-compile check (LaTeX)
+Before compiling any `.tex` file, verify it contains:
+
+1. A correctly formatted `\mymarginlabel` command:
+```latex
+\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+```
+2. A `\hypersetup` block with `pdfsubject` and `pdfkeywords` referencing `\jobname`:
+```latex
+\hypersetup{
+  pdfauthor   = {David Ewing},
+  pdfsubject  = {\jobname.tex},
+  pdfkeywords = {source: \jobname.tex}
+}
+```
+If either is missing or malformed, add/correct it before compiling.
