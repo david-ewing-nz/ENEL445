@@ -1166,28 +1166,264 @@ indicating that the 3~chains have converged to the same posterior.
   \label{fig:rhat}
 \end{figure}
 
+\subsection{Test Case: Quadratic Bayesian Regression}
+
+The quadratic test case uses $n=100$ observations generated from
+$y_i = \beta_0 + \beta_1 x_i + \beta_2 x_i^2 + \varepsilon_i$
+with true parameters $\beta_0=1.0$, $\beta_1=2.0$, $\beta_2=-1.0$, and noise precision
+$\tau_e=4.0$ ($\sigma_e=0.5$). The covariate is $x_i \sim \mathcal{N}(0,1)$, giving a
+more challenging design matrix than the linear case.
+Figure~\ref{fig:q-data} shows the generated dataset.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\linewidth]{quadratic_data_scatter.png}
+  \caption{Generated quadratic regression data ($n=100$). The dashed curve is the true
+    regression function $\beta_0 + \beta_1 x + \beta_2 x^2$.}
+  \label{fig:q-data}
+\end{figure}
+
+\subsubsection{Gradient Verification}
+
+The 11-parameter unconstrained vector $\theta$ is verified at the CAVI optimum by comparing
+central finite differences at $h=10^{-5}$ and $h=10^{-7}$.
+Table~\ref{tab:q-gradcheck} reports the results. As in the linear case, the near-zero
+gradients at the optimum ($\mu_0$--$u_{33}$) produce numerically unstable relative errors;
+the non-degenerate components $\eta_a$ and $\eta_b$ confirm gradient correctness with
+relative error below $6 \times 10^{-8}$.
+
+\begin{table}[H]
+  \centering
+  \caption{Quadratic case gradient check at CAVI optimum. Near-zero gradients for
+    $\mu_i$ and $u_{ij}$ are expected; $\eta_a, \eta_b$ confirm implementation
+    correctness.}
+  \label{tab:q-gradcheck}
+  \input{../results/tables/quadratic_gradient_check.tex}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{quadratic_elbo_gradient_check.png}
+  \caption{Gradient verification bar chart for the 11-parameter quadratic case.
+    The two FD step sizes coincide visually for all components.}
+  \label{fig:q-gradcheck}
+\end{figure}
+
+\subsubsection{ELBO Landscape}
+
+Figure~\ref{fig:q-landscape} shows the ELBO slice varying $\mu_{\beta_0}$ and $\mu_{\beta_1}$
+at the CAVI optimum. The surface remains smooth and unimodal, confirming that the quadratic
+feature $x^2$ does not introduce spurious local optima in this parameterisation.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.65\linewidth]{quadratic_elbo_landscape.png}
+  \caption{Two-dimensional ELBO slice for the quadratic case, varying $\mu_{\beta_0}$
+    and $\mu_{\beta_1}$ at the CAVI optimum. The star marks the CAVI solution.}
+  \label{fig:q-landscape}
+\end{figure}
+
+\subsubsection{Optimisation Performance}
+
+Table~\ref{tab:q-performance} summarises the quadratic case results.
+CAVI converges in 8~iterations at 1.1~ms, achieving 1494$\times$ speedup over Gibbs
+(1706~ms for $3\times5000$ samples) and the best final ELBO ($-21.1$).
+BFGS takes 32~iterations (50~ms, 34$\times$ speedup) and reaches a final ELBO of $-75.1$,
+substantially below CAVI.
+Newton's Method converges in just 2~iterations (44~ms, 39$\times$ speedup) but to a
+very poor ELBO ($-92.1$), indicating it found a sub-optimal critical point of the
+11-dimensional objective.
+Gradient Ascent (2000~iterations, 3230~ms) is actually \emph{slower} than Gibbs:
+the per-step cost of $2\times11 = 22$ ELBO evaluations for finite-difference gradients
+overwhelms the gain per iteration.
+
+\begin{table}[H]
+  \centering
+  \caption{Quadratic case optimisation performance. Speedup is relative to Gibbs runtime.}
+  \label{tab:q-performance}
+  \input{../results/tables/quadratic_performance.tex}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{quadratic_timing_comparison.png}
+  \caption{Computational cost on a log scale (quadratic case). Gradient Ascent is slower
+    than Gibbs due to finite-difference overhead; CAVI remains the fastest method.}
+  \label{fig:q-timing}
+\end{figure}
+
+\subsubsection{ELBO Convergence}
+
+Figure~\ref{fig:q-elbocv} shows the ELBO trajectories.
+CAVI increases monotonically and converges quickly. Gradient Ascent and BFGS converge
+to the same sub-optimal ELBO ($-75.1$) from the OLS starting point; Newton's Method
+reaches an even worse critical point in 2~steps. The 70-unit gap between the gradient-based
+methods and CAVI ($\Delta\mathcal{L} \approx 54$) is substantially larger than in the
+linear case ($\Delta\mathcal{L} \approx 27$), suggesting the 11-dimensional landscape
+is more difficult to navigate from a generic starting point.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{quadratic_elbo_convergence.png}
+  \caption{ELBO vs.\ iteration for the quadratic case. CAVI (left panel) converges
+    monotonically; gradient-based methods (right) plateau well below the CAVI optimum.}
+  \label{fig:q-elbocv}
+\end{figure}
+
+\subsubsection{Posterior Accuracy and Variance Behaviour}
+
+Table~\ref{tab:q-posterior} summarises posterior means and SD ratios for all four
+parameters ($\beta_0, \beta_1, \beta_2, \tau_e$).
+CAVI recovers the posterior means accurately (maximum error $<0.004$) and achieves
+near-unity SD~ratios of $0.985$--$0.998$, indicating minimal variance collapse in this
+conjugate quadratic setting.
+BFGS and Gradient Ascent also recover the means well and show mild collapse
+(SD~ratios $0.981$--$0.996$), consistent with their sub-optimal ELBO.
+Newton's Method matches the posterior means precisely but displays substantial
+over-dispersion: SD~ratios of $1.641$, $1.929$, $2.555$, and $5.078$ for
+$\beta_0$, $\beta_1$, $\beta_2$, and $\tau_e$ respectively.
+This confirms that Newton found a flat saddle or shoulder of the ELBO landscape where the
+Hessian regularisation inflated the estimated covariance.
+
+\begin{table}[H]
+  \centering
+  \caption{Quadratic case posterior summary. SD ratio $= \sigma_{\mathrm{VB}}/\sigma_{\mathrm{Gibbs}}$;
+    values above~1 indicate over-dispersion (Newton), below~1 indicate variance collapse.}
+  \label{tab:q-posterior}
+  \input{../results/tables/quadratic_posterior_summary.tex}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{quadratic_sd_ratios.png}
+  \caption{SD ratios $\sigma_{\mathrm{VB}}/\sigma_{\mathrm{Gibbs}}$ for all four parameters
+    (quadratic case). Newton's Method over-disperses dramatically for $\beta_2$ and $\tau_e$.}
+  \label{fig:q-sdratios}
+\end{figure}
+
+Figures~\ref{fig:q-comp_b0}--\ref{fig:q-comp_tau} compare VB posterior means and SDs
+against the Gibbs reference for each parameter.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{quadratic_comparison_beta0.png}
+  \caption{Posterior mean (left) and SD (right) for $\beta_0$ (quadratic case).
+    Pink dashed: Gibbs. Black dotted: true value.}
+  \label{fig:q-comp_b0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{quadratic_comparison_beta1.png}
+  \caption{Posterior mean and SD for $\beta_1$ (quadratic case).}
+  \label{fig:q-comp_b1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{quadratic_comparison_beta2.png}
+  \caption{Posterior mean and SD for $\beta_2$ (quadratic case).}
+  \label{fig:q-comp_b2}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{quadratic_comparison_tau_e.png}
+  \caption{Posterior mean and SD for $\tau_e$ (quadratic case).
+    Newton's Method SD is off-scale; CAVI and BFGS are near-reference.}
+  \label{fig:q-comp_tau}
+\end{figure}
+
+Figures~\ref{fig:q-vbg_b0}--\ref{fig:q-vbg_tau} overlay the full posterior densities.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{quadratic_vb_gibbs_beta0.png}
+  \caption{VB and Gibbs posterior densities for $\beta_0$ (quadratic case).}
+  \label{fig:q-vbg_b0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{quadratic_vb_gibbs_beta1.png}
+  \caption{VB and Gibbs posterior densities for $\beta_1$ (quadratic case).}
+  \label{fig:q-vbg_b1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{quadratic_vb_gibbs_beta2.png}
+  \caption{VB and Gibbs posterior densities for $\beta_2$ (quadratic case).}
+  \label{fig:q-vbg_b2}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{quadratic_vb_gibbs_tau_e.png}
+  \caption{VB and Gibbs posterior densities for $\tau_e$ (quadratic case).
+    Newton's wide distribution reflects its over-dispersed critical point.}
+  \label{fig:q-vbg_tau}
+\end{figure}
+
+\subsubsection{Gibbs Sampler Diagnostics}
+
+The Gibbs sampler converges well in the quadratic setting: all chains mix rapidly and
+the Gelman--Rubin $\hat{R}$ statistic is below $1.01$ for all four parameters,
+confirming that the 12{,}000 post-burn-in samples provide a reliable reference
+posterior.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{quadratic_gibbs_trace_beta0.png}
+  \caption{Gibbs trace plot for $\beta_0$ across 3~chains (quadratic case).}
+  \label{fig:q-trace_b0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{quadratic_gibbs_rhat.png}
+  \caption{Gelman--Rubin $\hat{R}$ for all four parameters (quadratic case).
+    All values are below the convergence threshold of~1.01.}
+  \label{fig:q-rhat}
+\end{figure}
+
 \subsection{Discussion}
 
-The linear test case is the most favourable setting for mean-field VI.
-The true posterior is unimodal and nearly Gaussian, so the mean-field factorisation
-$q(\bm{\beta},\tau_e) = q(\bm{\beta})\,q(\tau_e)$ loses little information.
-CAVI exploits the conjugate structure to find the optimal mean-field approximation
-in closed form, achieving SD~ratios of 0.98--0.98 — close to one despite the
-factorisation assumption.
+Both test cases share a common structure: the ELBO is a smooth, unimodal function in the
+neighbourhood of the CAVI solution, and CAVI exploits conjugacy to reach that optimum
+in a handful of coordinate ascent steps. The mean-field factorisation
+$q(\bm{\beta},\tau_e) = q(\bm{\beta})\,q(\tau_e)$ loses little information in either
+setting because the true posterior is nearly Gaussian and the $\bm{\beta}$--$\tau_e$
+posterior correlation is small, yielding SD~ratios of $0.98$--$1.00$ for CAVI in both cases.
 
-The gradient-based methods reveal two distinct failure modes. First, Newton's Method
-and BFGS converge to local optima that are substantially worse than the CAVI solution,
-demonstrating that generic optimisers without analytical gradients can fail even
-on a convex ELBO landscape. Second, Gradient Ascent with finite-difference gradients
-offers no speed advantage over Gibbs on small problems: the $O(2d)$ function evaluations
-per gradient step dominate the total cost at $d=7$ unconstrained parameters.
+The gradient-based methods reveal consistent failure modes across both test cases.
+First, \emph{BFGS and Gradient Ascent} converge to the same sub-optimal ELBO
+(approximately $-75$ for the quadratic case and $-27$ for the linear case),
+indicating that the approximate Hessian used by BFGS and the finite-difference gradient
+used by Gradient Ascent are not sufficiently accurate near the true optimum.
+Both methods still recover the posterior means accurately, but their final ELBOs are far
+below CAVI.
+Second, \emph{Newton's Method} reaches a critical point in just 2~iterations in both cases,
+but the critical point is poor: ELBO $= -92$ versus CAVI's $-21$ in the quadratic case.
+In the quadratic case, Newton's Hessian regularisation leads to \emph{over-dispersion}
+(SD ratios $1.6$--$5.1$), indicating that the regularised Hessian has driven the
+covariance matrix to an inflated saddle.
+Third, \emph{Gradient Ascent with finite-difference gradients} offers no speed advantage
+over Gibbs when $d \geq 7$: the $O(2d)$ ELBO evaluations per step dominate the total
+cost, making it slower than the conjugate Gibbs sampler in both test cases.
 
-These results motivate two conclusions for the broader study. First, when conjugacy
-is available, CAVI is the optimal strategy and the generic gradient methods cannot
-improve upon it. Second, when conjugacy is unavailable (non-conjugate likelihoods,
-deeper models), gradient-based ELBO optimisation becomes the only viable VI route ---
-but analytical gradients (via automatic differentiation) will be essential to recover
-competitive runtime.
+These results lead to three conclusions.
+First, CAVI is the dominant method whenever conjugacy is available: it is orders of
+magnitude faster than Gibbs, achieves the best ELBO, and accurately captures posterior
+uncertainty.
+Second, the failure of BFGS and Newton's Method to match CAVI is not a fundamental limit
+of gradient-based VI, but a consequence of finite-difference gradient noise: with
+analytical gradients (e.g., via automatic differentiation), BFGS would be expected to
+converge to the CAVI solution since the ELBO is concave in this conjugate setting.
+Third, the quadratic case demonstrates that increasing parameter dimension from $d=7$
+to $d=11$ does not qualitatively change the variance collapse behaviour for CAVI,
+confirming that the mean-field approximation is accurate in these conjugate settings
+regardless of model dimension.
 
 \section{Conclusion}
 
