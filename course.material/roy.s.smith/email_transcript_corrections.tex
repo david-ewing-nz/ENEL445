@@ -1,0 +1,145 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.45cm,headheight=23.12pt]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{tgheros}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{setspace}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{lastpage}
+\usepackage[hidelinks]{hyperref}
+
+\renewcommand{\familydefault}{\sfdefault}
+\definecolor{headinggrey}{gray}{0.22}
+\definecolor{rulegrey}{gray}{0.72}
+\definecolor{tableheadgrey}{gray}{0.92}
+
+\setstretch{1.08}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+\emergencystretch=2em
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{ENEL445 -- Applied Engineering Optimisation}
+\rhead{Transcript Corrections}
+\cfoot{\thepage\ of \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{rulegrey}\leaders\hrule height \headrulewidth\hfill}}
+
+\begin{document}
+
+\vspace*{0.5em}
+
+{\raggedleft
+David Ewing\\
+Student ID: 82171165\\
+ENEL445 -- Applied Engineering Optimisation\\
+University of Canterbury\\[0.3em]
+5 May 2026\par
+}
+
+\vspace{1.2em}
+
+Professor Roy S.\ Smith\\
+Department of Information Technology and Electrical Engineering\\
+ETH Z\"urich\\[0.3em]
+\textit{(Erskine Visiting Fellow, University of Canterbury)}
+
+\vspace{1.8em}
+
+\textbf{Subject: Corrections to the Least Squares Regression Lecture Transcript}
+
+\vspace{0.4em}
+\noindent\textcolor{rulegrey}{\rule{\textwidth}{0.4pt}}
+\vspace{0.8em}
+
+Dear Professor Smith,
+
+I hope this message finds you well. I have been reviewing the transcript of your lecture on least squares regression and have identified a number of errors --- some arising from voice-recognition transcription artefacts, and others appearing to be factual inaccuracies when checked against standard historical sources. I have compiled them below for your information.
+
+I should note that the corrections to historical details were verified against the Wikipedia articles for Carl Friedrich Gauss, Ceres (dwarf planet), and Franz Xaver von Zach. I recognise that these are secondary sources and that you may have access to more authoritative references; I offer the corrections in good faith and welcome any further clarification.
+
+\vspace{0.6em}
+\textbf{\large Voice-Recognition Transcription Errors}
+\vspace{0.3em}
+
+The following appear to be artefacts of automatic speech recognition, where words or names were misheard:
+
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.42\textwidth}
+                >{\raggedright\arraybackslash}p{0.42\textwidth}}
+\toprule
+\textbf{As transcribed} & \textbf{Corrected to} \\
+\midrule
+\textit{right essential, right essential angle} & right ascension angle \\
+\textit{xeris} & Ceres \\
+\textit{over what happened to 44 days} & over what amounted to 44 days \\
+\textit{1805 genre published a paper sort of on the method of the method of} & 1805 Legendre published a paper sort of on the method of \\
+\textit{conic sectors} (three instances) & conic sections \\
+\textit{con acceptors} & conic sections \\
+\textit{conic sections, conic sectors} (stray doublet) & conic sections \\
+\textit{matrix calculus, calculus.org} & \texttt{matrixcalculus.org} \\
+\textit{from et cetera} & from ETH \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.6em}
+\textbf{\large Attribution Error}
+\vspace{0.3em}
+
+The transcript read: \textit{``within half a degree of where Zach said it would be in that but Zach, but Gauss, would not say.''}
+
+This appeared to be a garbled version of the intended meaning. I corrected it to: \textit{``within half a degree of where Gauss said it would be, but Gauss would not say,''} since it was Gauss who made the prediction, not Zach (Zach was the astronomer who published the observational data and subsequently recovered Ceres).
+
+\vspace{0.6em}
+\textbf{\large Expansion of First Mention of Zach}
+\vspace{0.3em}
+
+The first reference to ``Zach'' gave no indication of who he was. I added a brief identification:
+\textit{``Zach --- Franz Xaver von Zach, editor of the \textit{Monatliche Correspondenz zur Bef\"orderung der Erd- und Himmels-Kunde} (Monthly Correspondence for the Promotion of Earth and Sky Science). He published the observational data,''}
+so that readers unfamiliar with the history have sufficient context.
+
+\vspace{0.6em}
+\textbf{\large Historical Factual Corrections}
+\vspace{0.3em}
+
+The following corrections were made on the basis of historical sources:
+
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.42\textwidth}
+                >{\raggedright\arraybackslash}p{0.42\textwidth}}
+\toprule
+\textbf{As transcribed} & \textbf{Corrected to} \\
+\midrule
+\textit{Titus Bode law} & Titius--Bode law \\
+ & (after Johann Daniel Titius, not ``Titus'') \\[0.3em]
+\textit{22 observations} / \textit{And he made 22 of them} & 24 observations / And he made 24 of them \\
+ & (Piazzi made 24 observations of Ceres before losing it) \\[0.3em]
+\textit{seventh of December} & 31st of December \\
+ & (Ceres was recovered by Zach on 31 December 1801; he also observed on 7 December but the confirmed recovery is attributed to the 31st) \\[0.3em]
+\textit{five years earlier} & ten years earlier \\
+ & (Gauss claimed to have been using the method since 1794 or 1795, approximately ten years before Legendre published in 1805) \\
+\bottomrule
+\end{tabular}
+
+\vspace{1.2em}
+
+I hope these corrections are useful. Please do not hesitate to let me know if any of my changes deviate from your original intent, or if you have a preferred phrasing for any of the passages.
+
+Thank you for an engaging and illuminating lecture.
+
+\vspace{1.8em}
+
+Yours sincerely,
+
+\vspace{1.4em}
+
+David Ewing\\
+ENEL445, University of Canterbury
+
+\end{document}
