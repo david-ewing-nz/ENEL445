@@ -14,9 +14,6 @@ __pycache__/
 env/
 venv/
 
-# VS Code
-.vscode/
-
 # Logs
 *.log
 
