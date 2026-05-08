@@ -102,14 +102,14 @@ def save_plot(fig, filename, archive_paths, dpi=300):
         fig: matplotlib figure
         filename: str, must end with '_py.png'
         archive_paths: dict from create_archive_structure()
-        dpi: int, resolution
+        dpi: int, resolution (default 300 for publication quality)
     """
     if not filename.endswith('_py.png'):
         raise ValueError("Filename must end with '_py.png' to avoid R file conflicts")
     
     # Save to archive
     archive_file = archive_paths['figs'] / filename
-    fig.savefig(archive_file, dpi=dpi, bbox_inches='tight')
+    fig.savefig(archive_file, dpi=dpi, bbox_inches='tight', pad_inches=0.05)
     
     # Copy to main figs folder
     main_figs = Path("..") / "figs"
@@ -384,3 +384,118 @@ def set_random_seed(seed=82171165):
     """Set random seed for reproducibility (matching R code)."""
     np.random.seed(seed)
     print(f"Random seed set to: {seed}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Publication-quality figure style
+# ─────────────────────────────────────────────────────────────────────────────
+
+# IEEE-compatible colour cycle (colorblind-safe, distinguishable in greyscale).
+# Based on Paul Tol's "bright" palette.
+_PUB_COLOURS = [
+    '#0077BB',   # blue         – primary lines / VB
+    '#EE7733',   # orange       – second series
+    '#009988',   # teal         – third series
+    '#CC3311',   # red          – fourth series / error
+    '#33BBEE',   # cyan         – fifth series
+    '#EE3377',   # magenta      – sixth series
+    '#BBBBBB',   # grey         – reference / Gibbs fill
+]
+
+# Markers matched to colours (used when lines share the same colour)
+_PUB_MARKERS = ['o', 's', '^', 'D', 'v', 'P', 'X']
+
+
+def set_pub_style():
+    """
+    Apply publication-quality matplotlib rcParams for IEEE-style figures.
+
+    Call once per notebook before any plotting cell:
+
+        from vb_utils_py import set_pub_style
+        set_pub_style()
+
+    Settings
+    --------
+    - Font: Latin Modern Roman (matches LaTeX body text); falls back to serif.
+    - Font sizes: 9 pt axis labels / tick labels, 9 pt legend, 10 pt title.
+      These map to ~100 % size when figures are included at full column width
+      (86 mm / 3.39 in) in a two-column IEEE paper.
+    - Line widths: 1.5 pt data lines, 0.8 pt axes/grid.
+    - Marker size: 5 pt (visible but not dominant).
+    - Grid: light grey, alpha 0.35, behind data (zorder 0).
+    - Figure size default: (5.0, 3.5) inches — fits one IEEE column.
+    - DPI: 300 for saved files.
+    - Colour cycle: Paul Tol "bright" (colorblind-safe, greyscale-distinguishable).
+    """
+    plt.rcParams.update({
+        # ── Font ──────────────────────────────────────────────────────────────
+        'font.family':          'serif',
+        'font.serif':           ['Latin Modern Roman', 'CMU Serif',
+                                 'Computer Modern Roman', 'DejaVu Serif'],
+        'font.size':            9,
+        'axes.titlesize':       10,
+        'axes.labelsize':       9,
+        'xtick.labelsize':      8,
+        'ytick.labelsize':      8,
+        'legend.fontsize':      8,
+        'legend.title_fontsize':9,
+        'figure.titlesize':     11,
+
+        # ── Lines & markers ───────────────────────────────────────────────────
+        'lines.linewidth':      1.5,
+        'lines.markersize':     5,
+        'patch.linewidth':      0.8,
+
+        # ── Axes ──────────────────────────────────────────────────────────────
+        'axes.linewidth':       0.8,
+        'axes.spines.top':      False,
+        'axes.spines.right':    False,
+        'axes.prop_cycle':      plt.cycler('color', _PUB_COLOURS),
+        'axes.formatter.use_mathtext': True,
+
+        # ── Grid ──────────────────────────────────────────────────────────────
+        'axes.grid':            True,
+        'grid.color':           '#CCCCCC',
+        'grid.linewidth':       0.6,
+        'grid.alpha':           0.5,
+        'axes.axisbelow':       True,
+
+        # ── Ticks ─────────────────────────────────────────────────────────────
+        'xtick.major.width':    0.8,
+        'ytick.major.width':    0.8,
+        'xtick.minor.visible':  False,
+        'ytick.minor.visible':  False,
+        'xtick.direction':      'out',
+        'ytick.direction':      'out',
+
+        # ── Legend ────────────────────────────────────────────────────────────
+        'legend.frameon':       True,
+        'legend.framealpha':    0.9,
+        'legend.edgecolor':     '#CCCCCC',
+        'legend.borderpad':     0.4,
+        'legend.labelspacing':  0.3,
+        'legend.handlelength':  1.5,
+
+        # ── Figure ────────────────────────────────────────────────────────────
+        'figure.figsize':       (5.0, 3.5),
+        'figure.dpi':           150,          # screen preview
+        'savefig.dpi':          300,          # saved PNGs
+        'savefig.bbox':         'tight',
+        'savefig.pad_inches':   0.05,
+
+        # ── Math text ─────────────────────────────────────────────────────────
+        'mathtext.fontset':     'cm',
+        'mathtext.rm':          'serif',
+    })
+    print("Publication style applied  (IEEE-compatible, serif fonts, 300 dpi).")
+
+
+def pub_colours():
+    """Return the publication colour list."""
+    return list(_PUB_COLOURS)
+
+
+def pub_markers():
+    """Return the publication marker list."""
+    return list(_PUB_MARKERS)

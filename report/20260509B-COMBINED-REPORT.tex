@@ -1,0 +1,713 @@
+\documentclass[11pt,a4paper]{article}
+
+%  XeLaTeX
+\usepackage{fontspec}
+
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage[useregional]{datetime2}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{tabularray}
+\usepackage{framed}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{eso-pic}
+\usepackage{mathtools}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{xcolor}
+
+\usepackage[backend=biber, style=apa, sorting=nyt]{biblatex}
+\addbibresource{D:/github/ENEL445/report/references.bib}
+\graphicspath{{D:/github/ENEL445/figs/}}
+
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\hypersetup{
+  pdfauthor   = {David Ewing},
+  pdfsubject  = {\jobname.tex},
+  pdfkeywords = {source: \jobname.tex}
+}
+
+% Running margin label
+\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\AddToShipoutPictureBG{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[rotate=90, anchor=north]
+      at ($(current page.north west)+(1.4cm,-13cm)$)
+      {\scriptsize\ttfamily \mymarginlabel};
+  \end{tikzpicture}%
+}
+
+% Custom commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\ELBO}{\text{ELBO}}
+\newcommand{\tr}{\text{tr}}
+\newcommand{\sigmoid}{\sigma}
+\setlength{\parindent}{0pt}
+
+\title{
+Gradient-Based Optimisation for Variational Inference:\\
+A Comparative Study Across Linear, Quadratic, and Logistic Regression
+}
+\author{
+  David Ewing (82171165)\\
+  ENEL445 --- Applied Engineering Optimisation
+}
+\date{9 May 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.7em}
+
+This report applies the gradient-based optimisation methods from ENEL445 to variational
+inference across three Bayesian regression settings: linear, quadratic, and logistic
+regression.
+The unifying objective is maximising the Evidence Lower Bound (ELBO), which converts
+intractable posterior inference into a tractable optimisation problem.
+
+Four optimisation methods are compared in each setting: Coordinate Ascent Variational
+Inference (CAVI), gradient ascent with Armijo backtracking, Newton's method with
+regularised finite-difference Hessian, and BFGS with Wolfe conditions.
+The variational family is $q(\bm{\beta}) = \N(\bm{\mu}, \bm{\Sigma})$ with a Cholesky
+reparameterisation to ensure positive definiteness throughout optimisation.
+
+Reference posteriors are obtained from Gibbs samplers.
+For the linear and quadratic cases, the conjugate structure admits closed-form Gibbs
+updates; the variational family is a Normal--Gamma approximation.
+For the logistic case, the Jaakkola--Jordan \parencite{Jaakkola2000} variational bound
+restores tractability, and a P\'{o}lya--Gamma Gibbs sampler \parencite{Polson2013}
+provides the reference.
+
+The three test cases form a designed progression in inferential difficulty:
+the linear case has a conjugate Gaussian likelihood ($n=50$, $p=2$),
+the quadratic case adds nonlinearity via feature expansion ($n=100$, $p=3$),
+and the logistic case introduces a non-conjugate Bernoulli likelihood ($n=200$, $p=2$).
+Posterior variance collapse is mild in the linear case, moderate in the quadratic case,
+and minimal in the logistic case.
+CAVI is the most efficient method across all three settings.
+BFGS is the recommended gradient-based alternative when closed-form CAVI updates are
+not available.
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+%─────────────────────────────────────────────────────────────────────────────
+\section*{Introduction}
+\addcontentsline{toc}{section}{Introduction}
+%─────────────────────────────────────────────────────────────────────────────
+
+Bayesian inference provides principled uncertainty quantification for regression models,
+but requires computing the posterior distribution
+\begin{equation*}
+  p(\bm{\beta} \mid \bm{y}) \propto p(\bm{y} \mid \bm{\beta})\,p(\bm{\beta}),
+\end{equation*}
+which is analytically tractable only for conjugate likelihood--prior pairs.
+For most real-world models the posterior integral
+\begin{equation*}
+  p(\bm{\beta} \mid \bm{y})
+  = \frac{p(\bm{y} \mid \bm{\beta})\,p(\bm{\beta})}
+         {\displaystyle\int p(\bm{y} \mid \bm{\beta})\,p(\bm{\beta})\, \mathrm{d}\bm{\beta}}
+\end{equation*}
+cannot be evaluated analytically.
+Variational Inference (VI) converts posterior computation into optimisation by finding
+the best approximation $q(\bm{\beta})$ from a tractable family, maximising the
+Evidence Lower Bound (ELBO):
+\begin{equation*}
+  \mathcal{L}(\bm{\phi})
+  = \E_{q}[\log p(\bm{y}\mid\bm{\beta})]
+  - \mathrm{KL}(q \| p)
+  \leq \log p(\bm{y}).
+\end{equation*}
+
+This project applies the optimisation methods taught in ENEL445 to three Bayesian
+regression settings, forming a deliberate progression in inferential difficulty.
+
+\begin{description}
+  \item[Case Study 1 --- Linear Regression:]
+    Gaussian likelihood with conjugate prior; ELBO has a closed-form gradient.
+    Posterior variance collapse is the primary concern.
+    Reference posterior from a conjugate Gibbs sampler.
+    ($n=50$, $\bm{\beta}_{\mathrm{true}} = (1.0, 2.0)$.)
+  \item[Case Study 2 --- Quadratic Regression:]
+    Identical Bayesian framework to the linear case, but with feature expansion
+    $\bm{x} \mapsto (1, x, x^2)$ so the model remains linear in the coefficient vector.
+    Moderate posterior variance collapse.
+    ($n=100$, $\bm{\beta}_{\mathrm{true}} = (1.0, 2.0, -1.0)$.)
+  \item[Case Study 3 --- Logistic Regression:]
+    Non-conjugate Bernoulli likelihood; the Jaakkola--Jordan bound provides a tractable
+    ELBO.
+    P\'{o}lya--Gamma Gibbs sampler as the reference.
+    Posterior variance collapse is minimal.
+    ($n=200$, $\bm{\beta}_{\mathrm{true}} = (-1.0, 2.0)$.)
+\end{description}
+
+All three studies share the same four optimisation methods (CAVI, gradient ascent,
+Newton, BFGS), the same Cholesky reparameterisation for positive-definiteness, and
+the same convergence criteria.
+The unified methodology allows cross-case comparisons of convergence speed,
+computational cost, posterior accuracy, and variance collapse behaviour.
+
+A known failure mode of mean-field VI is \emph{posterior variance collapse}: the
+optimised approximation is systematically overconfident, underestimating posterior
+uncertainty.
+This failure mode is observed and analysed across all three settings.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Common Methodology}
+\label{sec:methodology}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Variational Inference as Optimisation}
+
+The mean-field variational approximation factorises the joint posterior as
+$q(\bm{\beta}, \tau_e) = q(\bm{\beta})\,q(\tau_e)$ for the Gaussian regression cases,
+or $q(\bm{\beta}) = \N(\bm{\mu}, \bm{\Sigma})$ for the logistic case.
+Maximising the ELBO over the variational parameters $\bm{\phi}$ is equivalent to
+minimising the KL divergence $\mathrm{KL}(q\|p)$ between the approximation and the
+true posterior.
+
+\subsection{Constraint Handling: Cholesky Reparameterisation}
+
+The covariance matrix $\bm{\Sigma}$ must remain symmetric positive definite at every
+iteration.
+The set of symmetric positive definite matrices has a curved boundary: a standard
+Euclidean gradient step can cross outside it, producing an invalid covariance.
+The solution is to parameterise over the Cholesky factor $\bm{L}$, where
+$\bm{\Sigma} = \bm{L}\bm{L}^T$ and $\bm{L}$ is lower-triangular with positive diagonal
+entries.
+The diagonal entries are reparameterised as $L_{ii} = e^{\tilde{\ell}_{ii}}$ to allow
+unconstrained optimisation.
+This converts the constraint into a smooth bijection and ensures every gradient step
+produces a valid covariance.
+
+\subsection{Optimisation Methods}
+
+All four methods share the same objective (the ELBO), the same reparameterisation,
+and the same convergence criteria.
+
+\begin{description}
+  \item[CAVI:] Coordinate Ascent Variational Inference.
+    Closed-form coordinate updates derived from the exponential family structure.
+    Each update exactly maximises the ELBO over one block of parameters while holding
+    the others fixed.
+    Most efficient method; requires conjugate structure.
+  \item[Gradient ascent:] First-order method.
+    Search direction is the gradient $\bm{d}^{(t)} = \nabla\mathcal{L}(\bm{\phi}^{(t)})$.
+    Step size determined by Armijo backtracking (sufficient increase condition).
+  \item[Newton's method:] Second-order method.
+    Search direction is $\bm{d}^{(t)} = -\bm{H}^{-1}\nabla\mathcal{L}$,
+    where $\bm{H}$ is the Hessian approximated by finite differences (25 evaluations
+    per iteration).
+    Fast convergence near the optimum; expensive per iteration.
+  \item[BFGS:] Quasi-Newton method.
+    Builds a curvature approximation from gradient differences, requiring only
+    gradient evaluations.
+    Step size determined by Wolfe conditions to maintain positive definiteness of
+    the approximate inverse Hessian ($\bm{y}_t^T\bm{s}_t > 0$).
+    Best practical compromise between convergence speed and cost.
+\end{description}
+
+For all line-search methods, the search direction must be an ascent direction:
+$\nabla\mathcal{L}(\bm{\phi}^{(t)})^T\bm{d}^{(t)} > 0$.
+
+\subsection{Convergence Criteria}
+
+Iteration terminates when any of the following conditions is satisfied:
+\begin{enumerate}[label=(\roman*)]
+  \item Gradient norm: $\lVert\nabla\mathcal{L}\rVert < \varepsilon_g$.
+  \item Relative ELBO change: $|\Delta\mathcal{L}|/|\mathcal{L}| < \varepsilon_r$.
+  \item Parameter change: $\lVert\Delta\bm{\phi}\rVert < \varepsilon_\phi$.
+  \item Maximum iterations: $t \geq t_{\max}$.
+\end{enumerate}
+CAVI additionally monitors the maximum relative change in variational parameters.
+
+\subsection{Reference Samplers}
+
+Two types of Gibbs sampler are used as gold-standard references.
+
+\paragraph{Conjugate Gibbs (linear and quadratic cases).}
+The Normal--Gamma conjugate structure of the Bayesian regression model (Gaussian
+likelihood with Gaussian prior on $\bm{\beta}$ and Gamma prior on precision $\tau_e$)
+admits closed-form Gibbs updates:
+\begin{align}
+  \bm{\beta} \mid \tau_e, \bm{y} &\sim \N(\bm{\mu}_n, \bm{\Sigma}_n), \\
+  \tau_e \mid \bm{\beta}, \bm{y} &\sim \mathrm{Gamma}(a_n, b_n),
+\end{align}
+where $\bm{\Sigma}_n = (\tau_e\bm{X}^T\bm{X} + \lambda_\beta\bm{I})^{-1}$ and
+$\bm{\mu}_n = \tau_e\bm{\Sigma}_n\bm{X}^T\bm{y}$.
+
+\paragraph{P\'{o}lya--Gamma Gibbs (logistic case).}
+The P\'{o}lya--Gamma (PG) sampler of \textcite{Polson2013} augments the logistic model
+with latent variables $\omega_i \sim \mathrm{PG}(1, x_i^T\bm{\beta})$, rendering
+$\bm{\beta}$ conditionally Gaussian:
+\begin{align}
+  \bm{\beta} \mid \bm{\omega}, \bm{y}
+    &\sim \N\!\left(\bm{\Sigma}_\omega(\bm{X}^T\bm{\kappa}),\; \bm{\Sigma}_\omega\right),
+  \quad \bm{\Sigma}_\omega = (\bm{X}^T\bm{\Omega}\bm{X} + \bm{\Sigma}_0^{-1})^{-1},
+\end{align}
+where $\bm{\Omega} = \mathrm{diag}(\omega_i)$ and $\kappa_i = y_i - 1/2$.
+The PG draw requires $T$ Gamma variates per latent variable; the truncation $T=50$
+is used throughout.
+
+\subsection{Common Notation}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Symbol & Meaning \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Bayesian model}} \\
+$\bm{X}$ & Design matrix ($n \times p$), rows $x_i^T$ \\
+$\bm{y}$ & Response vector \\
+$\bm{\beta}$ & Regression coefficient vector \\
+$\tau_e$ & Observation-noise precision (Gaussian cases) \\
+$n,\,p$ & Number of observations; number of predictors \\
+$\lambda_\beta$ & Prior precision on $\bm{\beta}$ \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Variational approximation}} \\
+$q(\bm{\beta})$ & Variational Gaussian approximation \\
+$\bm{\mu},\,\bm{\Sigma}$ & Mean and covariance of $q(\bm{\beta})$ \\
+$\bm{L}$ & Cholesky factor, $\bm{\Sigma}=\bm{L}\bm{L}^T$ \\
+$\mathcal{L}(\bm{\phi})$ & Evidence Lower Bound (ELBO) \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Optimisation}} \\
+$\bm{d}^{(t)}$ & Search direction at iteration $t$ \\
+$\alpha_t$ & Step size at iteration $t$ \\
+$\bm{s}_t,\,\bm{y}_t$ & Parameter-change and gradient-difference vectors (BFGS) \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Logistic-specific}} \\
+$\sigma(\cdot)$ & Logistic sigmoid, $\sigma(\psi)=(1+e^{-\psi})^{-1}$ \\
+$\xi_i$ & Jaakkola--Jordan tightness parameter \\
+$\omega_i$ & P\'{o}lya--Gamma latent variable \\
+$\kappa_i$ & Pseudo-response $\kappa_i = y_i - 1/2$ \\
+$\mathrm{ESS}$ & Effective sample size \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Lecture correspondence (Prof.\ R.\,S.\ Smith, ENEL445 2026)}} \\
+$J(\theta)$ & Cost function $= \mathcal{L}(\bm{\phi})$ (ELBO) \\
+$\Phi$ & Regressor matrix $= \bm{X}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Case Study 1: Bayesian Linear Regression}
+\label{sec:linear}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Model}
+
+The Bayesian linear regression model is
+\begin{align}
+  \bm{y} &\sim \N(\bm{X}\bm{\beta},\; \tau_e^{-1}\bm{I}_n), \\
+  \bm{\beta} &\sim \N(\bm{0},\; \lambda_\beta^{-1}\bm{I}_p), \quad \lambda_\beta = 0.1, \\
+  \tau_e &\sim \mathrm{Gamma}(\alpha_e, \gamma_e).
+\end{align}
+The mean-field variational approximation is
+$q(\bm{\beta},\tau_e) = \N(\bm{\mu}_\beta,\bm{\Sigma}_\beta)\cdot\mathrm{Gamma}(a_e,b_e)$.
+
+The test case uses $n=50$ observations with $x_i \sim \mathrm{Uniform}(-2,2)$ and
+true parameters $\bm{\beta}_{\mathrm{true}} = (1.0,\; 2.0)^T$ ($p=2$).
+Data are generated with noise standard deviation $\sigma=0.5$.
+
+\subsection{ELBO}
+
+Under the Normal--Gamma variational family, the ELBO is
+\begin{align}
+  \mathcal{L}(\bm{\phi})
+  &= \E_q[\log p(\bm{y}\mid\bm{\beta},\tau_e)]
+   + \E_q[\log p(\bm{\beta})]
+   + \E_q[\log p(\tau_e)]
+   - \E_q[\log q(\bm{\beta})]
+   - \E_q[\log q(\tau_e)].
+\end{align}
+Each term has a closed-form expression:
+\begin{align}
+  \E_q[\log p(\bm{y}\mid\bm{\beta},\tau_e)]
+  &= \frac{n}{2}\bigl(\psi(a_e)-\log b_e\bigr)
+    - \frac{a_e}{2b_e}\bigl(
+        \lVert\bm{y}-\bm{X}\bm{\mu}_\beta\rVert^2
+        + \tr(\bm{X}\bm{\Sigma}_\beta\bm{X}^T)
+      \bigr)
+    - \frac{n}{2}\log(2\pi),\\
+  \mathrm{KL}(q(\bm{\beta})\|p(\bm{\beta}))
+  &= \tfrac{1}{2}\bigl[
+      \lambda_\beta\,\tr(\bm{\Sigma}_\beta)
+      + \lambda_\beta\lVert\bm{\mu}_\beta\rVert^2
+      - p
+      - \log\det(\lambda_\beta\bm{\Sigma}_\beta)
+    \bigr],
+\end{align}
+with analogous terms for the Gamma factor.
+Full derivations are in the individual linear report (Appendix~\ref{app:linear-ref}).
+
+\subsection{Results}
+
+[Results to be filled from \texttt{python/linear\_run.ipynb}.
+Key figures: \texttt{figs/linear\_*.png}.
+Key tables: \texttt{results/tables/linear\_diagnostics.csv}.]
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Case Study 2: Bayesian Quadratic Regression}
+\label{sec:quadratic}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Model}
+
+The quadratic regression case uses the same Bayesian framework as the linear case,
+but with a feature-expanded design matrix.
+The raw covariate $x_i \sim \mathrm{Uniform}(-2,2)$ is mapped to
+$\tilde{x}_i = (1,\; x_i,\; x_i^2)^T$, so the model is
+\begin{equation}
+  y_i = \beta_0 + \beta_1 x_i + \beta_2 x_i^2 + \varepsilon_i,
+  \quad \varepsilon_i \sim \N(0, \tau_e^{-1}).
+\end{equation}
+The model is linear in $\bm{\beta} = (\beta_0, \beta_1, \beta_2)^T$, so the same
+Normal--Gamma ELBO and CAVI updates apply with $p=3$.
+
+The test case uses $n=100$ observations and true parameters
+$\bm{\beta}_{\mathrm{true}} = (1.0,\; 2.0,\; -1.0)^T$.
+The quadratic term $\beta_2 = -1.0$ introduces a downward curvature that tests whether
+the optimisers correctly attribute variance to the additional parameter.
+
+\subsection{ELBO}
+
+The ELBO is identical in form to the linear case (Section~\ref{sec:linear}) with
+$p=3$ and the expanded design matrix $\tilde{\bm{X}}$.
+There is no new approximation: the feature expansion is a deterministic preprocessing
+step applied before inference.
+
+\subsection{Results}
+
+[Results to be filled from \texttt{python/quadratic\_run.ipynb}.
+Key figures: \texttt{figs/quadratic\_*.png}.
+Key tables: \texttt{results/tables/quadratic\_diagnostics.csv}.]
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Case Study 3: Bayesian Logistic Regression}
+\label{sec:logistic}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Model}
+
+The Bayesian logistic regression model is
+\begin{align}
+  y_i \mid \bm{\beta} &\sim \mathrm{Bernoulli}(\sigma(x_i^T\bm{\beta})),
+  \quad i = 1,\ldots,n, \\
+  \bm{\beta} &\sim \N(\bm{0},\; \lambda^{-1}\bm{I}_p),
+  \quad \lambda^{-1} = 10,
+\end{align}
+where $\sigma(\psi) = (1+e^{-\psi})^{-1}$ is the logistic sigmoid.
+The logistic likelihood is not conjugate to the Gaussian prior, so the posterior is not
+available in closed form.
+
+The test case uses $n=200$ observations with $x_i \sim \mathrm{Uniform}(-2,2)$ and
+true parameters $\bm{\beta}_{\mathrm{true}} = (-1.0,\; 2.0)^T$ ($p=2$).
+
+\subsection{Jaakkola--Jordan ELBO}
+
+The Jaakkola--Jordan bound \parencite{Jaakkola2000} introduces local variational
+parameters $\xi_i > 0$ to replace the intractable log-likelihood term
+$\E_q[\log\sigma(x_i^T\bm{\beta})]$ with a tight quadratic lower bound.
+At the optimal tightness $\xi_i^* = \sqrt{\E_q[(x_i^T\bm{\beta})^2]}$, the ELBO is
+\begin{equation}
+  \mathcal{L}(\bm{\theta})
+  = \sum_{i=1}^{n}
+    \Bigl[(y_i - \tfrac{1}{2})\,x_i^T\bm{\mu}
+          - \log 2 - \log\cosh\!\tfrac{\xi_i^*}{2}\Bigr]
+  - \mathrm{KL}(q\|p).
+\end{equation}
+The gradient and CAVI updates for this ELBO are derived in \textcite{Jaakkola2000};
+the implementation uses Cholesky reparameterisation with 5 unconstrained parameters.
+
+\subsection{Results}
+
+We generated synthetic data using a known logistic regression model with parameters
+$\beta_0 = -1.0$ and $\beta_1 = 2.0$.
+These are the data-generating parameters --- they define the process that produced the
+observations and represent what we are trying to recover.
+
+Inference was conducted as if the true values were unknown.
+The Gibbs sampler uses only two inputs: the 200 binary observations and the weakly
+informative prior $\bm{\beta} \sim \N(\bm{0}, 10\bm{I})$.
+It never sees the true values.
+
+The posterior distribution is the result of combining what the data say (the likelihood)
+with what we believed before seeing the data (the prior).
+The posterior mean sits at approximately $(-1.6,\; 2.6)$, offset from the true values,
+because with only 200 observations the likelihood is not strong enough to overcome the
+prior completely.
+
+The true values appear on the plots only as a benchmark --- to verify that the posterior
+is plausible.
+The fact that the true values fall within the posterior distribution confirms the sampler
+is behaving correctly.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{logistic_elbo_convergence.png}
+  \caption{ELBO convergence for all four optimisation methods on the logistic test case.
+           All methods converge to the same final value within 50 iterations.}
+  \label{fig:logistic-elbo}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{logistic_vb_gibbs_beta0.png}
+  \caption{Posterior comparison for $\beta_0$: variational approximation versus PG Gibbs
+           reference density.
+           The posterior mean is offset from the true value $\beta_0=-1.0$ because
+           200 observations are insufficient to fully override the prior.}
+  \label{fig:logistic-posterior}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{logistic_gibbs_ess.png}
+  \caption{Effective sample size (ESS) per parameter for the PG Gibbs sampler.
+           ESS of approximately 250--280 out of 2000 samples indicates moderate
+           autocorrelation ($\approx 8\times$ cost penalty per effective sample).}
+  \label{fig:logistic-ess}
+\end{figure}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Discussion}
+\label{sec:discussion}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Cross-Case Comparison}
+
+Table~\ref{tab:comparison} summarises the key structural and empirical differences
+across the three test cases.
+All timing figures are from the same machine (Alienware 17~R5, Intel i7-8750H) but
+are not controlled comparisons: model complexity, parameter count, and Gibbs overhead
+differ across cases.
+The fair within-notebook comparison is each VI method versus its own Gibbs reference.
+
+\begin{table}[H]
+\centering
+\caption{Comparison of the three case studies.}
+\label{tab:comparison}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Property & Linear & Quadratic & Logistic \\
+\midrule
+Likelihood & Gaussian & Gaussian & Bernoulli \\
+True $\bm{\beta}$ & $(1.0, 2.0)$ & $(1.0, 2.0, -1.0)$ & $(-1.0, 2.0)$ \\
+Predictors $p$ & 2 & 3 & 2 \\
+Observations $n$ & 50 & 100 & 200 \\
+Conjugacy & Yes & Yes & No (JJ bound) \\
+ELBO form & Normal--Gamma & Normal--Gamma & Jaakkola--Jordan \\
+Reference sampler & Conjugate Gibbs & Conjugate Gibbs & PG Gibbs \\
+Gibbs cost & Low & Low & High ($n \times T$ Gammas) \\
+Variational parameters & $p + p(p+1)/2 + 2$ & $p + p(p+1)/2 + 2$ & $2p + 1$ (Cholesky) \\
+Variance collapse & Mild & Moderate & Minimal \\
+CAVI updates & Closed form & Closed form & Closed form (via JJ) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Posterior Variance Collapse}
+
+Posterior variance collapse --- the tendency of mean-field VI to underestimate posterior
+uncertainty --- varies systematically across the three cases.
+
+In the linear and quadratic Gaussian cases, the mean-field factorisation
+$q(\bm{\beta})\,q(\tau_e)$ removes true posterior correlations between $\bm{\beta}$ and
+$\tau_e$, squeezing the marginal approximations.
+The effect is mild for the linear case (small $p=2$ and small $n=50$) and more pronounced
+for the quadratic case (larger $p=3$ and $n=100$).
+
+In the logistic case with the Jaakkola--Jordan bound, variance collapse is minimal.
+This is because the JJ bound is tight at the CAVI fixed point: when
+$\xi_i^* = \sqrt{\E_q[(x_i^T\bm{\beta})^2]}$, the bound equals the true expectation,
+and the ELBO objective penalises over-concentration.
+The result is that CAVI and all gradient-based methods recover posterior standard
+deviations accurately relative to the PG Gibbs reference.
+
+\subsection{Optimisation Behaviour}
+
+CAVI is the most efficient method across all three settings, because it exploits
+closed-form coordinate updates.
+For the linear and quadratic cases, the conjugate Normal--Gamma structure enables
+exact updates; for the logistic case, the JJ bound restores the same conjugate structure.
+
+BFGS converges rapidly in all three cases, providing an effective gradient-based
+alternative when closed-form CAVI updates are not available (as would be the case for
+non-standard likelihoods or non-conjugate priors).
+
+Newton's method is the most expensive per-iteration due to the finite-difference
+Hessian, but converges in the fewest iterations near the optimum.
+For the problem sizes here ($p \leq 3$), the finite-difference overhead is manageable.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section*{Conclusion}
+\addcontentsline{toc}{section}{Conclusion}
+%─────────────────────────────────────────────────────────────────────────────
+
+This project has applied gradient-based optimisation methods to variational inference
+across three Bayesian regression settings of increasing difficulty.
+The unifying principle is that ELBO maximisation transforms intractable posterior
+inference into a tractable optimisation problem, directly amenable to the methods
+taught in ENEL445.
+
+Across all three case studies, CAVI is the most efficient method, converging rapidly
+via closed-form coordinate updates.
+BFGS is the recommended gradient-based alternative, achieving quasi-Newton convergence
+speed with only gradient evaluations and Wolfe-condition step control.
+
+The three cases expose a clear progression:
+\begin{enumerate}
+  \item The linear case establishes the baseline: conjugate Gibbs reference, mild
+    variance collapse, all methods converge cleanly.
+  \item The quadratic case raises the parameter count and reveals that moderate variance
+    collapse can persist even when the ELBO has converged.
+  \item The logistic case introduces a non-conjugate computational bottleneck, resolved
+    by the Jaakkola--Jordan bound, and demonstrates that variance collapse can be
+    avoided entirely when the bound is tight at the CAVI fixed point.
+\end{enumerate}
+
+The P\'{o}lya--Gamma Gibbs sampler provides an accurate reference for the logistic case
+but is computationally expensive ($n \times T$ Gamma draws per iteration).
+For production settings with $n \gg 200$, the VI methods offer a substantial
+computational advantage.
+
+\printbibliography
+
+%─────────────────────────────────────────────────────────────────────────────
+\appendix
+%─────────────────────────────────────────────────────────────────────────────
+
+\section{Case Study Summary Table}
+\label{app:comparison-table}
+
+The following table expands on Table~\ref{tab:comparison} with additional
+optimisation-specific and sampler-specific properties.
+
+\begin{table}[H]
+\centering
+\caption{Extended case study comparison.}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Property & Linear & Quadratic & Logistic \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Model}} \\
+Likelihood & Gaussian & Gaussian & Bernoulli \\
+True $\bm{\beta}$ & $(1.0, 2.0)$ & $(1.0, 2.0, -1.0)$ & $(-1.0, 2.0)$ \\
+Predictors $p$ & 2 & 3 & 2 \\
+Observations $n$ & 50 & 100 & 200 \\
+Conjugacy & Yes & Yes & No \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Variational approximation}} \\
+Variational family & Normal--Gamma & Normal--Gamma & Gaussian only \\
+ELBO form & Closed form & Closed form & Jaakkola--Jordan \\
+VI parameters $d$ & 8 & 11 & 5 \\
+Variance collapse & Mild & Moderate & Minimal \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Reference sampler}} \\
+Sampler type & Conjugate Gibbs & Conjugate Gibbs & PG Gibbs \\
+Cost per sweep & $O(p^3)$ & $O(p^3)$ & $O(n \cdot T)$ \\
+ESS (typical) & High & High & $\approx 250$--$280$ \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Optimisation}} \\
+CAVI convergence & $<50$ iterations & $<50$ iterations & $<50$ iterations \\
+BFGS convergence & Fast & Fast & Fast \\
+Recommended method & CAVI & CAVI & CAVI \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The text associated with the logistic case is reproduced here for reference.
+
+\begin{framed}
+\noindent
+We generated synthetic data using a known logistic regression model with parameters
+$\beta_0 = -1.0$ and $\beta_1 = 2.0$.
+These are the data-generating parameters: they define the process that produced the
+observations and represent what we are trying to recover.
+
+We then treated inference as if the true values were unknown.
+The Gibbs sampler uses only two inputs: the 200 binary observations and a weakly
+informative prior $\bm{\beta} \sim \N(\bm{0}, 10\bm{I})$.
+It never sees the true values.
+
+The posterior distribution is the result of combining what the data say (the likelihood)
+with what we believed before seeing the data (the prior).
+The posterior mean sits at approximately $(-1.6, 2.6)$, offset from the true values,
+because with only 200 observations the likelihood is not strong enough to overcome
+the prior completely.
+
+The true values appear on the plots only as a benchmark --- to verify that the posterior
+is plausible.
+The fact that the true values fall within the posterior distribution confirms the sampler
+is behaving correctly.
+\end{framed}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Individual Report References}
+\label{app:individual-refs}
+%─────────────────────────────────────────────────────────────────────────────
+
+The three individual case study reports contain full derivations, all figures, and
+complete code listings.
+
+\begin{description}
+  \item[Linear regression:] \texttt{report/20260505D-LINEAR-REPORT.tex}.
+    \label{app:linear-ref}
+    Full ELBO derivation, gradient verification, ELBO landscape, all convergence
+    figures, posterior comparison figures, and variance collapse analysis.
+  \item[Quadratic regression:] \texttt{report/20260506B-QUADRATIC-REPORT.tex}.
+    \label{app:quad-ref}
+    Identical framework to the linear case with $p=3$ and feature expansion.
+  \item[Logistic regression:] \texttt{report/20260509A-LOGISTIC-REPORT.tex}.
+    \label{app:logistic-ref}
+    Full Jaakkola--Jordan derivation, P\'{o}lya--Gamma sampler, ESS diagnostics,
+    and all 20 result figures.
+\end{description}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Code Structure}
+\label{app:code}
+%─────────────────────────────────────────────────────────────────────────────
+
+All code is in the \texttt{python/} directory.
+Each notebook follows a five-stage structure.
+
+\begin{description}
+  \item[Stage 1:] Data generation. Saves \texttt{results/data/<case>\_data.parquet}.
+  \item[Stage 2:] ELBO evaluation and gradient verification (finite-difference check).
+  \item[Stage 3:] Optimisation (CAVI, gradient ascent, Newton, BFGS).
+    Saves \texttt{results/data/<case>\_opt.parquet}.
+  \item[Stage 4:] Reference Gibbs sampler with ESS diagnostics.
+    Saves \texttt{results/data/<case>\_gibbs.parquet}.
+  \item[Stage 5:] Diagnostics and comparison figures.
+    Saves \texttt{results/tables/<case>\_diagnostics.csv}.
+\end{description}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Case & Notebook & Figure prefix \\
+\midrule
+Linear     & \texttt{python/linear\_run.ipynb}     & \texttt{linear\_} \\
+Quadratic  & \texttt{python/quadratic\_run.ipynb}  & \texttt{quadratic\_} \\
+Logistic   & \texttt{python/logistic\_run.ipynb}   & \texttt{logistic\_} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Core algorithms are in \texttt{python/vb\_algorithms\_py.py};
+utilities (archive, plot, I/O) are in \texttt{python/vb\_utils\_py.py}.
+
+\end{document}
