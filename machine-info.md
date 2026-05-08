@@ -46,3 +46,34 @@
 |-----------|----------------|
 | Manufacturer | Alienware   |
 | Version   | 1.7.0          |
+
+---
+
+## Additional Machines
+
+### ASUS Ascent GX10 AI Supercomputer
+
+| Property    | Value                              |
+|-------------|------------------------------------|
+| Model       | ASUS Ascent GX10 (WKSASU10030)     |
+| Chip        | NVIDIA GB10 Grace Blackwell Superchip |
+| OS          | NVIDIA DGX OS                      |
+| RAM         | 128 GB                             |
+| Storage     | 1 TB SSD                           |
+| WiFi        | WiFi 7 (802.11be)                  |
+| Bluetooth   | Yes                                |
+| Price (NZD) | $7,729.00 (PB Tech)                |
+
+---
+
+### Sipeed NanoCluster — Edge AI Cluster
+
+| Property | Value |
+|----------|-------|
+| Model    | Sipeed NanoCluster 7-Node Mini Server |
+| Nodes    | 7 × CM4/CM5 compute modules |
+| Orchestration | Kubernetes K3S |
+| Use case | Edge AI / edge agents |
+| Expected arrival | 01 July 2026 |
+
+> **REMINDER (01 July 2026):** Check for dispatch/arrival of the Sipeed NanoCluster. Once units are in hand, begin K3S cluster setup and integration with the ASUS GX10 (Claude Code CLI over SSH as the agent orchestration layer).

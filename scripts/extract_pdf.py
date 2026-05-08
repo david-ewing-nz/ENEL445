@@ -1,6 +1,8 @@
 import fitz  # PyMuPDF
 import os
 import glob
+import sys
+import argparse
 
 def convert_pdf_pages_to_images(pdf_path, output_dir):
     """Convert each page of a PDF to a PNG image."""
@@ -37,36 +39,46 @@ def convert_pdf_pages_to_images(pdf_path, output_dir):
 # Get script directory
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Define paths
-contents_dir = os.path.join(script_dir, '..', 'contents')
-fig_base_dir = os.path.join(script_dir, '..', 'figs')
+# Parse optional argument for a single PDF file
+parser = argparse.ArgumentParser(description="Convert PDF pages to PNG images.")
+parser.add_argument("pdf", nargs="?", help="Path to a single PDF file to convert (optional)")
+args = parser.parse_args()
 
-# Create base fig directory
-os.makedirs(fig_base_dir, exist_ok=True)
+if args.pdf:
+    # Single file mode
+    pdf_path = os.path.abspath(args.pdf)
+    if not os.path.isfile(pdf_path):
+        print(f"Error: file not found: {pdf_path}")
+        sys.exit(1)
+    pdf_name_no_ext = os.path.splitext(os.path.basename(pdf_path))[0]
+    output_dir = os.path.join(os.path.dirname(pdf_path), pdf_name_no_ext)
+    os.makedirs(output_dir, exist_ok=True)
+    convert_pdf_pages_to_images(pdf_path, output_dir)
+    print(f"Images saved to: {os.path.abspath(output_dir)}")
 
-# Find all PDF files in contents directory
-pdf_files = glob.glob(os.path.join(contents_dir, '*.pdf'))
-
-if not pdf_files:
-    print(f"No PDF files found in {contents_dir}")
 else:
-    print(f"Found {len(pdf_files)} PDF files to process\n")
-    print("=" * 60)
-    
-    success_count = 0
-    for pdf_path in sorted(pdf_files):
-        # Get PDF filename without extension
-        pdf_basename = os.path.basename(pdf_path)
-        pdf_name_no_ext = os.path.splitext(pdf_basename)[0]
-        
-        # Create output directory for this PDF
-        output_dir = os.path.join(fig_base_dir, pdf_name_no_ext)
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # Convert PDF pages to images
-        if convert_pdf_pages_to_images(pdf_path, output_dir):
-            success_count += 1
-    
-    print("=" * 60)
-    print(f"\nConversion completed: {success_count}/{len(pdf_files)} PDFs processed successfully")
-    print(f"Images saved to: {os.path.abspath(fig_base_dir)}")
+    # Batch mode — process all PDFs in contents/
+    contents_dir = os.path.join(script_dir, '..', 'contents')
+    fig_base_dir = os.path.join(script_dir, '..', 'figs')
+    os.makedirs(fig_base_dir, exist_ok=True)
+
+    pdf_files = glob.glob(os.path.join(contents_dir, '*.pdf'))
+
+    if not pdf_files:
+        print(f"No PDF files found in {contents_dir}")
+    else:
+        print(f"Found {len(pdf_files)} PDF files to process\n")
+        print("=" * 60)
+
+        success_count = 0
+        for pdf_path in sorted(pdf_files):
+            pdf_basename = os.path.basename(pdf_path)
+            pdf_name_no_ext = os.path.splitext(pdf_basename)[0]
+            output_dir = os.path.join(fig_base_dir, pdf_name_no_ext)
+            os.makedirs(output_dir, exist_ok=True)
+            if convert_pdf_pages_to_images(pdf_path, output_dir):
+                success_count += 1
+
+        print("=" * 60)
+        print(f"\nConversion completed: {success_count}/{len(pdf_files)} PDFs processed successfully")
+        print(f"Images saved to: {os.path.abspath(fig_base_dir)}")

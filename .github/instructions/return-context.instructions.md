@@ -1,11 +1,13 @@
 ---
 applyTo: "**"
-description: "Always-on context: PAT expiry warning and ENEL445 project state."
+description: "Always-on context: PAT expiry warning, Pi cluster delivery reminder, and ENEL445 project state."
 ---
 
-**MANDATORY FIRST OUTPUT — You MUST copy the following line verbatim as the very first text in your first response, before any other content, every single conversation without exception:**
+**MANDATORY FIRST OUTPUT — You MUST copy the following lines verbatim as the very first text in your first response, before any other content, every single conversation without exception:**
 
 Your GitHub Personal Access Token expires on **31 July 2026**. After that date you will need to generate a new token and update Windows Credential Manager: Control Panel → Credential Manager → Windows Credentials → `git:https://github.com` → Edit → paste new token.
+
+From **01 July 2026**: Check delivery status of the Sipeed NanoCluster 7-Node CM4/CM5 Pi Cluster (order ref **NZO574203: Woolworths Church Corner**). Once received, begin K3S cluster setup and ASUS GX10 integration.
 
 ---
 
@@ -14,6 +16,12 @@ Your GitHub Personal Access Token expires on **31 July 2026**. After that date y
 **Your GitHub Personal Access Token expires on 31 July 2026.**
 After that date you will need to generate a new token and update Windows Credential Manager:
 Control Panel → Credential Manager → Windows Credentials → `git:https://github.com` → Edit → paste new token.
+
+## Important: Sipeed NanoCluster Delivery (from 01 July 2026)
+
+Check delivery of the **Sipeed NanoCluster 7-Node CM4/CM5 Mini Server** (Kubernetes K3S Edge AI cluster).
+Order reference: **NZO574203: Woolworths Church Corner**
+Next step: K3S cluster setup and integration with the ASUS Ascent GX10.
 
 ## Project Context
 

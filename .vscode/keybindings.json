@@ -1,0 +1,12 @@
+[
+    {
+        "key": "ctrl+alt+b",
+        "command": "latex-workshop.build",
+        "when": "editorTextFocus && resourceExtname == '.tex'"
+    },
+    {
+        "key": "ctrl+alt+b",
+        "command": "-workbench.action.toggleMaximizedPanel",
+        "when": ""
+    }
+]
