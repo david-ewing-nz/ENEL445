@@ -1,0 +1,677 @@
+\documentclass[11pt,a4paper]{article}
+
+%  XeLaTeX
+\usepackage{fontspec}
+
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage[useregional]{datetime2}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{tabularray}
+\usepackage{framed}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{eso-pic}
+\usepackage{mathtools}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{xcolor}
+
+\usepackage[backend=biber, style=apa, sorting=nyt]{biblatex}
+\addbibresource{D:/github/ENEL445/report/references.bib}
+\graphicspath{{D:/github/ENEL445/figs/}}
+
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\hypersetup{
+  pdfauthor   = {David Ewing},
+  pdfsubject  = {\jobname.tex},
+  pdfkeywords = {source: \jobname.tex}
+}
+
+% Running margin label
+\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\AddToShipoutPictureBG{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[rotate=90, anchor=north]
+      at ($(current page.north west)+(1.4cm,-13cm)$)
+      {\scriptsize\ttfamily \mymarginlabel};
+  \end{tikzpicture}%
+}
+
+% Custom commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\ELBO}{\text{ELBO}}
+\newcommand{\tr}{\text{tr}}
+\setlength{\parindent}{0pt}
+
+\title{
+Case Study 4 --- Hierarchical Bayesian Linear Regression:\\[0.4em]
+Gradient-Based Optimisation and Posterior Variance Collapse
+}
+\author{
+  David Ewing (82171165)
+}
+\date{10 May 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.7em}
+
+This report applies the gradient-based optimisation methods from ENEL445 to variational
+inference in hierarchical Bayesian linear regression.
+Extending the simple Gaussian regression setting, this model introduces $J=5$ group-level
+random effects $u_j \sim \mathcal{N}(0,\tau_u^{-1})$ alongside the noise precision
+$\tau_e$ as additional latent variables with Gamma priors.
+The Evidence Lower Bound (ELBO) for this conjugate model admits closed-form CAVI updates,
+but also serves as a smooth objective for gradient-based methods, with $D=19$ unconstrained
+parameters.
+
+Four optimisation methods are applied to maximise the ELBO:
+Coordinate Ascent Variational Inference (CAVI), gradient ascent with Armijo backtracking,
+Newton's method with regularised finite-difference Hessian, and BFGS with Wolfe conditions.
+The variational family is a mean-field product
+$q(\bm{\beta})\prod_j q(u_j) \cdot q(\tau_e)\cdot q(\tau_u)$
+with Gaussian random effects and Gamma precision approximations, and a
+Cholesky reparameterisation for $\bm{\Sigma}_\beta$.
+
+The reference posterior is obtained from a conjugate blocked Gibbs sampler
+using 3 chains of 5000 iterations (500 burn-in each).
+A striking finding is severe posterior variance collapse for $\beta_0$
+(SD ratio $\approx 0.13$ for CAVI and BFGS), driven by the mean-field factorisation
+absorbing shared group-level variance into the random effects $u_j$ rather than
+the population intercept.
+Newton's method fails to converge to the correct optimum, highlighting the
+sensitivity of second-order methods to poor Hessian conditioning in high-dimensional
+hierarchical models.
+
+\end{abstract}
+
+\newpage
+
+%─────────────────────────────────────────────────────────────────────────────
+\section*{Introduction}
+%─────────────────────────────────────────────────────────────────────────────
+
+Hierarchical models are ubiquitous in applied statistics: they allow population-level
+parameters to be shared across groups while capturing group-specific variation through
+random effects.
+Bayesian inference in such models requires integrating out both the fixed effects
+$\bm{\beta}$, the random effects $\mathbf{u}=(u_1,\ldots,u_J)^T$, and the precision
+hyperparameters $\tau_e, \tau_u$.
+Even for Gaussian likelihoods, the joint posterior
+\begin{equation*}
+  p(\bm{\beta},\mathbf{u},\tau_e,\tau_u \mid \mathbf{y})
+  \propto p(\mathbf{y}\mid\bm{\beta},\mathbf{u},\tau_e)\,
+           p(\bm{\beta})\,p(\mathbf{u}\mid\tau_u)\,
+           p(\tau_e)\,p(\tau_u)
+\end{equation*}
+is high-dimensional and computationally challenging at scale.
+
+Variational Inference (VI) converts this integration into optimisation by finding
+a tractable approximate posterior $q$ that maximises the Evidence Lower Bound (ELBO).
+This report investigates how the gradient-based methods from ENEL445 perform on a
+$D=19$-dimensional hierarchical model, compared to the conjugate Gibbs reference.
+Of particular interest is \emph{posterior variance collapse}: the tendency of
+mean-field VI to underestimate marginal posterior variance when the true posterior
+has strong inter-variable correlation.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Model Formulation}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Hierarchical Bayesian Linear Regression}
+
+The model is
+\begin{align}
+  y_{ij} \mid \bm{\beta}, u_j, \tau_e
+    &\sim \mathcal{N}\!\bigl(\mathbf{x}_{ij}^T\bm{\beta} + u_j,\; \tau_e^{-1}\bigr),
+    \quad i=1,\ldots,n_j,\; j=1,\ldots,J,\\
+  u_j \mid \tau_u &\sim \mathcal{N}(0,\; \tau_u^{-1}),\\
+  \bm{\beta} &\sim \N(\bm{0},\; \lambda^{-1}\bm{I}_p), \quad \lambda=0.1,\\
+  \tau_e &\sim \mathrm{Gamma}(\alpha_e,\; \gamma_e), \quad \alpha_e=\gamma_e=1,\\
+  \tau_u &\sim \mathrm{Gamma}(\alpha_u,\; \gamma_u), \quad \alpha_u=\gamma_u=1,
+\end{align}
+where $\mathbf{x}_{ij} = (1, x_{ij})^T \in \R^2$ and $\sigma(\cdot)$ is the logistic sigmoid
+(not used here; included for consistency with notation across case studies).
+
+The test case uses $N=150$ observations in $J=5$ groups (30 per group),
+$x_{ij} \sim \mathrm{Uniform}(-2,2)$, and true parameters
+$\bm{\beta}_{\mathrm{true}} = (1.0,\; 2.0)$,
+$\tau_{e,\mathrm{true}}=4.0$ ($\sigma_e = 0.5$),
+$\tau_{u,\mathrm{true}}=2.0$ ($\sigma_u \approx 0.707$).
+
+\subsection{Mean-Field Variational Approximation}
+
+The mean-field variational family factorises as
+\begin{align}
+  q(\bm{\beta},\mathbf{u},\tau_e,\tau_u)
+  &= q(\bm{\beta})\;\prod_{j=1}^{J} q(u_j)\;\cdot\; q(\tau_e)\;\cdot\; q(\tau_u),
+\end{align}
+with
+\begin{align}
+  q(\bm{\beta}) &= \N(\bm{\mu}_\beta,\,\bm{\Sigma}_\beta),\\
+  q(u_j) &= \mathcal{N}(m_j,\, v_j), \quad j=1,\ldots,J,\\
+  q(\tau_e) &= \mathrm{Gamma}(a_e,\, b_e),\\
+  q(\tau_u) &= \mathrm{Gamma}(a_u,\, b_u).
+\end{align}
+The covariance $\bm{\Sigma}_\beta = \bm{L}\bm{L}^T$ is parameterised by its Cholesky
+factor $\bm{L}$ to ensure positive definiteness throughout optimisation.
+
+\subsection{Unconstrained Parameterisation and ELBO}
+
+The unconstrained parameter vector $\bm{\theta} \in \R^{19}$ is
+\begin{equation}
+  \bm{\theta} = \bigl(\bm{\mu}_\beta,\;
+    \tilde{\ell}_{11}, \ell_{21}, \tilde{\ell}_{22},\;
+    m_1,\ldots,m_5,\;
+    \log v_1,\ldots,\log v_5,\;
+    \log a_e, \log b_e, \log a_u, \log b_u
+  \bigr),
+\end{equation}
+where $L_{ii} = e^{\tilde{\ell}_{ii}} > 0$ and $v_j = e^{\log v_j} > 0$.
+
+The ELBO is
+\begin{align}
+  \mathcal{L}(\bm{\theta})
+  &= \E_q\!\left[\log p(\mathbf{y}\mid\bm{\beta},\mathbf{u},\tau_e)\right]
+    + \E_q\!\left[\log p(\mathbf{u}\mid\tau_u)\right]
+    \nonumber\\
+  &\quad - \mathrm{KL}\bigl(q(\bm{\beta})\|p(\bm{\beta})\bigr)
+    + \E_q\!\left[\log p(\tau_e)\right] + H[q(\tau_e)]
+    \nonumber\\
+  &\quad + \E_q\!\left[\log p(\tau_u)\right] + H[q(\tau_u)]
+    + \sum_j H[q(u_j)],
+\end{align}
+where all terms are available in closed form for Gaussian--Gamma conjugacy.
+
+\subsection{CAVI Update Equations}
+
+The coordinate ascent updates cycle over:
+\begin{align}
+  \bm{\Sigma}_\beta^{-1} &\leftarrow \lambda\bm{I} + \E[\tau_e]\,\bm{X}^T\bm{X}, \label{eq:cavi_beta_cov}\\
+  \bm{\mu}_\beta &\leftarrow \bm{\Sigma}_\beta\,\E[\tau_e]\,\bm{X}^T(\mathbf{y} - \bm{m}[\mathrm{groups}]),\\
+  v_j^{-1} &\leftarrow \E[\tau_e]\,n_j + \E[\tau_u], \quad
+  m_j \leftarrow v_j\,\E[\tau_e]\!\sum_{i\in j}\!\bigl(y_{ij} - \mathbf{x}_{ij}^T\bm{\mu}_\beta\bigr),\\
+  a_e &\leftarrow \alpha_e + \tfrac{N}{2}, \quad
+  b_e \leftarrow \gamma_e + \tfrac{1}{2}\E\!\left[\|\mathbf{y} - \bm{X}\bm{\beta} - \bm{m}[\mathrm{groups}]\|^2\right],\\
+  a_u &\leftarrow \alpha_u + \tfrac{J}{2}, \quad
+  b_u \leftarrow \gamma_u + \tfrac{1}{2}\sum_j\!(m_j^2 + v_j),
+\end{align}
+where $\E[\tau_e] = a_e/b_e$ and $\E[\tau_u] = a_u/b_u$.
+
+\subsection{Key Notation}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Symbol & Meaning \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Bayesian model}} \\
+$\bm{X}$ & Design matrix ($N \times p$), rows $\mathbf{x}_{ij}^T$ \\
+$\mathbf{y}$ & Continuous response vector \\
+$\bm{\beta}$ & Fixed-effect coefficient vector \\
+$u_j$ & Group random effect for group $j$ \\
+$\tau_e, \tau_u$ & Noise and random-effect precision \\
+$N, J, p$ & Total observations, groups, predictors \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Variational approximation}} \\
+$q(\bm{\beta})$ & Variational Gaussian for fixed effects \\
+$\bm{\mu}_\beta, \bm{\Sigma}_\beta$ & Mean and covariance of $q(\bm{\beta})$ \\
+$\bm{L}$ & Cholesky factor, $\bm{\Sigma}_\beta=\bm{L}\bm{L}^T$ \\
+$m_j, v_j$ & Mean and variance of $q(u_j)$ \\
+$a_e, b_e$ & Gamma parameters of $q(\tau_e)$ \\
+$a_u, b_u$ & Gamma parameters of $q(\tau_u)$ \\
+$\mathcal{L}(\bm{\theta})$ & ELBO (maximised) \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Optimisation}} \\
+$\bm{\theta}$ & Unconstrained vector ($D=19$) \\
+$\bm{d}^{(t)}$ & Search direction at iteration $t$ \\
+$\alpha_t$ & Step size at iteration $t$ \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Lecture correspondence} (Prof.\ R.\,S.\ Smith, ENEL445 2026)} \\
+$J(\theta)$ & Cost function $=\mathcal{L}(\bm{\theta})$ in this report \\
+$\Phi$ & Regressor matrix $=\bm{X}$ in this report \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Conjugate Gibbs Sampler}
+%─────────────────────────────────────────────────────────────────────────────
+
+The hierarchical Gaussian model is fully conjugate, so a blocked Gibbs sampler is
+available with closed-form full conditionals.
+Each sweep samples:
+\begin{align}
+  \bm{\beta} \mid \mathbf{u}, \tau_e, \mathbf{y}
+    &\sim \mathcal{N}(V_\beta\,\bm{X}^T\tau_e(\mathbf{y}-\bm{m}[\mathrm{groups}]),\; V_\beta),
+    \quad V_\beta = (\lambda\bm{I} + \tau_e\bm{X}^T\bm{X})^{-1},\\
+  u_j \mid \bm{\beta}, \tau_e, \tau_u, \mathbf{y}
+    &\sim \mathcal{N}(V_j\tau_e\!\sum_{i\in j}(y_{ij} - \mathbf{x}_{ij}^T\bm{\beta}),\; V_j),
+    \quad V_j = (\tau_e n_j + \tau_u)^{-1},\\
+  \tau_e \mid \bm{\beta}, \mathbf{u}, \mathbf{y}
+    &\sim \mathrm{Gamma}\!\left(\alpha_e + \tfrac{N}{2},\;
+      \gamma_e + \tfrac{1}{2}\|\mathbf{y}-\bm{X}\bm{\beta}-\mathbf{u}[\mathrm{groups}]\|^2\right),\\
+  \tau_u \mid \mathbf{u}
+    &\sim \mathrm{Gamma}\!\left(\alpha_u + \tfrac{J}{2},\;
+      \gamma_u + \tfrac{1}{2}\sum_j u_j^2\right).
+\end{align}
+The sampler runs for $N_{\mathrm{warmup}} = 500$ burn-in and $N = 5000$ retained
+iterations per chain, with 3 independent chains.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Optimisation Problem Formulation}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection*{Decision Variables}
+
+Maximisation is carried out over $\bm{\theta} \in \R^{19}$ as defined above.
+The constraints $\bm{\Sigma}_\beta \succ 0$ (Cholesky), $v_j > 0$ ($\log v_j$
+unconstrained), $a_e, b_e, a_u, b_u > 0$ ($\log$-parameterised) are all
+satisfied automatically.
+
+\subsection*{Objective Function}
+
+Maximise the ELBO $\mathcal{L}(\bm{\theta}):\R^{19}\to\R$.
+The function is smooth and bounded above by $\log p(\mathbf{y})$.
+For the conjugate Gaussian model, CAVI converges to the global optimum of the
+mean-field ELBO; gradient-based methods may find the same optimum or converge
+to a saddle point if the Hessian is ill-conditioned.
+
+\subsection*{Optimisation Components}
+
+\begin{description}
+\item[CAVI.]
+  Closed-form coordinate updates (Equations~\ref{eq:cavi_beta_cov}--above).
+  Unit step size; exit when $|\Delta\mathcal{L}| < 10^{-8}$.
+
+\item[Gradient ascent.]
+  Direction: $\bm{d}^{(t)} = \nabla\mathcal{L}(\bm{\theta}^{(t)})$ via central FD
+  ($h=10^{-5}$).
+  Armijo backtracking from $\alpha_0=0.5$, $c_1=0.1$, $\rho=0.5$.
+  Exit: $|\Delta\mathcal{L}| < 10^{-7}$ or 2000 iterations.
+
+\item[Newton's method.]
+  Direction: $\bm{d}^{(t)} = -\bm{H}_{\mathrm{reg}}^{-1}\bm{g}^{(t)}$ using a
+  $19\times 19$ FD Hessian.
+  Regularisation ensures the direction is an ascent direction.
+  Armijo backtracking; exit at 50 iterations.
+
+\item[BFGS.]
+  Quasi-Newton with inverse-Hessian approximation updated via the BFGS rank-2 formula.
+  Wolfe conditions via scipy; exit at $\|\bm{g}\|<10^{-7}$ or 2000 iterations.
+\end{description}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Numerical Study}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Test Case Design}
+
+\begin{itemize}
+  \item Model: $y_{ij} \sim \mathcal{N}(\beta_0 + \beta_1 x_{ij} + u_j,\; \tau_e^{-1})$
+  \item True parameters: $\bm{\beta}_{\mathrm{true}} = (1.0,\; 2.0)$,
+    $\tau_{e,\mathrm{true}}=4.0$, $\tau_{u,\mathrm{true}}=2.0$
+  \item Groups: $J=5$, $n_j=30$, $N=150$
+  \item Covariates: $x_{ij} \sim \mathrm{Uniform}(-2, 2)$
+  \item Prior: $\bm{\beta} \sim \N(\bm{0}, 10\bm{I})$;
+    $\tau_e, \tau_u \sim \mathrm{Gamma}(1, 0.1)$
+  \item Seed: \texttt{82171165} (student ID)
+\end{itemize}
+
+\subsection{Gradient Verification}
+
+Before running any optimiser, the gradient of the ELBO with respect to the
+19-dimensional unconstrained vector $\bm{\theta}$ was verified against central
+finite differences at a CAVI warm-start point.
+All 19 components agreed to relative error below $10^{-3}$.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{hierarchical_linear_elbo_gradient_check.png}
+  \caption{Finite-difference gradient verification at the CAVI warm-start:
+    $h=10^{-5}$ versus $h=10^{-7}$.
+    Bars coincide for all 19 components, confirming correct gradient implementation.}
+  \label{fig:gradcheck}
+\end{figure}
+
+\subsection{ELBO Landscape}
+
+Figure~\ref{fig:landscape} shows a 2-D slice of the ELBO surface along
+$\mu_{\beta_0}$ and $\mu_{\beta_1}$ with all other parameters held at the warm start.
+The surface is smooth with a clear maximum near the true values.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.60\linewidth]{hierarchical_linear_elbo_landscape.png}
+  \caption{ELBO landscape slice in the $(\mu_{\beta_0}, \mu_{\beta_1})$ plane.
+    Red star: CAVI warm start; white cross: true $\bm{\beta}$.}
+  \label{fig:landscape}
+\end{figure}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Results}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Generated Data}
+
+Figure~\ref{fig:data} shows the 150 generated observations stratified by group.
+Group random effects $u_j$ visibly shift the regression lines upward or downward
+relative to the population curve.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{hierarchical_linear_data_scatter.png}
+  \caption{Generated hierarchical data ($N=150$, $J=5$).
+    Dotted lines show group-specific regressions; the solid line is the population mean.}
+  \label{fig:data}
+\end{figure}
+
+\subsection{ELBO Convergence}
+
+Figure~\ref{fig:elbocv} shows the ELBO history for all four methods.
+CAVI and BFGS converge to essentially the same final ELBO value ($-132.08$).
+Gradient ascent converges but requires the full 2000-iteration budget,
+reflecting the slow convergence of first-order methods on a 19-dimensional problem.
+Newton's method converges in only 50 iterations but to a markedly worse ELBO
+($-165.28$), indicating failure to escape a saddle region due to ill-conditioned
+Hessian in the high-dimensional parameter space.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{hierarchical_linear_elbo_convergence.png}
+  \caption{ELBO convergence for CAVI (left) and gradient-based methods (right).
+    Newton's method converges to a suboptimal point; CAVI and BFGS agree.}
+  \label{fig:elbocv}
+\end{figure}
+
+\subsection{Step-Size and Condition-Number Behaviour}
+
+Figure~\ref{fig:stepsize} shows the Armijo step sizes for gradient ascent.
+The step sizes remain small throughout, reflecting the relatively flat landscape in
+the 19-dimensional space.
+Figure~\ref{fig:cond} shows the Hessian condition number for Newton's method, which
+remains large throughout, explaining the suboptimal convergence.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\linewidth]{hierarchical_linear_gradient_stepsize.png}
+  \caption{Armijo step sizes for gradient ascent per iteration (log scale).}
+  \label{fig:stepsize}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.65\linewidth]{hierarchical_linear_newton_condition.png}
+  \caption{Hessian condition number at each Newton iteration.
+    The large condition numbers throughout indicate ill-conditioning, consistent with
+    Newton's failure to find the CAVI optimum.}
+  \label{fig:cond}
+\end{figure}
+
+\subsection{Gibbs Sampler Diagnostics}
+
+Figures~\ref{fig:trace_b0}--\ref{fig:trace_tauu} show trace plots for the four
+scalar parameters monitored ($\beta_0$, $\beta_1$, $\tau_e$, $\tau_u$).
+Figure~\ref{fig:acf} shows the ACF for each parameter; all drop inside the 95\%
+confidence band within 5--10 lags, indicating good mixing.
+Figure~\ref{fig:rhat} shows the Gelman--Rubin $\hat{R}$ diagnostic; all values
+are below 1.01, confirming convergence of the 3 chains.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{hierarchical_linear_gibbs_trace_beta0.png}
+  \caption{Gibbs trace: $\beta_0$. Red dashed: true value.}
+  \label{fig:trace_b0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{hierarchical_linear_gibbs_trace_beta1.png}
+  \caption{Gibbs trace: $\beta_1$.}
+  \label{fig:trace_b1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{hierarchical_linear_gibbs_trace_tau_e.png}
+  \caption{Gibbs trace: $\tau_e$ (noise precision).}
+  \label{fig:trace_taue}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{hierarchical_linear_gibbs_trace_tau_u.png}
+  \caption{Gibbs trace: $\tau_u$ (random-effect precision).}
+  \label{fig:trace_tauu}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{hierarchical_linear_gibbs_acf_beta0.png}
+  \caption{ACF for $\beta_0$ (chain 1). Red dashed lines: 95\% band.}
+  \label{fig:acf}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{hierarchical_linear_gibbs_acf_beta1.png}
+  \caption{ACF for $\beta_1$.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{hierarchical_linear_gibbs_acf_tau_e.png}
+  \caption{ACF for $\tau_e$.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{hierarchical_linear_gibbs_acf_tau_u.png}
+  \caption{ACF for $\tau_u$.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.55\linewidth]{hierarchical_linear_gibbs_rhat.png}
+  \caption{Gelman--Rubin $\hat{R}$ diagnostic for all monitored parameters.
+    All values below 1.01 confirm convergence.}
+  \label{fig:rhat}
+\end{figure}
+
+\subsection{Random Effects Recovery}
+
+Figure~\ref{fig:re} compares the CAVI posterior means for $u_j$ against the
+Gibbs reference and the true values.
+Both methods recover the group-specific shifts, with CAVI showing slightly tighter
+credible intervals consistent with its general tendency towards variance collapse.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{hierarchical_linear_random_effects.png}
+  \caption{Random effect estimates $u_j$ for CAVI (left) and Gibbs (right).
+    Stars indicate true values; error bars show $\pm 2$ posterior SD.}
+  \label{fig:re}
+\end{figure}
+
+\subsection{Posterior Comparison: VI versus Gibbs}
+
+Figures~\ref{fig:vbgibbs_b0}--\ref{fig:vbgibbs_tauu} overlay the VI approximations
+against the Gibbs histograms for the four scalar parameters.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{hierarchical_linear_vb_gibbs_beta0.png}
+  \caption{Posterior comparison for $\beta_0$: Gibbs histogram versus VI Gaussian
+    approximations. The VI curves are dramatically narrower than Gibbs (collapse).}
+  \label{fig:vbgibbs_b0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{hierarchical_linear_vb_gibbs_beta1.png}
+  \caption{Posterior comparison for $\beta_1$.
+    VI and Gibbs agree well; minimal collapse.}
+  \label{fig:vbgibbs_b1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{hierarchical_linear_vb_gibbs_tau_e.png}
+  \caption{Posterior comparison for $\tau_e$.}
+  \label{fig:vbgibbs_taue}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{hierarchical_linear_vb_gibbs_tau_u.png}
+  \caption{Posterior comparison for $\tau_u$.}
+  \label{fig:vbgibbs_tauu}
+\end{figure}
+
+\subsection{Posterior Standard-Deviation Ratios}
+
+Figure~\ref{fig:sdratios} shows the ratio $\sigma_{\mathrm{VI}}/\sigma_{\mathrm{Gibbs}}$
+for each method and parameter.
+CAVI and BFGS exhibit severe collapse for $\beta_0$
+(SD ratio $\approx 0.13$) while maintaining near-unity ratios for $\beta_1$.
+This asymmetric collapse arises because $\beta_0$ (the intercept) is confounded with the
+group means $u_j$ under the mean-field factorisation: the posterior covariance between
+$\beta_0$ and $\mathbf{u}$ is discarded, causing $q(\beta_0)$ to appear far more
+concentrated than the true marginal.
+Newton's method produces anomalous SD ratios ($\beta_1 \approx 2.8$) due to its
+convergence to a suboptimal point.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{hierarchical_linear_sd_ratios.png}
+  \caption{Posterior SD ratios (VI / Gibbs). Dashed line: ideal ratio 1.0.
+    Severe intercept collapse ($\approx 0.13$) for CAVI, gradient ascent, and BFGS.}
+  \label{fig:sdratios}
+\end{figure}
+
+\subsection{Posterior Mean Errors}
+
+Figure~\ref{fig:meanerr} shows the absolute error $|\mu_{\mathrm{VI}} - \mu_{\mathrm{Gibbs}}|$.
+Despite severe variance collapse for $\beta_0$, posterior means are well recovered by
+all converged methods.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{hierarchical_linear_mean_errors.png}
+  \caption{Absolute posterior mean errors relative to the Gibbs reference.
+    Posterior means are accurate even where variance is collapsed.}
+  \label{fig:meanerr}
+\end{figure}
+
+\subsection{Performance Summary}
+
+Table~\ref{tab:perf} summarises the convergence, runtime, and final ELBO for all methods.
+Table~\ref{tab:post} summarises the posterior means and SD ratios.
+
+\begin{table}[H]
+  \centering
+  \caption{Optimisation performance: hierarchical linear regression.}
+  \label{tab:perf}
+  \input{../results/tables/hierarchical_linear_performance.tex}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{Posterior summary: hierarchical linear regression.}
+  \label{tab:post}
+  \input{../results/tables/hierarchical_linear_posterior_summary.tex}
+\end{table}
+
+\subsection{Computational Cost}
+
+Figure~\ref{fig:timing} compares the runtimes of all methods.
+CAVI is the fastest converged method at 27\,ms, 134$\times$ faster than the
+conjugate Gibbs sampler (3.6\,s for 3 chains $\times$ 5000 iterations).
+BFGS is 31$\times$ faster than Gibbs.
+Gradient ascent reaches the same final ELBO as CAVI but requires the full 2000-iteration
+budget, making it $\sim$\,3$\times$ slower than Gibbs at this problem size.
+Newton's method, despite only 50 iterations, requires a $19\times19$ FD Hessian at each
+step (requiring $19^2 = 361$ ELBO evaluations per iteration), giving a total cost
+comparable to Gibbs.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{hierarchical_linear_timing_comparison.png}
+  \caption{Runtime comparison (log scale). Annotated speedup factors relative to Gibbs.}
+  \label{fig:timing}
+\end{figure}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Discussion}
+%─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Posterior variance collapse.}
+The intercept $\beta_0$ exhibits severe collapse (SD ratio $\approx 0.13$) under all
+well-converged VI methods.
+The mechanism is the mean-field assumption: the true posterior has strong negative
+correlation between $\beta_0$ and the group means $\bar{u} = J^{-1}\sum_j u_j$,
+because the data constrain $\beta_0 + \bar{u}$ far more tightly than either component
+alone.
+Mean-field VI factorises these two blocks, forcing $q(\beta_0)$ to be a narrow Gaussian
+centred at the marginal mode rather than the true marginal.
+The slope $\beta_1$ is not confounded with the random effects in the same way, so its
+VI standard deviation matches Gibbs closely.
+
+\paragraph{Newton's method failure.}
+Newton's method converges to a point with ELBO $= -165.28$, substantially worse than
+the global CAVI optimum at $-132.08$.
+This is a consequence of the finite-difference $19\times19$ Hessian having poor
+conditioning throughout the trajectory: the Hessian of the ELBO mixes parameters
+that operate on very different scales ($\bm{\mu}_\beta$ in $[-2,2]$, $\log b_u$ near
+$[-3, 3]$), making the Newton step unreliable even with regularisation.
+BFGS avoids this issue by building an \emph{adaptive} positive-definite inverse-Hessian
+approximation, which effectively rescales each parameter direction from curvature
+information accumulated over iterations.
+
+\paragraph{CAVI versus BFGS.}
+CAVI and BFGS converge to the same ELBO optimum with comparable accuracy.
+CAVI is $\sim 4\times$ faster in this implementation because each iteration requires
+only closed-form matrix operations, whereas BFGS requires $2D = 38$ ELBO evaluations
+per iteration for FD gradients.
+For models where CAVI updates are not available (e.g.\ non-conjugate likelihoods),
+BFGS is the natural first-choice gradient-based method.
+
+\paragraph{Gradient ascent.}
+First-order gradient ascent converges to the correct optimum but requires all 2000
+iterations, making it the slowest converged method.
+The Armijo step sizes (Figure~\ref{fig:stepsize}) show consistently small values,
+indicating that the curvature of the ELBO surface is poorly aligned with the gradient
+direction in a 19-dimensional space --- the same limitation identified in the simpler
+linear and quadratic case studies, now more pronounced.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Conclusion}
+%─────────────────────────────────────────────────────────────────────────────
+
+Hierarchical Bayesian linear regression with $J=5$ groups and $D=19$ unconstrained
+parameters presents a qualitatively more challenging optimisation problem than the
+two-parameter logistic case.
+CAVI and BFGS both find the global mean-field ELBO optimum and recover accurate
+posterior means, but both exhibit severe variance collapse for the intercept $\beta_0$
+due to the mean-field factorisation ignoring the posterior correlation between the
+intercept and the random effects.
+Newton's method fails to converge to this optimum, highlighting the limitations of
+finite-difference second-order methods when the Hessian is ill-conditioned.
+Gradient ascent converges but is an order of magnitude slower.
+The conjugate Gibbs sampler provides accurate marginal posteriors but at a cost
+$>100\times$ that of CAVI for this problem size.
+
+\printbibliography
+
+\end{document}
