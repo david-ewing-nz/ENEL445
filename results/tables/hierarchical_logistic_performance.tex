@@ -1,0 +1,8 @@
+\begin{tblr}{colspec={lrrrr}, hline{1,2,Z}={solid}}
+  Method & Iterations & Runtime (ms) & Speedup vs Gibbs & Final ELBO \\
+  CAVI & 37 & 15.1 & 1050x & -54.907 \\
+  Gradient Ascent & 416 & 1710.2 & 9x & -54.907 \\
+  Newton's Method & 9 & 684.9 & 23.1x & -77.360 \\
+  BFGS & 31 & 195.5 & 81x & -54.907 \\
+  PG Gibbs (3 chains) & 3x2000 & 15832.6 & 1x (reference) & N/A \\
+\end{tblr}
