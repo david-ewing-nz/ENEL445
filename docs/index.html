@@ -14,9 +14,33 @@
     li a:hover { text-decoration: underline; }
     li p { margin: 4px 0 0; font-size: 0.88rem; color: #555; }
     footer { margin-top: 48px; font-size: 0.8rem; color: #888; border-top: 1px solid #eee; padding-top: 12px; }
+    #margin-label {
+      position: fixed;
+      left: 0;
+      top: 50%;
+      transform: translateX(-50%) translateY(-50%) rotate(-90deg);
+      transform-origin: center center;
+      white-space: nowrap;
+      font-family: 'Courier New', monospace;
+      font-size: 0.7rem;
+      color: #aaa;
+      pointer-events: none;
+      user-select: none;
+      letter-spacing: 0.03em;
+    }
   </style>
 </head>
 <body>
+  <div id="margin-label"></div>
+  <script>
+    (function() {
+      var d = new Date(document.lastModified);
+      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var dateStr = d.getDate() + '\u00a0' + months[d.getMonth()] + '\u00a0' + d.getFullYear();
+      document.getElementById('margin-label').textContent =
+        'DRAFT: David Ewing dew59@uclive.ac.nz \u00a0|\u00a0 ' + dateStr + ' \u00a0|\u00a0 index.html';
+    })();
+  </script>
   <h1>ENEL445 — Applied Engineering Optimisation</h1>
   <h2>David Ewing &nbsp;|&nbsp; University of Canterbury &nbsp;|&nbsp; 2026</h2>
 
