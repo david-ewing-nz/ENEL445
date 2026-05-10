@@ -53,7 +53,7 @@
 
 \title{
 Gradient-Based Optimisation for Variational Inference:\\
-A Comparative Study Across Four Bayesian Regression Settings
+A Comparative Study Across Five Bayesian Regression Settings
 }
 \author{
   David Ewing (82171165)\\
@@ -70,8 +70,8 @@ A Comparative Study Across Four Bayesian Regression Settings
 \setlength{\parskip}{0.7em}
 
 This report applies the gradient-based optimisation methods from ENEL445 to variational
-inference across four Bayesian regression settings: linear, quadratic, logistic,
-and hierarchical linear regression.
+inference across five Bayesian regression settings: linear, quadratic, logistic,
+hierarchical linear, and hierarchical logistic regression.
 The unifying objective is maximising the Evidence Lower Bound (ELBO), which converts
 intractable posterior inference into a tractable optimisation problem.
 
@@ -92,10 +92,13 @@ The four test cases form a designed progression in inferential difficulty:
 the linear case has a conjugate Gaussian likelihood ($n=50$, $p=2$),
 the quadratic case adds nonlinearity via feature expansion ($n=100$, $p=3$),
 the logistic case introduces a non-conjugate Bernoulli likelihood ($n=200$, $p=2$),
-and the hierarchical linear case adds group random effects ($J=5$ groups, $N=150$, $p=2$).
+the hierarchical linear case adds group random effects ($J=5$ groups, $N=150$, $p=2$),
+and the hierarchical logistic case combines the Jaakkola--Jordan bound with mixed effects
+($J=5$ groups, $N=150$, $p=2$).
 Posterior variance collapse is mild in the linear case, moderate in the quadratic case,
-minimal in the logistic case, and mild in the hierarchical case.
-CAVI is the most efficient method across all four settings.
+minimal in the logistic case, mild in the hierarchical linear case, and symmetric
+(both coefficients) in the hierarchical logistic case.
+CAVI is the most efficient method across all five settings.
 BFGS is the recommended gradient-based alternative when closed-form CAVI updates are
 not available.
 \end{abstract}
@@ -157,13 +160,19 @@ regression settings, forming a deliberate progression in inferential difficulty.
     ELBO dimension $D=19$; mean-field approximation over $\bm{\beta}$, $u_j$, $\tau_e$, $\tau_u$.
     Three-chain Gibbs sampler as the reference.
     ($N=150$, $J=5$, $\bm{\beta}_{\mathrm{true}} = (1.0, 2.0)$.)
+  \item[Case Study 5 --- Hierarchical Logistic Regression:]
+    Two-level logistic model combining the Jaakkola--Jordan ELBO with group random effects.
+    ELBO dimension $D=17$; P\'{o}lya--Gamma Gibbs sampler as the reference.
+    Symmetric posterior variance collapse across both coefficients.
+    ($N=150$, $J=5$, $\bm{\beta}_{\mathrm{true}} = (-1.0, 2.0)$.)
 \end{description}
 
-All four studies share the same four optimisation methods (CAVI, gradient ascent,
+All five studies share the same four optimisation methods (CAVI, gradient ascent,
 Newton, BFGS), the same Cholesky reparameterisation for positive-definiteness, and
 the same convergence criteria.
 The unified methodology allows cross-case comparisons of convergence speed,
-computational cost, posterior accuracy, and variance collapse behaviour.
+computational cost, posterior accuracy, and variance collapse behaviour across
+all five settings.
 
 A known failure mode of mean-field VI is \emph{posterior variance collapse}: the
 optimised approximation is systematically overconfident, underestimating posterior
@@ -663,6 +672,109 @@ Full derivations follow the pattern of the linear case (Section~\ref{sec:linear}
 \end{figure}
 
 %─────────────────────────────────────────────────────────────────────────────
+\section{Case Study 5: Hierarchical Bayesian Logistic Regression}
+\label{sec:hierarchical-logistic}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Model}
+
+Case Study~5 combines the Jaakkola--Jordan variational framework from Case Study~3
+with the hierarchical random-effects structure from Case Study~4.
+With $J=5$ groups and $N=150$ observations:
+\begin{align}
+  y_{ij} &\sim \mathrm{Bernoulli}\!\left(\sigma(x_{ij}^T\bm{\beta} + u_j)\right), \\
+  u_j &\sim \N(0, \tau_u^{-1}), \qquad j = 1,\ldots,J, \\
+  \bm{\beta} &\sim \N(\bm{0}, \lambda^{-1}\bm{I}_p), \quad \lambda = 0.1, \\
+  \tau_u &\sim \mathrm{Gamma}(\alpha_u, \gamma_u).
+\end{align}
+The test case uses $N=150$, $J=5$, $p=2$, $\bm{\beta}_{\mathrm{true}}=(-1.0,2.0)^T$,
+and $\tau_u^{\mathrm{true}}=2.0$.
+
+\subsection{ELBO}
+
+The mean-field approximation factorises as
+$q = q(\bm{\beta})\prod_j q(u_j)\,q(\tau_u)$.
+The Jaakkola--Jordan bound introduces variational parameters $\xi_{ij}$ per
+observation to restore tractability:
+\begin{equation}
+  \mathcal{L} \approx \sum_{ij} \E_q[\log \sigma_{\xi_{ij}}(x_{ij}^T\bm{\beta}+u_j)]
+    - \mathrm{KL}(q(\bm{\beta})\|p(\bm{\beta}))
+    - \sum_j \mathrm{KL}(q(u_j)\|p(u_j))
+    - \mathrm{KL}(q(\tau_u)\|p(\tau_u)),
+\end{equation}
+where $\sigma_\xi$ denotes the JJ surrogate likelihood.
+The ELBO has $D=17$ unconstrained parameters: 2 for $\bm{\mu}_\beta$, 3 for the
+Cholesky factor of $\bm{\Sigma}_\beta$, 5 group means $m_j$, 5 log-variances
+$\log v_j$, and 2 log-shape/rate parameters for $q(\tau_u)$.
+
+CAVI updates follow the JJ fixed-point equations:
+\begin{align}
+  \xi_{ij}^2 &= \E_q[(x_{ij}^T\bm{\beta}+u_j)^2], \\
+  q(\bm{\beta}) &= \N(\bm{\mu}_\beta, \bm{\Sigma}_\beta), \quad
+    \bm{\Sigma}_\beta = \left(2\sum_{ij}\lambda(\xi_{ij})x_{ij}x_{ij}^T + \lambda\bm{I}\right)^{-1}, \\
+  q(u_j) &= \N(m_j, v_j), \quad
+    v_j = \left(2\sum_i \lambda(\xi_{ij}) + \E[\tau_u]\right)^{-1},
+\end{align}
+where $\lambda(\xi) = (\sigma(\xi)-\tfrac{1}{2})/(2\xi)$ is the JJ function.
+
+\subsection{Results}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{hierarchical_logistic_data_scatter.png}
+  \caption{Synthetic data for Case Study~5: $N=150$ binary observations in $J=5$ groups.
+           Group membership is colour-coded; positive outcomes shown as filled circles.}
+  \label{fig:hier-log-data}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{hierarchical_logistic_elbo_convergence.png}
+  \caption{ELBO convergence for all four optimisation methods (hierarchical logistic case).
+           CAVI converges in approximately 37 iterations.
+           Newton's method fails to reach the CAVI optimum
+           (ELBO $= -77.4$ vs\ $-54.9$ for CAVI/BFGS).}
+  \label{fig:hier-log-elbo}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{hierarchical_logistic_vb_gibbs_beta0.png}
+  \caption{Posterior comparison for $\beta_0$ (hierarchical logistic case):
+           variational approximation versus P\'{o}lya--Gamma Gibbs reference.
+           Both concentrate near the true value of $-1.0$.}
+  \label{fig:hier-log-beta0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{hierarchical_logistic_vb_gibbs_beta1.png}
+  \caption{Posterior comparison for $\beta_1$ (hierarchical logistic case):
+           variational approximation versus Gibbs reference near the true value of $2.0$.}
+  \label{fig:hier-log-beta1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{hierarchical_logistic_sd_ratios.png}
+  \caption{Posterior standard deviation ratios (VB/Gibbs) for the hierarchical
+           logistic case. Both $\beta_0$ and $\beta_1$ show symmetric collapse
+           (SD ratio $\approx 0.46$), in contrast to the asymmetric collapse
+           observed in Case Study~4.}
+  \label{fig:hier-log-sd}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{hierarchical_logistic_timing_comparison.png}
+  \caption{Timing comparison for the hierarchical logistic case.
+           CAVI is 1050$\times$ faster than PG Gibbs; BFGS is 81$\times$ faster.
+           The PG Gibbs sampler requires $n\times T$ Gamma draws per iteration
+           ($N=150$, 3$\times$2000 samples).}
+  \label{fig:hier-log-timing}
+\end{figure}
+
+%─────────────────────────────────────────────────────────────────────────────
 \section{Discussion}
 \label{sec:discussion}
 %─────────────────────────────────────────────────────────────────────────────
@@ -670,7 +782,7 @@ Full derivations follow the pattern of the linear case (Section~\ref{sec:linear}
 \subsection{Cross-Case Comparison}
 
 Table~\ref{tab:comparison} summarises the key structural and empirical differences
-across the four test cases.
+across the five test cases.
 All timing figures are from the same machine (Alienware 17~R5, Intel i7-8750H) but
 are not controlled comparisons: model complexity, parameter count, and Gibbs overhead
 differ across cases.
@@ -678,23 +790,23 @@ The fair within-notebook comparison is each VI method versus its own Gibbs refer
 
 \begin{table}[H]
 \centering
-\caption{Comparison of the four case studies.}
+\caption{Comparison of the five case studies.}
 \label{tab:comparison}
-\begin{tabular}{@{}lllll@{}}
+\begin{tabular}{@{}llllll@{}}
 \toprule
-Property & Linear & Quadratic & Logistic & Hierarchical \\
+Property & Linear & Quadratic & Logistic & Hier.~Linear & Hier.~Logistic \\
 \midrule
-Likelihood & Gaussian & Gaussian & Bernoulli & Gaussian \\
-True $\bm{\beta}$ & $(1.0, 2.0)$ & $(1.0, 2.0, -1.0)$ & $(-1.0, 2.0)$ & $(1.0, 2.0)$ \\
-Predictors $p$ & 2 & 3 & 2 & 2 \\
-Observations $n$ & 50 & 100 & 200 & 150 ($J\!=\!5$ groups) \\
-Conjugacy & Yes & Yes & No (JJ bound) & Yes \\
-ELBO form & Normal--Gamma & Normal--Gamma & Jaakkola--Jordan & Normal--Gamma \\
-Reference sampler & Conjugate Gibbs & Conjugate Gibbs & PG Gibbs & Hier.~Gibbs \\
-Gibbs cost & Low & Low & High ($n \times T$) & Medium \\
-Vartnl.~parameters & $p + p(p+1)/2 + 2$ & $p + p(p+1)/2 + 2$ & $2p + 1$ & $D = 19$ \\
-Variance collapse & Mild & Moderate & Minimal & Mild \\
-CAVI updates & Closed form & Closed form & Closed form (via JJ) & Closed form \\
+Likelihood & Gaussian & Gaussian & Bernoulli & Gaussian & Bernoulli \\
+True $\bm{\beta}$ & $(1.0, 2.0)$ & $(1.0, 2.0, -1.0)$ & $(-1.0, 2.0)$ & $(1.0, 2.0)$ & $(-1.0, 2.0)$ \\
+Predictors $p$ & 2 & 3 & 2 & 2 & 2 \\
+Observations $n$ & 50 & 100 & 200 & 150 ($J\!=\!5$) & 150 ($J\!=\!5$) \\
+Conjugacy & Yes & Yes & No (JJ) & Yes & No (JJ) \\
+ELBO form & Normal--Gamma & Normal--Gamma & JJ bound & Normal--Gamma & JJ + hier.\ \\
+Reference sampler & Conj.~Gibbs & Conj.~Gibbs & PG Gibbs & Hier.~Gibbs & PG Gibbs \\
+Gibbs cost & Low & Low & High & Medium & High \\
+Vartnl.~params $D$ & 8 & 11 & 5 & 19 & 17 \\
+Variance collapse & Mild & Moderate & Minimal & Mild ($\beta_0$) & Symmetric \\
+CAVI updates & Closed form & Closed form & Via JJ & Closed form & Via JJ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -702,7 +814,7 @@ CAVI updates & Closed form & Closed form & Closed form (via JJ) & Closed form \\
 \subsection{Posterior Variance Collapse}
 
 Posterior variance collapse --- the tendency of mean-field VI to underestimate posterior
-uncertainty --- varies systematically across the four cases.
+uncertainty --- varies systematically across the five cases.
 
 In the linear and quadratic Gaussian cases, the mean-field factorisation
 $q(\bm{\beta})\,q(\tau_e)$ removes true posterior correlations between $\bm{\beta}$ and
@@ -717,29 +829,35 @@ and the ELBO objective penalises over-concentration.
 The result is that CAVI and all gradient-based methods recover posterior standard
 deviations accurately relative to the PG Gibbs reference.
 
-In the hierarchical case, the mean-field factorisation separates $q(\bm{\beta})$
+In the hierarchical linear case, the mean-field factorisation separates $q(\bm{\beta})$
 from $q(u_j)$ and both from $q(\tau_u)$, removing correlations between the fixed
 effects and the random-effect precision.
-The resulting variance collapse is mild, similar to the simple linear case,
-because the within-group structure ($n_j \approx 30$) provides strong local information.
+The resulting collapse is asymmetric: severe for $\beta_0$ (SD ratio $0.130$) but
+negligible for $\beta_1$ (SD ratio $0.987$), because the intercept is entangled
+with the group random effects while the slope is not.
+
+In the hierarchical logistic case, variance collapse is symmetric across both
+coefficients (SD ratio $\approx 0.46$ for both $\beta_0$ and $\beta_1$).
+The JJ bound removes the asymmetry seen in Case Study~4: without a Gaussian precision
+parameter $\tau_e$, the mean-field factorisation treats $\bm{\beta}$ and $u_j$ more
+evenly, producing balanced underestimation.
 
 \subsection{Optimisation Behaviour}
 
-CAVI is the most efficient method across all four settings, because it exploits
+CAVI is the most efficient method across all five settings, because it exploits
 closed-form coordinate updates.
-For the linear, quadratic, and hierarchical cases, the conjugate Normal--Gamma
-structure enables exact updates; for the logistic case, the JJ bound restores the
-same conjugate structure.
+For the linear, quadratic, and hierarchical linear cases, the conjugate Normal--Gamma
+structure enables exact updates; for the logistic and hierarchical logistic cases,
+the JJ bound restores the same conjugate structure.
 
-BFGS converges rapidly in all four cases, providing an effective gradient-based
-alternative when closed-form CAVI updates are not available (as would be the case for
-non-standard likelihoods or non-conjugate priors).
+BFGS converges rapidly in all five cases, providing an effective gradient-based
+alternative when closed-form CAVI updates are not available.
 
 Newton's method is the most expensive per-iteration due to the finite-difference
 Hessian.
 For the low-dimensional cases ($D \leq 11$) it converges cleanly; for the hierarchical
-case ($D=19$), the Hessian cost is higher and the method exhausts its iteration budget
-without fully converging, making BFGS the preferred second-order alternative.
+cases ($D=19$ and $D=17$), the Hessian cost is higher and the method fails to reach
+the CAVI optimum, making BFGS the preferred second-order alternative.
 
 %─────────────────────────────────────────────────────────────────────────────
 \section*{Conclusion}
@@ -747,17 +865,17 @@ without fully converging, making BFGS the preferred second-order alternative.
 %─────────────────────────────────────────────────────────────────────────────
 
 This project has applied gradient-based optimisation methods to variational inference
-across four Bayesian regression settings of increasing difficulty.
+across five Bayesian regression settings of increasing difficulty.
 The unifying principle is that ELBO maximisation transforms intractable posterior
 inference into a tractable optimisation problem, directly amenable to the methods
 taught in ENEL445.
 
-Across all four case studies, CAVI is the most efficient method, converging rapidly
+Across all five case studies, CAVI is the most efficient method, converging rapidly
 via closed-form coordinate updates.
 BFGS is the recommended gradient-based alternative, achieving quasi-Newton convergence
 speed with only gradient evaluations and Wolfe-condition step control.
 
-The four cases expose a clear progression:
+The five cases expose a clear progression:
 \begin{enumerate}
   \item The linear case establishes the baseline: conjugate Gibbs reference, mild
     variance collapse, all methods converge cleanly.
@@ -766,15 +884,20 @@ The four cases expose a clear progression:
   \item The logistic case introduces a non-conjugate computational bottleneck, resolved
     by the Jaakkola--Jordan bound, and demonstrates that variance collapse can be
     avoided entirely when the bound is tight at the CAVI fixed point.
-  \item The hierarchical case adds group random effects ($J=5$, $D=19$), demonstrating
-    that the same mean-field VI framework scales to mixed-effects models with minimal
-    additional modelling effort.
+  \item The hierarchical linear case adds group random effects ($J=5$, $D=19$),
+    demonstrating that the same mean-field VI framework scales to mixed-effects models
+    with minimal additional modelling effort. Asymmetric variance collapse emerges
+    from the entanglement of $\beta_0$ with the random effects.
+  \item The hierarchical logistic case combines the JJ bound with random effects
+    ($J=5$, $D=17$), completing the progression. Variance collapse becomes symmetric
+    across both coefficients, and PG Gibbs confirms the VI solution.
 \end{enumerate}
 
-The P\'{o}lya--Gamma Gibbs sampler provides an accurate reference for the logistic case
-but is computationally expensive ($n \times T$ Gamma draws per iteration).
+The P\'{o}lya--Gamma Gibbs sampler provides an accurate reference for the logistic
+and hierarchical logistic cases but is computationally expensive ($n \times T$
+Gamma draws per iteration).
 For production settings with $n \gg 200$, the VI methods offer a substantial
-computational advantage.
+computational advantage --- CAVI is 1050$\times$ faster than PG Gibbs in Case Study~5.
 
 \printbibliography
 
@@ -791,32 +914,32 @@ optimisation-specific and sampler-specific properties.
 \begin{table}[H]
 \centering
 \caption{Extended case study comparison.}
-\begin{tabular}{@{}lllll@{}}
+\begin{tabular}{@{}llllll@{}}
 \toprule
-Property & Linear & Quadratic & Logistic & Hierarchical \\
+Property & Linear & Quadratic & Logistic & Hier.~Lin. & Hier.~Log. \\
 \midrule
-\multicolumn{5}{@{}l}{\textbf{Model}} \\
-Likelihood & Gaussian & Gaussian & Bernoulli & Gaussian \\
-True $\bm{\beta}$ & $(1.0, 2.0)$ & $(1.0, 2.0, -1.0)$ & $(-1.0, 2.0)$ & $(1.0, 2.0)$ \\
-Predictors $p$ & 2 & 3 & 2 & 2 \\
-Observations $n$ & 50 & 100 & 200 & 150 ($J\!=\!5$) \\
-Conjugacy & Yes & Yes & No & Yes \\
+\multicolumn{6}{@{}l}{\textbf{Model}} \\
+Likelihood & Gaussian & Gaussian & Bernoulli & Gaussian & Bernoulli \\
+True $\bm{\beta}$ & $(1.0, 2.0)$ & $(1.0, 2.0, -1.0)$ & $(-1.0, 2.0)$ & $(1.0, 2.0)$ & $(-1.0, 2.0)$ \\
+Predictors $p$ & 2 & 3 & 2 & 2 & 2 \\
+Observations $n$ & 50 & 100 & 200 & 150 ($J\!=\!5$) & 150 ($J\!=\!5$) \\
+Conjugacy & Yes & Yes & No & Yes & No \\
 \midrule
-\multicolumn{5}{@{}l}{\textbf{Variational approximation}} \\
-Variational family & Normal--Gamma & Normal--Gamma & Gaussian only & Normal--Gamma \\
-ELBO form & Closed form & Closed form & Jaakkola--Jordan & Closed form \\
-VI parameters $d$ & 8 & 11 & 5 & 19 \\
-Variance collapse & Mild & Moderate & Minimal & Mild \\
+\multicolumn{6}{@{}l}{\textbf{Variational approximation}} \\
+Variational family & Normal--Gamma & Normal--Gamma & Gaussian & Normal--Gamma & Gaussian \\
+ELBO form & Closed form & Closed form & JJ bound & Closed form & JJ + hier.\ \\
+VI parameters $D$ & 8 & 11 & 5 & 19 & 17 \\
+Variance collapse & Mild & Moderate & Minimal & Asymmetric & Symmetric \\
 \midrule
-\multicolumn{5}{@{}l}{\textbf{Reference sampler}} \\
-Sampler type & Conjugate Gibbs & Conjugate Gibbs & PG Gibbs & Hier.~Gibbs \\
-Cost per sweep & $O(p^3)$ & $O(p^3)$ & $O(n \cdot T)$ & $O(N + J)$ \\
-ESS (typical) & High & High & $\approx 250$--$280$ & High \\
+\multicolumn{6}{@{}l}{\textbf{Reference sampler}} \\
+Sampler type & Conj.~Gibbs & Conj.~Gibbs & PG Gibbs & Hier.~Gibbs & PG Gibbs \\
+Cost per sweep & $O(p^3)$ & $O(p^3)$ & $O(n \cdot T)$ & $O(N + J)$ & $O(n \cdot T)$ \\
+ESS (typical) & High & High & $\approx 250$--$280$ & High & Moderate \\
 \midrule
-\multicolumn{5}{@{}l}{\textbf{Optimisation}} \\
-CAVI convergence & $<50$ iter & $<50$ iter & $<50$ iter & $\approx 100$ iter \\
-BFGS convergence & Fast & Fast & Fast & Fast \\
-Recommended method & CAVI & CAVI & CAVI & CAVI \\
+\multicolumn{6}{@{}l}{\textbf{Optimisation}} \\
+CAVI convergence & $<50$ iter & $<50$ iter & $<50$ iter & $\approx 100$ iter & $\approx 37$ iter \\
+BFGS convergence & Fast & Fast & Fast & Fast & Fast \\
+Recommended method & CAVI & CAVI & CAVI & CAVI & CAVI \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -852,25 +975,24 @@ is behaving correctly.
 \label{app:individual-refs}
 %─────────────────────────────────────────────────────────────────────────────
 
-The four individual case study reports contain full derivations, all figures, and
+The five individual case study reports contain full derivations, all figures, and
 complete code listings.
 
 \begin{description}
-  \item[Linear regression:] \texttt{report/20260505D-LINEAR-REPORT.tex}.
-    \label{app:linear-ref}
+  \item[CS1 --- Linear regression:] \texttt{report/20260510A-LINEAR-CASE-STUDY.tex}.
     Full ELBO derivation, gradient verification, ELBO landscape, all convergence
     figures, posterior comparison figures, and variance collapse analysis.
-  \item[Quadratic regression:] \texttt{report/20260506B-QUADRATIC-REPORT.tex}.
-    \label{app:quad-ref}
+  \item[CS2 --- Quadratic regression:] \texttt{report/20260510A-QUADRATIC-CASE-STUDY.tex}.
     Identical framework to the linear case with $p=3$ and feature expansion.
-  \item[Logistic regression:] \texttt{report/20260509A-LOGISTIC-REPORT.tex}.
-    \label{app:logistic-ref}
+  \item[CS3 --- Logistic regression:] \texttt{report/20260510A-LOGISTIC-CASE-STUDY.tex}.
     Full Jaakkola--Jordan derivation, P\'{o}lya--Gamma sampler, ESS diagnostics,
     and all 20 result figures.
-  \item[Hierarchical linear regression:] \texttt{python/hierarchical\_linear\_run.ipynb}.
-    \label{app:hier-ref}
+  \item[CS4 --- Hierarchical linear regression:] \texttt{report/20260510A-HIERARCHICAL-LINEAR-CASE-STUDY.tex}.
     Two-level Normal--Gamma ELBO, group random effects, three-chain Gibbs sampler,
-    and all 23 result figures.
+    and all 23 result figures. Asymmetric $\beta_0$ variance collapse.
+  \item[CS5 --- Hierarchical logistic regression:] \texttt{report/20260510A-HIERARCHICAL-LOGISTIC-CASE-STUDY.tex}.
+    JJ bound with random effects, P\'{o}lya--Gamma Gibbs reference,
+    and all 20 result figures. Symmetric variance collapse across both coefficients.
 \end{description}
 
 %─────────────────────────────────────────────────────────────────────────────
@@ -897,10 +1019,11 @@ Each notebook follows a five-stage structure.
 \toprule
 Case & Notebook & Figure prefix \\
 \midrule
-Linear        & \texttt{python/linear\_run.ipynb}              & \texttt{linear\_} \\
-Quadratic     & \texttt{python/quadratic\_run.ipynb}           & \texttt{quadratic\_} \\
-Logistic      & \texttt{python/logistic\_run.ipynb}            & \texttt{logistic\_} \\
-Hierarchical  & \texttt{python/hierarchical\_linear\_run.ipynb} & \texttt{hierarchical\_linear\_} \\
+Linear          & \texttt{python/linear\_run.ipynb}                  & \texttt{linear\_} \\
+Quadratic       & \texttt{python/quadratic\_run.ipynb}               & \texttt{quadratic\_} \\
+Logistic        & \texttt{python/logistic\_run.ipynb}                & \texttt{logistic\_} \\
+Hier.~Linear    & \texttt{python/hierarchical\_linear\_run.ipynb}    & \texttt{hierarchical\_linear\_} \\
+Hier.~Logistic  & \texttt{python/hierarchical\_logistic\_run.ipynb}  & \texttt{hierarchical\_logistic\_} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -908,7 +1031,7 @@ Hierarchical  & \texttt{python/hierarchical\_linear\_run.ipynb} & \texttt{hierar
 Core algorithms are in \texttt{python/vb\_algorithms\_py.py};
 utilities (archive, plot, I/O) are in \texttt{python/vb\_utils\_py.py}.
 
-All four reports are available online at:
+All five individual case study reports are available online at:
 \begin{center}
   \url{https://ENEL445.IndustrialOrigami.ai}
 \end{center}
