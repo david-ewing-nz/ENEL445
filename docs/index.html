@@ -36,7 +36,9 @@
     (function() {
       var d = new Date(document.lastModified);
       var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      var dateStr = d.getDate() + '\u00a0' + months[d.getMonth()] + '\u00a0' + d.getFullYear();
+      var pad = function(n) { return String(n).padStart(2,'0'); };
+      var dateStr = d.getDate() + '\u00a0' + months[d.getMonth()] + '\u00a0' + d.getFullYear()
+                  + '\u00a0' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
       document.getElementById('margin-label').textContent =
         'DRAFT: David Ewing dew59@uclive.ac.nz \u00a0|\u00a0 ' + dateStr + ' \u00a0|\u00a0 index.html';
     })();
