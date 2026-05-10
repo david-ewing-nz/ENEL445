@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="David Ewing (82171165)" />
+  <meta name="dcterms.date" content="2026-05-09" />
+  <title> Case Study 3 — Bayesian Logistic Regression: Gradient-Based Optimisation and Posterior Variance Collapse </title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    div.abstract {
+      margin: 2em 2em 2em 2em;
+      text-align: left;
+      font-size: 85%;
+    }
+    div.abstract-title {
+      font-weight: bold;
+      text-align: center;
+      padding: 0;
+      margin-bottom: 0.5em;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <script
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"
+  type="text/javascript"></script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title"> Case Study 3 — Bayesian Logistic Regression:<br />
+Gradient-Based Optimisation and Posterior Variance Collapse </h1>
+<p class="author">David Ewing (82171165)</p>
+<p class="date">9 May 2026</p>
+<div class="abstract">
+<div class="abstract-title">Abstract</div>
+<p>This report applies the gradient-based optimisation methods from
+ENEL445 to variational inference in Bayesian logistic regression. Unlike
+the Gaussian regression setting, logistic regression has no conjugate
+variational family, and the Evidence Lower Bound (ELBO) does not admit a
+simple closed-form update. The Jaakkola–Jordan <span class="citation"
+data-cites="Jaakkola2000"></span> variational lower bound provides a
+tractable ELBO for logistic regression via the local variational bound
+<span class="math inline">\(\log\sigma(\psi) \geq
+\tfrac{\psi}{2} - \log 2\cosh(\xi/2)\)</span>, which is tight when <span
+class="math inline">\(\xi = \sqrt{\mathbb{E}[\psi^2]}\)</span>.</p>
+<p>Four optimisation methods are applied to maximise the ELBO:
+Coordinate Ascent Variational Inference (CAVI), gradient ascent with
+Armijo backtracking, Newton’s method with regularised finite-difference
+Hessian, and BFGS with Wolfe conditions. The variational family is <span
+class="math inline">\(q(\bm{\beta}) =
+\mathcal{N}(\bm{\mu},\bm{\Sigma})\)</span> with a Cholesky
+reparameterisation to preserve positive definiteness throughout
+optimisation.</p>
+<p>The reference posterior is obtained from a Pólya–Gamma Gibbs sampler
+<span class="citation" data-cites="Polson2013"></span> using a truncated
+sum-of-gammas approximation with <span
+class="math inline">\(T=50\)</span> terms. Diagnostics include effective
+sample size (ESS), autocorrelation function (ACF) plots, and
+computational cost per effective sample.</p>
+<p>The model is <span class="math inline">\(y_i \sim
+\mathrm{Bernoulli}(\sigma(\beta_0 + \beta_1 x_i))\)</span> with <span
+class="math inline">\(\bm{\beta}_{\mathrm{true}} = (-1.0,\;
+2.0)\)</span> and <span class="math inline">\(n=200\)</span>
+observations. All four VI methods recover posterior means within <span
+class="math inline">\(0.02\)</span> of the Gibbs reference. CAVI
+converges in fewer than 50 iterations and is several orders of magnitude
+faster than the Pólya–Gamma sampler, which requires <span
+class="math inline">\(200\)</span> Gamma draws per iteration. Note that
+timing comparisons across the linear, quadratic, and logistic notebooks
+in this project are not controlled experiments: the likelihoods,
+parameter counts, and Gibbs structures differ across cases. The fair
+within-notebook comparison is each VI method versus its own Gibbs
+reference.</p>
+</div>
+</header>
+<h1 class="unnumbered" id="introduction">Introduction</h1>
+<p>Bayesian inference provides principled uncertainty quantification for
+binary classification through the posterior distribution <span
+class="math display">\[p(\bm{\beta} \mid \bm{y}) \propto p(\bm{y} \mid
+\bm{\beta})\,p(\bm{\beta}),\]</span> where <span
+class="math inline">\(p(\bm{y}\mid\bm{\beta}) = \prod_{i=1}^{n}
+\sigma(x_i^T\bm{\beta})^{y_i}
+(1-\sigma(x_i^T\bm{\beta}))^{1-y_i}\)</span> is the Bernoulli
+log-likelihood under the logistic link <span
+class="math inline">\(\sigma(\psi)=(1+e^{-\psi})^{-1}\)</span>. The
+posterior is not available in closed form because the logistic
+likelihood is not conjugate to the Gaussian prior <span
+class="math inline">\(p(\bm{\beta})=\mathcal{N}(\bm{0},
+\lambda^{-1}\bm{I})\)</span>.</p>
+<p>Variational Inference (VI) converts posterior computation into
+optimisation by finding the best approximation <span
+class="math inline">\(q(\bm{\beta})\)</span> from a tractable family,
+maximising the Evidence Lower Bound (ELBO): <span
+class="math display">\[\mathcal{L}(\bm{\phi}) = \mathbb{E}_{q}[\log
+p(\bm{y}\mid\bm{\beta})] - \mathrm{KL}(q \| p)
+  \leq \log p(\bm{y}).\]</span> The logistic likelihood <span
+class="math inline">\(\log\sigma(\psi)\)</span> is not quadratic in
+<span class="math inline">\(\bm{\beta}\)</span>, so the expectation
+<span
+class="math inline">\(\mathbb{E}_q[\log\sigma(x_i^T\bm{\beta})]\)</span>
+cannot be computed analytically under a Gaussian <span
+class="math inline">\(q\)</span>. The Jaakkola–Jordan bound replaces
+this term with a tight quadratic lower bound, restoring conjugacy and
+making CAVI and gradient-based methods tractable.</p>
+<p>This report is the third numerical study in this project (following
+linear and quadratic Gaussian regression), and addresses a qualitatively
+different challenge: the logistic likelihood introduces a non-conjugate
+computational bottleneck that gradient-based methods must navigate.</p>
+<h1 id="model-formulation">Model Formulation</h1>
+<h2 id="bayesian-logistic-regression">Bayesian Logistic Regression</h2>
+<p>The model is <span class="math display">\[\begin{aligned}
+  y_i \mid \bm{\beta} &amp;\sim
+\mathrm{Bernoulli}(\sigma(x_i^T\bm{\beta})), \quad i=1,\ldots,n,\\
+  \bm{\beta} &amp;\sim \mathcal{N}(\bm{0}, \lambda^{-1}\bm{I}_p), \quad
+\lambda^{-1}=10,
+\end{aligned}\]</span> where <span class="math inline">\(x_i = (1,
+x_i)^T \in \mathbb{R}^2\)</span> is the feature vector (intercept +
+covariate), and <span class="math inline">\(\sigma(\psi) =
+(1+e^{-\psi})^{-1}\)</span> is the logistic sigmoid.</p>
+<p>The test case uses <span class="math inline">\(n=200\)</span>
+observations with <span class="math inline">\(x_i \sim
+\mathrm{Uniform}(-2,2)\)</span> and true parameters <span
+class="math inline">\(\bm{\beta}_{\mathrm{true}} = (-1.0,\;
+2.0)\)</span>.</p>
+<h2 id="mean-field-variational-approximation">Mean-Field Variational
+Approximation</h2>
+<p>The variational family is <span
+class="math display">\[\begin{aligned}
+  q(\bm{\beta}) &amp;= \mathcal{N}(\bm{\mu}, \bm{\Sigma}),
+\end{aligned}\]</span> with variational parameters <span
+class="math inline">\(\bm{\phi} = (\bm{\mu}, \bm{\Sigma})\)</span>. The
+covariance <span class="math inline">\(\bm{\Sigma} =
+\bm{L}\bm{L}^T\)</span> is represented by its Cholesky factor <span
+class="math inline">\(\bm{L}\)</span> to ensure positive definiteness
+throughout optimisation.</p>
+<p>The unconstrained parameter vector is <span
+class="math display">\[\bm{\theta} = (\mu_0,\; \mu_1,\;
+\tilde{\ell}_{11},\; \ell_{21},\; \tilde{\ell}_{22})
+  \in \mathbb{R}^5,\]</span> where <span class="math inline">\(L_{11} =
+e^{\tilde{\ell}_{11}}\)</span> and <span class="math inline">\(L_{22} =
+e^{\tilde{\ell}_{22}}\)</span> enforce <span
+class="math inline">\(L_{ii} &gt; 0\)</span>.</p>
+<h2 id="jaakkolajordan-elbo">Jaakkola–Jordan ELBO</h2>
+<p>The log-likelihood term <span
+class="math inline">\(\mathbb{E}_q[\log\sigma(\psi_i)]\)</span> where
+<span class="math inline">\(\psi_i = x_i^T\bm{\beta}\)</span> is
+intractable under a Gaussian <span class="math inline">\(q\)</span>. The
+Jaakkola–Jordan bound uses a local variational parameter <span
+class="math inline">\(\xi_i &gt; 0\)</span> to introduce a quadratic
+lower bound: <span class="math display">\[\log\sigma(\psi_i) \geq
+\frac{\psi_i}{2} - \log 2\cosh\!\left(\frac{\xi_i}{2}\right)
+  - \frac{\xi_i}{2}\bigl(\mathbb{E}_q[\psi_i^2]/\xi_i^2 - 1\bigr) \cdot
+\frac{\tanh(\xi_i/2)}{4}.\]</span> At the optimal <span
+class="math inline">\(\xi_i^* = \sqrt{\mathbb{E}_q[\psi_i^2]}\)</span>,
+where <span class="math inline">\(\mathbb{E}_q[\psi_i^2] =
+(x_i^T\bm{\mu})^2 + x_i^T\bm{\Sigma} x_i\)</span>, the bound is tight
+and the ELBO becomes <span class="math display">\[\label{eq:elbo}
+  \mathcal{L}(\bm{\theta}) = \sum_{i=1}^{n}
+  \Bigl[(y_i - \tfrac{1}{2})\,x_i^T\bm{\mu}
+        - \log 2 - \log\cosh\!\tfrac{\xi_i^*}{2}\Bigr]
+  - \mathrm{KL}(q\|p),\]</span> where the KL divergence for Gaussian
+families is <span class="math display">\[\mathrm{KL}(q\|p) =
+\tfrac{1}{2}\Bigl[
+    \log\frac{|\bm{\Sigma}_0|}{|\bm{\Sigma}|}
+    - p + \text{tr}(\bm{\Sigma}_0^{-1}\bm{\Sigma})
+    + (\bm{\mu}-\bm{\mu}_0)^T\bm{\Sigma}_0^{-1}(\bm{\mu}-\bm{\mu}_0)
+  \Bigr],\]</span> with <span
+class="math inline">\(\bm{\mu}_0=\bm{0}\)</span> and <span
+class="math inline">\(\bm{\Sigma}_0 = 10\bm{I}\)</span>.</p>
+<h2 id="key-notation">Key Notation</h2>
+<div class="center">
+<div class="tabular">
+<p><span>@ll@</span> Symbol &amp; Meaning<br />
+<br />
+<span class="math inline">\(\bm{X}\)</span> &amp; Design matrix (<span
+class="math inline">\(n \times p\)</span>), rows <span
+class="math inline">\(x_i^T\)</span><br />
+<span class="math inline">\(\bm{y}\)</span> &amp; Binary response vector
+(<span class="math inline">\(y_i \in \{0,1\}\)</span>)<br />
+<span class="math inline">\(\bm{\beta}\)</span> &amp; Regression
+coefficient vector<br />
+<span class="math inline">\(\sigma(\cdot)\)</span> &amp; Logistic
+sigmoid <span
+class="math inline">\(\sigma(\psi)=(1+e^{-\psi})^{-1}\)</span><br />
+<span class="math inline">\(n, p\)</span> &amp; Observations,
+predictors<br />
+<br />
+<span class="math inline">\(q(\bm{\beta})\)</span> &amp; Variational
+Gaussian approximation<br />
+<span class="math inline">\(\bm{\mu}, \bm{\Sigma}\)</span> &amp; Mean
+and covariance of <span
+class="math inline">\(q(\bm{\beta})\)</span><br />
+<span class="math inline">\(\bm{L}\)</span> &amp; Cholesky factor, <span
+class="math inline">\(\bm{\Sigma}=\bm{L}\bm{L}^T\)</span><br />
+<span class="math inline">\(\mathcal{L}(\bm{\theta})\)</span> &amp;
+Jaakkola–Jordan ELBO<br />
+<span class="math inline">\(\xi_i\)</span> &amp; Local variational
+parameter (tightness parameter)<br />
+<br />
+<span class="math inline">\(\bm{\theta}\)</span> &amp; Unconstrained
+vector <span class="math inline">\((\bm{\mu}, \tilde{\ell}_{11},
+\ell_{21}, \tilde{\ell}_{22})\)</span><br />
+<span class="math inline">\(\bm{d}^{(t)}\)</span> &amp; Search direction
+at iteration <span class="math inline">\(t\)</span><br />
+<span class="math inline">\(\alpha_t\)</span> &amp; Step size at
+iteration <span class="math inline">\(t\)</span><br />
+<br />
+<span class="math inline">\(\omega_i\)</span> &amp; Pólya–Gamma latent
+variable, <span class="math inline">\(\omega_i \mid \bm{\beta} \sim
+\mathrm{PG}(1, x_i^T\bm{\beta})\)</span><br />
+<span class="math inline">\(T\)</span> &amp; Truncation order for PG
+series approximation<br />
+<span class="math inline">\(\kappa_i\)</span> &amp; Pseudo-response
+<span class="math inline">\(\kappa_i = y_i - 1/2\)</span><br />
+<span class="math inline">\(\mathrm{ESS}\)</span> &amp; Effective sample
+size<br />
+<br />
+<span class="math inline">\(J(\theta)\)</span> &amp; Cost function <span
+class="math inline">\(=\mathcal{L}(\bm{\theta})\)</span> (ELBO) in this
+report<br />
+<span class="math inline">\(\Phi\)</span> &amp; Regressor matrix <span
+class="math inline">\(=\bm{X}\)</span> in this report<br />
+</p>
+</div>
+</div>
+<h1 id="pólyagamma-gibbs-sampler">Pólya–Gamma Gibbs Sampler</h1>
+<p>The Pólya–Gamma (PG) Gibbs sampler of <span class="citation"
+data-cites="Polson2013"></span> provides a reference posterior for
+assessing variational approximation quality. The key identity is <span
+class="math display">\[\frac{(e^\psi)^a}{(1+e^\psi)^b}
+  = 2^{-b} e^{\kappa\psi}
+    \int_0^\infty e^{-\omega\psi^2/2}\, p(\omega)\,\mathrm{d}\omega,
+  \quad \omega \sim \mathrm{PG}(b, 0),\]</span> which introduces a
+Pólya–Gamma latent variable <span
+class="math inline">\(\omega_i\)</span> that renders the logistic
+likelihood conditionally Gaussian.</p>
+<h2 id="gibbs-updates">Gibbs Updates</h2>
+<p>The joint model with PG augmentation is <span
+class="math display">\[\begin{aligned}
+  \bm{\beta} \mid \bm{\omega}, \bm{y} &amp;\sim \mathcal{N}(m_\omega,
+V_\omega),\\
+  \omega_i \mid \bm{\beta} &amp;\sim \mathrm{PG}(1,\, x_i^T\bm{\beta}),
+\end{aligned}\]</span> where <span
+class="math display">\[\begin{aligned}
+  V_\omega &amp;= \bigl(\bm{X}^T \mathrm{diag}(\bm{\omega})\bm{X} +
+\bm{\Sigma}_0^{-1}\bigr)^{-1},\\
+  m_\omega &amp;= V_\omega\bigl(\bm{X}^T\bm{\kappa} +
+\bm{\Sigma}_0^{-1}\bm{\mu}_0\bigr),
+  \quad \kappa_i = y_i - \tfrac{1}{2}.
+\end{aligned}\]</span> Both full conditionals are available
+analytically, so each Gibbs iteration is exact (up to the PG
+truncation).</p>
+<h2 id="pg-sampling-approximation">PG Sampling Approximation</h2>
+<p>The PG distribution <span class="math inline">\(\mathrm{PG}(1,
+c)\)</span> is sampled using the truncated series <span
+class="math display">\[\omega \stackrel{d}{=} \frac{1}{2\pi^2}
+  \sum_{k=1}^{T} \frac{g_k}{(k-\tfrac{1}{2})^2 + c^2/(4\pi^2)},
+  \quad g_k \sim \mathrm{Gamma}(1,1),\]</span> with <span
+class="math inline">\(T=50\)</span> terms. This is sufficient for <span
+class="math inline">\(|\psi_i| \lesssim 4\)</span> with negligible
+truncation error. The sampler runs for <span
+class="math inline">\(N_{\mathrm{warmup}} = 500\)</span> burn-in
+iterations and <span class="math inline">\(N = 2000\)</span> retained
+samples.</p>
+<p><strong>Note on timing:</strong> Each PG Gibbs iteration requires
+<span class="math inline">\(n \times T = 200 \times 50 =
+10\,000\)</span> Gamma variates. This is substantially more expensive
+per sample than the conjugate Gaussian Gibbs used in the linear and
+quadratic cases, so cross-model timing comparisons are qualitative
+only.</p>
+<h1 id="optimisation-problem-formulation">Optimisation Problem
+Formulation</h1>
+<h2 class="unnumbered" id="decision-variables">Decision Variables</h2>
+<p>The optimisation is carried out over the unconstrained vector <span
+class="math display">\[\bm{\theta} = (\mu_0,\; \mu_1,\;
+\tilde{\ell}_{11},\; \ell_{21},\; \tilde{\ell}_{22})
+  \in \mathbb{R}^5,\]</span> so that <span
+class="math inline">\(\bm{\mu} = (\mu_0, \mu_1)^T\)</span> and <span
+class="math inline">\(\bm{\Sigma} = \bm{L}\bm{L}^T\)</span> with <span
+class="math inline">\(\bm{L} = \bigl[\begin{smallmatrix}
+e^{\tilde{\ell}_{11}} &amp; 0 \\ \ell_{21} &amp; e^{\tilde{\ell}_{22}}
+\end{smallmatrix}\bigr]\)</span>. The constraint <span
+class="math inline">\(\bm{\Sigma} \succ 0\)</span> is satisfied
+automatically by this parameterisation.</p>
+<h2 class="unnumbered" id="objective-function">Objective Function</h2>
+<p>Maximise the Jaakkola–Jordan ELBO (Equation <a href="#eq:elbo"
+data-reference-type="ref" data-reference="eq:elbo">[eq:elbo]</a>) at the
+optimal <span class="math inline">\(\xi_i^* = \sqrt{(x_i^T\bm{\mu})^2 +
+x_i^T\bm{\Sigma} x_i}\)</span>. The function <span
+class="math inline">\(\mathcal{L}: \mathbb{R}^5 \to \mathbb{R}\)</span>
+is smooth, bounded above by <span class="math inline">\(\log
+p(\bm{y})\)</span>, and has a unique stationary point in this model (the
+CAVI fixed point).</p>
+<h2 class="unnumbered" id="constraints">Constraints</h2>
+<p>No explicit constraints remain after reparameterisation. The Cholesky
+parameterisation maps <span class="math inline">\(\mathbb{R}^5\)</span>
+bijectively to the space of valid Gaussian variational parameters.</p>
+<h2 class="unnumbered" id="optimisation-components">Optimisation
+Components</h2>
+<p>Each method is described in terms of the four components from the
+ENEL445 course: entry conditions, search direction, step-size rule, and
+exit conditions.</p>
+<dl>
+<dt>CAVI.</dt>
+<dd>
+<p><em>Entry:</em> always applicable. <em>Direction:</em> closed-form
+coordinate update <span class="math inline">\(\bm{\Sigma}^{-1}
+\leftarrow
+  \bm{\Sigma}_0^{-1} + 2\sum_i\lambda(\xi_i^*)x_ix_i^T\)</span>, <span
+class="math inline">\(\bm{\mu} \leftarrow
+\bm{\Sigma}(\bm{\Sigma}_0^{-1}\bm{\mu}_0 +
+\bm{X}^T\bm{\kappa})\)</span>, where <span
+class="math inline">\(\lambda(\xi) = \tanh(\xi/2)/(4\xi)\)</span>.
+<em>Step size:</em> unit (exact closed-form step). <em>Exit:</em> <span
+class="math inline">\(|\Delta\mathcal{L}| &lt; \varepsilon\)</span>.</p>
+</dd>
+<dt>Gradient ascent.</dt>
+<dd>
+<p><em>Entry:</em> <span
+class="math inline">\(\nabla\mathcal{L}(\bm{\theta}^{(t)})^T\bm{d}^{(t)}
+&gt; 0\)</span> (direction is the gradient itself; always satisfied).
+<em>Direction:</em> <span class="math inline">\(\bm{d}^{(t)} =
+\nabla\mathcal{L}(\bm{\theta}^{(t)})\)</span>. <em>Step size:</em>
+Armijo backtracking, starting from <span class="math inline">\(\alpha_0
+= 0.5\)</span>, halving until <span
+class="math inline">\(\mathcal{L}(\bm{\theta}+\alpha\bm{d}) \geq
+\mathcal{L}(\bm{\theta}) + c_1\alpha\|\bm{g}\|^2\)</span>, <span
+class="math inline">\(c_1 = 10^{-4}\)</span>. <em>Exit:</em> <span
+class="math inline">\(\|\bm{g}\|_2 &lt; 10^{-8}\)</span> or <span
+class="math inline">\(t \geq 2000\)</span>.</p>
+</dd>
+<dt>Newton’s method.</dt>
+<dd>
+<p><em>Entry:</em> ascent condition <span
+class="math inline">\(\bm{g}^T\bm{d} &gt; 0\)</span> enforced by Hessian
+regularisation <span class="math inline">\(\bm{H}_{\mathrm{reg}} =
+\bm{H} - \lambda\bm{I}\)</span> with <span
+class="math inline">\(\lambda\)</span> increased until <span
+class="math inline">\(-\bm{H}_{\mathrm{reg}}^{-1}\bm{g}\)</span> is an
+ascent direction. <em>Direction:</em> <span
+class="math inline">\(\bm{d}^{(t)} =
+-\bm{H}_{\mathrm{reg}}^{-1}\bm{g}^{(t)}\)</span> via finite-difference
+Hessian. <em>Step size:</em> Armijo backtracking. <em>Exit:</em> <span
+class="math inline">\(\|\Delta\bm{\theta}\| &lt; 10^{-8}\)</span> or
+<span class="math inline">\(t \geq 100\)</span>.</p>
+</dd>
+<dt>BFGS.</dt>
+<dd>
+<p><em>Entry:</em> quasi-Newton direction satisfies ascent condition
+when <span class="math inline">\(\bm{y}_t^T\bm{s}_t&gt;0\)</span>. Wolfe
+conditions ensure this curvature condition is maintained.
+<em>Direction:</em> <span class="math inline">\(\bm{d}^{(t)} = -\bm{B}_t
+\bm{g}^{(t)}\)</span> where <span
+class="math inline">\(\bm{B}_t\)</span> is the inverse-Hessian
+approximation (positive definite, updated via BFGS rank-2 formula).
+<em>Step size:</em> Wolfe conditions (scipy implementation).
+<em>Exit:</em> <span class="math inline">\(\|\bm{g}\| &lt;
+10^{-8}\)</span> or <span class="math inline">\(t \geq
+2000\)</span>.</p>
+</dd>
+</dl>
+<h1 id="numerical-study">Numerical Study</h1>
+<h2 id="test-case-design">Test Case Design</h2>
+<ul>
+<li><p>Model: <span class="math inline">\(y_i \sim
+\mathrm{Bernoulli}(\sigma(\beta_0 + \beta_1 x_i))\)</span></p></li>
+<li><p>True parameters: <span
+class="math inline">\(\bm{\beta}_{\mathrm{true}} = (-1.0,\;
+2.0)\)</span></p></li>
+<li><p>Covariates: <span class="math inline">\(x_i \sim
+\mathrm{Uniform}(-2, 2)\)</span>, <span
+class="math inline">\(n=200\)</span></p></li>
+<li><p>Prior: <span class="math inline">\(\bm{\beta} \sim
+\mathcal{N}(\bm{0}, 10\bm{I})\)</span></p></li>
+<li><p>Seed: <code>82171165</code> (student ID)</p></li>
+</ul>
+<h2 id="gradient-verification">Gradient Verification</h2>
+<p>Before running any optimiser, the analytical gradient of the ELBO
+with respect to <span class="math inline">\(\bm{\theta}\)</span> was
+verified against central finite differences at a non-trivial starting
+point <span class="math inline">\(\bm{\theta}_0 = (\bm{0},\, \log 0.1,
+0, \log 0.1)\)</span>. All components agreed to relative error below
+<span class="math inline">\(10^{-6}\)</span>.</p>
+<figure id="fig:gradcheck">
+<img src="logistic_elbo_gradient_check.png" style="width:80.0%" />
+<figcaption>Analytical versus finite-difference gradient at <span
+class="math inline">\(\bm{\theta}_0\)</span>. Bars coincide visually for
+all five components, confirming correct gradient
+implementation.</figcaption>
+</figure>
+<h2 id="elbo-landscape">ELBO Landscape</h2>
+<p>Figure <a href="#fig:landscape" data-reference-type="ref"
+data-reference="fig:landscape">2</a> shows a one-dimensional slice of
+the ELBO surface along <span class="math inline">\(\mu_1\)</span> with
+all other parameters held at <span
+class="math inline">\(\bm{\theta}_0\)</span>. The surface is smooth and
+unimodal, with the maximum near <span
+class="math inline">\(\beta_{1,\mathrm{true}}=2.0\)</span>.</p>
+<figure id="fig:landscape">
+<img src="logistic_elbo_landscape.png" style="width:60.0%" />
+<figcaption>ELBO slice along <span class="math inline">\(\mu_1\)</span>
+at <span class="math inline">\(\bm{\theta}_0\)</span>. The dashed red
+line marks the true value <span class="math inline">\(\beta_1 =
+2.0\)</span>.</figcaption>
+</figure>
+<h1 id="results">Results</h1>
+<h2 id="generated-data">Generated Data</h2>
+<p>Figure <a href="#fig:data" data-reference-type="ref"
+data-reference="fig:data">3</a> shows the generated binary dataset and
+the true sigmoid curve. Of the <span
+class="math inline">\(n=200\)</span> observations, approximately 105
+have <span class="math inline">\(y_i=1\)</span>.</p>
+<figure id="fig:data">
+<img src="logistic_data_scatter.png" style="width:75.0%" />
+<figcaption>Generated logistic data (<span
+class="math inline">\(n=200\)</span>). The solid line is the true
+sigmoid <span class="math inline">\(\sigma(\beta_0 + \beta_1
+x)\)</span>.</figcaption>
+</figure>
+<h2 id="elbo-convergence">ELBO Convergence</h2>
+<p>Figure <a href="#fig:elbocv" data-reference-type="ref"
+data-reference="fig:elbocv">4</a> shows the ELBO trajectory for CAVI,
+gradient ascent, and Newton’s method (BFGS is not shown as its
+trajectory is internal to scipy). CAVI converges monotonically in fewer
+than 50 iterations. Gradient ascent converges more slowly but reaches
+the same final value as CAVI when given sufficient iterations. Newton’s
+method converges rapidly in terms of iteration count, but each iteration
+is more expensive due to the finite-difference Hessian computation.</p>
+<figure id="fig:elbocv">
+<img src="logistic_elbo_convergence.png" />
+<figcaption>ELBO convergence (left) and convergence rate on a log scale
+(right) for CAVI, gradient ascent, and Newton’s method.</figcaption>
+</figure>
+<h2 id="step-size-behaviour">Step-Size Behaviour</h2>
+<p>Figure <a href="#fig:stepsize" data-reference-type="ref"
+data-reference="fig:stepsize">5</a> shows the Armijo step sizes for
+gradient ascent and Newton’s method. Gradient ascent uses a consistently
+small step size throughout, reflecting the slowly varying curvature of
+the Jaakkola–Jordan ELBO. Newton’s method uses unit step size for most
+iterations (the Armijo condition is satisfied on the first trial),
+consistent with near-quadratic convergence near the optimum.</p>
+<figure id="fig:stepsize">
+<img src="logistic_gradient_stepsize.png" />
+<figcaption>Armijo step size per iteration for gradient ascent (left)
+and Newton’s method (right). Newton achieves near-unit steps near
+convergence.</figcaption>
+</figure>
+<h2 id="newton-hessian-condition-number">Newton Hessian Condition
+Number</h2>
+<p>Figure <a href="#fig:cond" data-reference-type="ref"
+data-reference="fig:cond">6</a> shows the condition number of the
+regularised Hessian used in Newton’s method. Early iterations may
+require significant regularisation (<span class="math inline">\(\lambda
+\gg 0\)</span>) if the finite-difference Hessian is ill-conditioned;
+near convergence the Hessian becomes better conditioned and
+regularisation is minimal.</p>
+<figure id="fig:cond">
+<img src="logistic_newton_condition.png" style="width:65.0%" />
+<figcaption>Condition number of the regularised Hessian at each Newton
+iteration.</figcaption>
+</figure>
+<h2 id="pólyagamma-gibbs-sampler-diagnostics">Pólya–Gamma Gibbs Sampler
+Diagnostics</h2>
+<p>Figures <a href="#fig:trace" data-reference-type="ref"
+data-reference="fig:trace">7</a> and <a href="#fig:acf"
+data-reference-type="ref" data-reference="fig:acf">9</a> show the trace
+plots and ACF for the two parameters from the PG Gibbs sampler. The
+chains mix well, with ACF dropping below the 95% confidence band within
+10–20 lags.</p>
+<figure id="fig:trace">
+<img src="logistic_gibbs_trace_beta0.png" />
+<figcaption>Trace plot (left) and marginal posterior histogram (right)
+for <span class="math inline">\(\beta_0\)</span> from the PG Gibbs
+sampler. Red dashed: true value; black dotted: posterior
+mean.</figcaption>
+</figure>
+<figure id="fig:trace1">
+<img src="logistic_gibbs_trace_beta1.png" />
+<figcaption>Trace plot and posterior histogram for <span
+class="math inline">\(\beta_1\)</span>.</figcaption>
+</figure>
+<figure id="fig:acf">
+<img src="logistic_gibbs_acf_beta0.png" />
+<figcaption>Autocorrelation function for <span
+class="math inline">\(\beta_0\)</span> (PG Gibbs). Red dashed lines are
+the 95% confidence band for white noise.</figcaption>
+</figure>
+<figure id="fig:acf1">
+<img src="logistic_gibbs_acf_beta1.png" />
+<figcaption>Autocorrelation function for <span
+class="math inline">\(\beta_1\)</span>.</figcaption>
+</figure>
+<h2 id="effective-sample-size-and-cost-per-ess">Effective Sample Size
+and Cost per ESS</h2>
+<p>Figure <a href="#fig:ess" data-reference-type="ref"
+data-reference="fig:ess">11</a> reports the ESS for both parameters and
+the computational cost per effective sample. With <span
+class="math inline">\(T=50\)</span> PG truncation terms and <span
+class="math inline">\(N=2000\)</span> samples, ESS exceeds 1000 for both
+parameters, indicating good mixing.</p>
+<figure id="fig:ess">
+<img src="logistic_gibbs_ess.png" />
+<figcaption>Left: effective sample size for each parameter. Right: cost
+per effective sample (ms). VI methods are optimisers, not samplers;
+cost-per-ESS applies only to the Gibbs reference.</figcaption>
+</figure>
+<h2 id="posterior-comparison-vi-versus-gibbs">Posterior Comparison: VI
+versus Gibbs</h2>
+<p>Figures <a href="#fig:vbgibbs0" data-reference-type="ref"
+data-reference="fig:vbgibbs0">12</a> and <a href="#fig:vbgibbs1"
+data-reference-type="ref" data-reference="fig:vbgibbs1">13</a> overlay
+the Gaussian VI approximations against the PG Gibbs histogram for each
+parameter. All four VI methods agree closely with the Gibbs reference
+for both posterior means and standard deviations, indicating minimal
+posterior variance collapse in this setting. This is consistent with the
+Jaakkola–Jordan bound being tight at the CAVI optimum.</p>
+<figure id="fig:vbgibbs0">
+<img src="logistic_vb_gibbs_beta0.png" style="width:80.0%" />
+<figcaption>Posterior comparison for <span
+class="math inline">\(\beta_0\)</span>: Gibbs histogram versus VI
+Gaussian approximations (CAVI, gradient ascent, BFGS). Red dashed: true
+value.</figcaption>
+</figure>
+<figure id="fig:vbgibbs1">
+<img src="logistic_vb_gibbs_beta1.png" style="width:80.0%" />
+<figcaption>Posterior comparison for <span
+class="math inline">\(\beta_1\)</span>.</figcaption>
+</figure>
+<h2 id="predictive-sigmoid">Predictive Sigmoid</h2>
+<p>Figure <a href="#fig:pred" data-reference-type="ref"
+data-reference="fig:pred">14</a> shows the estimated sigmoid curve from
+BFGS and Gibbs posterior mean compared to the true curve. Both estimates
+are visually indistinguishable from the truth over the range of the
+training data, confirming that both methods accurately recover the
+classification boundary.</p>
+<figure id="fig:pred">
+<img src="logistic_predictive.png" style="width:75.0%" />
+<figcaption>Estimated predictive sigmoid <span
+class="math inline">\(\sigma(x^T\hat{\bm{\beta}})\)</span> for BFGS (VI)
+and Gibbs posterior mean versus the true curve.</figcaption>
+</figure>
+<h2 id="posterior-standard-deviation-ratios">Posterior
+Standard-Deviation Ratios</h2>
+<p>Figure <a href="#fig:sdratios" data-reference-type="ref"
+data-reference="fig:sdratios">15</a> shows the ratio <span
+class="math inline">\(\sigma_{\mathrm{VI}} /
+\sigma_{\mathrm{Gibbs}}\)</span> for each method and parameter. Ratios
+below 1 indicate posterior variance collapse. All methods achieve ratios
+between 0.90 and 1.10, indicating minimal collapse in this two-parameter
+logistic model with <span class="math inline">\(n=200\)</span>
+observations.</p>
+<figure id="fig:sdratios">
+<img src="logistic_sd_ratios.png" style="width:80.0%" />
+<figcaption>Posterior standard-deviation ratios (VI / Gibbs) for each
+method and parameter. The dashed line marks the ideal ratio of 1.0.
+Values below 1 indicate collapse.</figcaption>
+</figure>
+<h2 id="posterior-mean-errors">Posterior Mean Errors</h2>
+<p>Figure <a href="#fig:meanerr" data-reference-type="ref"
+data-reference="fig:meanerr">16</a> shows the absolute error <span
+class="math inline">\(|\mu_{\mathrm{VI}} -
+\mu_{\mathrm{Gibbs}}|\)</span> for each method and parameter. All
+methods recover posterior means to within 0.02, confirming reliable mean
+estimation regardless of which VI method is used.</p>
+<figure id="fig:meanerr">
+<img src="logistic_mean_errors.png" style="width:80.0%" />
+<figcaption>Absolute posterior mean errors relative to the Gibbs
+reference.</figcaption>
+</figure>
+<h2 id="full-posterior-comparison-all-methods">Full Posterior
+Comparison: All Methods</h2>
+<p>Figures <a href="#fig:comp0" data-reference-type="ref"
+data-reference="fig:comp0">17</a> and <a href="#fig:comp1"
+data-reference-type="ref" data-reference="fig:comp1">18</a> show the
+full overlay of all four VI methods plus the Gibbs reference for each
+parameter.</p>
+<figure id="fig:comp0">
+<img src="logistic_comparison_beta0.png" style="width:80.0%" />
+<figcaption>All methods — posterior distribution for <span
+class="math inline">\(\beta_0\)</span>. The Gibbs histogram (grey) is
+the reference; coloured curves are the VI Gaussian
+approximations.</figcaption>
+</figure>
+<figure id="fig:comp1">
+<img src="logistic_comparison_beta1.png" style="width:80.0%" />
+<figcaption>All methods — posterior distribution for <span
+class="math inline">\(\beta_1\)</span>.</figcaption>
+</figure>
+<h2 id="timing-comparison">Timing Comparison</h2>
+<p>Figure <a href="#fig:timing" data-reference-type="ref"
+data-reference="fig:timing">19</a> shows the computational cost of each
+method on a log scale, with annotations giving the speedup factor
+relative to the PG Gibbs sampler.</p>
+<figure id="fig:timing">
+<img src="logistic_timing_comparison.png" style="width:90.0%" />
+<figcaption>Computational cost on a log scale. Annotations give speedup
+relative to the PG Gibbs reference (dashed line). Note that cross-model
+timing comparisons (vs. the linear and quadratic cases) are qualitative
+only: the PG sampler requires <span class="math inline">\(n \times T =
+10\,000\)</span> Gamma variates per iteration.</figcaption>
+</figure>
+<h1 id="discussion">Discussion</h1>
+<h2 id="posterior-variance-collapse">Posterior Variance Collapse</h2>
+<p>Unlike the linear and quadratic Gaussian regression cases, the
+logistic model with the Jaakkola–Jordan bound does not exhibit strong
+posterior variance collapse. This is because the bound is tight at the
+CAVI fixed point: when <span class="math inline">\(\xi_i^* =
+\sqrt{\mathbb{E}_q[\psi_i^2]}\)</span>, the bound equals the true
+expectation, and the ELBO objective penalises over-concentration. The
+result is that CAVI and all gradient-based methods recover both
+posterior means and posterior standard deviations accurately relative to
+the PG Gibbs reference.</p>
+<h2 id="optimisation-behaviour">Optimisation Behaviour</h2>
+<p>CAVI is the most efficient method due to its closed-form updates
+under the Jaakkola–Jordan bound. Gradient ascent converges more slowly
+but requires only gradient computations. Newton’s method converges in
+fewer iterations but requires a finite-difference Hessian (<span
+class="math inline">\(25\)</span> evaluations per iteration), making
+each step expensive. BFGS provides a good compromise: quasi-Newton
+curvature information with only gradient evaluations, and converges
+rapidly due to the smooth, near-quadratic ELBO landscape.</p>
+<h2 id="comparison-across-test-cases">Comparison Across Test Cases</h2>
+<div class="center">
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Property</th>
+<th style="text-align: left;">Linear</th>
+<th style="text-align: left;">Quadratic</th>
+<th style="text-align: left;">Logistic (this report)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Likelihood</td>
+<td style="text-align: left;">Gaussian</td>
+<td style="text-align: left;">Gaussian</td>
+<td style="text-align: left;">Bernoulli</td>
+</tr>
+<tr>
+<td style="text-align: left;">Conjugacy</td>
+<td style="text-align: left;">Yes</td>
+<td style="text-align: left;">Yes</td>
+<td style="text-align: left;">No (JJ bound)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Reference sampler</td>
+<td style="text-align: left;">Gaussian Gibbs</td>
+<td style="text-align: left;">Gaussian Gibbs</td>
+<td style="text-align: left;">PG Gibbs</td>
+</tr>
+<tr>
+<td style="text-align: left;">Gibbs cost</td>
+<td style="text-align: left;">Low</td>
+<td style="text-align: left;">Low</td>
+<td style="text-align: left;">High (<span class="math inline">\(n \times
+T\)</span> Gammas)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Variance collapse</td>
+<td style="text-align: left;">Mild</td>
+<td style="text-align: left;">Moderate</td>
+<td style="text-align: left;">Minimal</td>
+</tr>
+<tr>
+<td style="text-align: left;">CAVI updates</td>
+<td style="text-align: left;">Closed form</td>
+<td style="text-align: left;">Closed form</td>
+<td style="text-align: left;">Closed form (via JJ)</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Note that all timing figures across the three test cases are from the
+same machine (Alienware 17 R5, Intel i7-8750H) but are not controlled
+comparisons. Model complexity, parameter count, and Gibbs overhead
+differ across cases.</p>
+<h1 class="unnumbered" id="conclusion">Conclusion</h1>
+<p>This report has applied gradient-based optimisation methods to
+variational inference in Bayesian logistic regression using the
+Jaakkola–Jordan ELBO. All four VI methods (CAVI, gradient ascent,
+Newton, BFGS) successfully maximise the ELBO and recover posterior
+distributions that closely match the PG Gibbs reference. Posterior
+variance collapse is minimal in this setting, in contrast to the linear
+and quadratic Gaussian cases.</p>
+<p>The main practical finding is that CAVI is the preferred method for
+this model: it converges rapidly via closed-form coordinate updates
+derived from the JJ bound, requires no hyperparameter tuning, and
+achieves the same accuracy as more expensive gradient-based methods.
+BFGS is the recommended gradient-based alternative when closed-form
+updates are not available.</p>
+<p>The PG Gibbs sampler provides an accurate reference but is
+computationally expensive due to the <span class="math inline">\(n
+\times T\)</span> Gamma draws required per iteration. For production
+logistic regression with <span class="math inline">\(n \gg 200\)</span>,
+the VI methods offer a substantial computational advantage.</p>
+<h1 id="app:code">Code Structure</h1>
+<p>The implementation is in <code>python/logistic_run.ipynb</code> (35
+cells).</p>
+<dl>
+<dt>Stage 1 (cells 2–4):</dt>
+<dd>
+<p>Data generation. Saves
+<code>results/data/logistic_data.parquet</code>.</p>
+</dd>
+<dt>Stage 2 (cells 5–9):</dt>
+<dd>
+<p>ELBO evaluation and gradient verification. Functions
+<code>elbo()</code>, <code>elbo_grad()</code>, <code>unpack()</code>,
+<code>pack()</code>.</p>
+</dd>
+<dt>Stage 3 (cells 10–18):</dt>
+<dd>
+<p>Optimisation methods. Functions <code>run_cavi()</code>,
+<code>run_gradient_ascent()</code>, <code>run_newton()</code>, BFGS via
+<code>scipy.optimize.minimize</code>. Saves
+<code>results/data/logistic_opt.parquet</code>.</p>
+</dd>
+<dt>Stage 4 (cells 19–24):</dt>
+<dd>
+<p>PG Gibbs sampler with ESS diagnostics. Functions
+<code>sample_pg_one()</code>, <code>sample_pg_vec()</code>,
+<code>acf()</code>, <code>compute_ess()</code>. Saves
+<code>results/data/logistic_gibbs.parquet</code>.</p>
+</dd>
+<dt>Stage 5 (cells 25–34):</dt>
+<dd>
+<p>Diagnostics and comparison. Saves
+<code>results/tables/logistic_diagnostics.csv</code> and
+<code>.parquet</code>.</p>
+</dd>
+</dl>
+<p>All figures are saved to <code>figs/</code> with the
+<code>logistic_</code> prefix to avoid collisions with the
+<code>linear_</code> and <code>quadratic_</code> figures from the other
+test cases.</p>
+</body>
+</html>

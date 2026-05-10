@@ -1,0 +1,651 @@
+\documentclass[11pt,a4paper]{article}
+
+%  XeLaTeX
+\usepackage{fontspec}
+
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage[useregional]{datetime2}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{tabularray}
+\usepackage{framed}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{eso-pic}
+\usepackage{mathtools}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{xcolor}
+
+\usepackage[backend=biber, style=apa, sorting=nyt]{biblatex}
+\addbibresource{D:/github/ENEL445/report/references.bib}
+\graphicspath{{D:/github/ENEL445/figs/}}
+
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\hypersetup{
+  pdfauthor   = {David Ewing},
+  pdfsubject  = {\jobname.tex},
+  pdfkeywords = {source: \jobname.tex}
+}
+
+% Running margin label
+\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\AddToShipoutPictureBG{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[rotate=90, anchor=north]
+      at ($(current page.north west)+(1.4cm,-13cm)$)
+      {\scriptsize\ttfamily \mymarginlabel};
+  \end{tikzpicture}%
+}
+
+% Custom commands
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\ELBO}{\text{ELBO}}
+\newcommand{\tr}{\text{tr}}
+\newcommand{\sigmoid}{\sigma}
+\setlength{\parindent}{0pt}
+
+\title{
+Case Study 5 --- Hierarchical Bayesian Logistic Regression:\\[0.4em]
+Gradient-Based Optimisation and Posterior Variance Collapse
+}
+\author{
+  David Ewing (82171165)
+}
+\date{10 May 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.7em}
+
+This report applies the gradient-based optimisation methods from ENEL445 to variational
+inference in hierarchical Bayesian logistic regression.
+This model combines two sources of analytical difficulty from previous case studies:
+the non-conjugate logistic likelihood (Case Study~3) and the hierarchical random-effects
+structure (Case Study~4).
+Group random effects $u_j \sim \mathcal{N}(0,\tau_u^{-1})$ augment the fixed effects
+$\bm{\beta}$, and the Jaakkola--Jordan \parencite{Jaakkola2000} bound is required to
+retain a tractable ELBO.
+The unconstrained parameter dimension is $D=17$.
+
+Four optimisation methods are applied: CAVI, gradient ascent with Armijo backtracking,
+Newton's method, and BFGS.
+The reference posterior is provided by a P\'{o}lya--Gamma blocked Gibbs sampler
+\parencite{Polson2013} with $T=50$ truncation terms, 3 chains $\times$ 2000 iterations.
+
+A key finding is pronounced posterior variance collapse in both $\beta_0$ and $\beta_1$
+(SD ratios $\approx 0.46$), reflecting the mean-field VI family's failure to capture
+the posterior correlation between the fixed effects and the group random effects.
+CAVI and BFGS converge to the same ELBO optimum $1050\times$ and $81\times$ faster
+than the PG Gibbs sampler respectively.
+Newton's method again fails to find the correct optimum, converging to a suboptimal
+point with markedly worse ELBO.
+
+\end{abstract}
+
+\newpage
+
+%─────────────────────────────────────────────────────────────────────────────
+\section*{Introduction}
+%─────────────────────────────────────────────────────────────────────────────
+
+Hierarchical logistic regression is a natural model for binary outcomes observed in
+grouped or clustered data: students within schools, patients within hospitals, or
+binary responses from repeated measurements on the same subject.
+Each group $j$ has a random intercept $u_j$ that shifts the group-specific log-odds
+relative to the population, while $\bm{\beta}$ captures the population-level
+covariate effect.
+
+Bayesian inference in this model requires integrating over both $\bm{\beta}$ and
+the random effects $\mathbf{u} = (u_1,\ldots,u_J)^T$, and over the random-effect
+precision $\tau_u$.
+The logistic likelihood is not conjugate to any natural prior, so both MCMC and
+variational approximations are computationally more demanding than the Gaussian case.
+
+This report is Case Study~5 in this project, combining the Jaakkola--Jordan bound
+from Case Study~3 with the hierarchical structure from Case Study~4.
+The mean-field ELBO is maximised using four optimisation strategies, and the results
+are compared against the P\'{o}lya--Gamma Gibbs reference.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Model Formulation}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Hierarchical Bayesian Logistic Regression}
+
+The model is
+\begin{align}
+  y_{ij} \mid \bm{\beta}, u_j
+    &\sim \mathrm{Bernoulli}\!\bigl(\sigmoid(\mathbf{x}_{ij}^T\bm{\beta} + u_j)\bigr),
+    \quad i=1,\ldots,n_j,\; j=1,\ldots,J,\\
+  u_j \mid \tau_u &\sim \mathcal{N}(0,\; \tau_u^{-1}),\\
+  \bm{\beta} &\sim \N(\bm{0},\; \lambda^{-1}\bm{I}_p), \quad \lambda=0.1,\\
+  \tau_u &\sim \mathrm{Gamma}(\alpha_u,\; \gamma_u), \quad \alpha_u=1, \;\gamma_u=0.1,
+\end{align}
+where $\sigmoid(\psi)=(1+e^{-\psi})^{-1}$ is the logistic sigmoid and
+$\mathbf{x}_{ij} = (1, x_{ij})^T \in \R^2$.
+
+The test case uses $N=150$ binary observations in $J=5$ groups (30 per group),
+$x_{ij} \sim \mathrm{Uniform}(-2,2)$, and true parameters
+$\bm{\beta}_{\mathrm{true}} = (-1.0,\; 2.0)$,
+$\tau_{u,\mathrm{true}}=2.0$ ($\sigma_u \approx 0.707$).
+
+\subsection{Mean-Field Variational Approximation}
+
+The mean-field variational family is
+\begin{align}
+  q(\bm{\beta},\mathbf{u},\tau_u)
+  &= q(\bm{\beta})\;\prod_{j=1}^{J} q(u_j)\;\cdot\; q(\tau_u),
+\end{align}
+with
+\begin{align}
+  q(\bm{\beta}) &= \N(\bm{\mu}_\beta,\,\bm{\Sigma}_\beta), \quad
+    \bm{\Sigma}_\beta = \bm{L}\bm{L}^T,\\
+  q(u_j) &= \mathcal{N}(m_j,\, v_j),\\
+  q(\tau_u) &= \mathrm{Gamma}(a_u,\, b_u).
+\end{align}
+
+\subsection{Jaakkola--Jordan ELBO}
+
+The log-likelihood $\E_q[\log\sigmoid(\psi_{ij})]$ where
+$\psi_{ij} = \mathbf{x}_{ij}^T\bm{\beta} + u_j$ is intractable under a Gaussian $q$.
+The Jaakkola--Jordan bound introduces local variational parameters $\xi_{ij}>0$:
+\begin{equation}
+  \log\sigmoid(\psi_{ij}) \geq \tfrac{\psi_{ij}}{2}
+    - \log 2\cosh\!\tfrac{\xi_{ij}}{2}
+    - \tfrac{\xi_{ij}}{2}\bigl(\E_q[\psi_{ij}^2]/\xi_{ij}^2 - 1\bigr)\tfrac{\tanh(\xi_{ij}/2)}{4}.
+\end{equation}
+At the optimal $\xi_{ij}^* = \sqrt{\E_q[\psi_{ij}^2]}$, where
+\begin{equation}
+  \E_q[\psi_{ij}^2]
+  = (\mathbf{x}_{ij}^T\bm{\mu}_\beta + m_j)^2
+    + \mathbf{x}_{ij}^T\bm{\Sigma}_\beta\mathbf{x}_{ij} + v_j,
+\end{equation}
+the ELBO is
+\begin{align}
+  \mathcal{L}(\bm{\theta})
+  &= \sum_{ij}\!\bigl[(y_{ij}-\tfrac{1}{2})\bar{\psi}_{ij}
+    - \log 2 - \log\cosh\tfrac{\xi_{ij}^*}{2}\bigr]
+  - \mathrm{KL}(q(\bm{\beta})\|p(\bm{\beta}))\nonumber\\
+  &\quad + \E_q[\log p(\mathbf{u}\mid\tau_u)]
+    + \E_q[\log p(\tau_u)]
+    + \sum_j H[q(u_j)] + H[q(\tau_u)],
+\end{align}
+where $\bar{\psi}_{ij} = \mathbf{x}_{ij}^T\bm{\mu}_\beta + m_j$ and
+all terms are available in closed form.
+
+\subsection{CAVI Update Equations}
+
+Let $\lambda_{ij} = \tanh(\xi_{ij}^*/2)/(4\xi_{ij}^*)$.
+The coordinate ascent updates are:
+\begin{align}
+  \bm{\Sigma}_\beta^{-1}
+    &\leftarrow \lambda\bm{I} + 2\sum_{ij}\lambda_{ij}\,\mathbf{x}_{ij}\mathbf{x}_{ij}^T,
+    \label{eq:cavi_Sigma}\\
+  \bm{\mu}_\beta
+    &\leftarrow \bm{\Sigma}_\beta\!\sum_{ij}
+      (y_{ij}-\tfrac{1}{2} - 2\lambda_{ij}m_j)\,\mathbf{x}_{ij},\\
+  v_j^{-1}
+    &\leftarrow 2\sum_{i\in j}\lambda_{ij} + \E[\tau_u], \quad
+  m_j \leftarrow v_j\!\sum_{i\in j}
+    (y_{ij}-\tfrac{1}{2} - 2\lambda_{ij}\mathbf{x}_{ij}^T\bm{\mu}_\beta),\\
+  a_u &\leftarrow \alpha_u + \tfrac{J}{2}, \quad
+  b_u \leftarrow \gamma_u + \tfrac{1}{2}\sum_j (m_j^2 + v_j).
+\end{align}
+
+\subsection{Unconstrained Parameterisation}
+
+The unconstrained vector $\bm{\theta} \in \R^{17}$ is
+\begin{equation}
+  \bm{\theta} = \bigl(\bm{\mu}_\beta,\;
+    \tilde{\ell}_{11}, \ell_{21}, \tilde{\ell}_{22},\;
+    m_1,\ldots,m_5,\;
+    \log v_1,\ldots,\log v_5,\;
+    \log a_u, \log b_u
+  \bigr),
+\end{equation}
+giving $D = 2 + 3 + 5 + 5 + 2 = 17$.
+
+\subsection{Key Notation}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Symbol & Meaning \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Bayesian model}} \\
+$\bm{X}$ & Design matrix ($N \times p$), rows $\mathbf{x}_{ij}^T$ \\
+$\mathbf{y}$ & Binary response vector ($y_{ij} \in \{0,1\}$) \\
+$\bm{\beta}$ & Fixed-effect coefficient vector \\
+$u_j$ & Group random effect for group $j$ \\
+$\tau_u$ & Random-effect precision \\
+$\sigmoid(\cdot)$ & Logistic sigmoid $\sigmoid(\psi)=(1+e^{-\psi})^{-1}$ \\
+$N, J, p$ & Total observations, groups, predictors \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Variational approximation}} \\
+$q(\bm{\beta})$ & Variational Gaussian for fixed effects \\
+$\bm{\mu}_\beta, \bm{\Sigma}_\beta$ & Mean and covariance of $q(\bm{\beta})$ \\
+$\bm{L}$ & Cholesky factor, $\bm{\Sigma}_\beta=\bm{L}\bm{L}^T$ \\
+$m_j, v_j$ & Mean and variance of $q(u_j)$ \\
+$a_u, b_u$ & Gamma parameters of $q(\tau_u)$ \\
+$\xi_{ij}$ & Local JJ variational parameter; optimal at $\sqrt{\E_q[\psi_{ij}^2]}$ \\
+$\lambda_{ij}$ & JJ weight $\tanh(\xi_{ij}/2)/(4\xi_{ij})$ \\
+$\mathcal{L}(\bm{\theta})$ & Jaakkola--Jordan ELBO (maximised) \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Optimisation}} \\
+$\bm{\theta}$ & Unconstrained vector ($D=17$) \\
+$\alpha_t$ & Step size at iteration $t$ \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{P\'{o}lya--Gamma sampler}} \\
+$\omega_{ij}$ & PG latent variable: $\omega_{ij}\mid\bm{\beta},u_j \sim \mathrm{PG}(1,\psi_{ij})$ \\
+$\kappa_{ij}$ & Pseudo-response $\kappa_{ij} = y_{ij} - 1/2$ \\
+$T$ & Truncation order for PG series ($T=50$) \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Lecture correspondence} (Prof.\ R.\,S.\ Smith, ENEL445 2026)} \\
+$J(\theta)$ & Cost function $=\mathcal{L}(\bm{\theta})$ in this report \\
+$\Phi$ & Regressor matrix $=\bm{X}$ in this report \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{P\'{o}lya--Gamma Blocked Gibbs Sampler}
+%─────────────────────────────────────────────────────────────────────────────
+
+The P\'{o}lya--Gamma (PG) identity of \textcite{Polson2013},
+\begin{equation}
+  \sigmoid(\psi)^{y}(1-\sigmoid(\psi))^{1-y}
+  \propto e^{\kappa\psi}
+    \int_0^\infty e^{-\omega\psi^2/2}\,p(\omega)\,\mathrm{d}\omega,
+  \quad \omega \sim \mathrm{PG}(1,0),
+\end{equation}
+introduces a latent variable $\omega_{ij}$ that renders the logistic likelihood
+conditionally Gaussian.
+Each Gibbs sweep samples:
+\begin{align}
+  \omega_{ij} \mid \bm{\beta}, u_j
+    &\sim \mathrm{PG}(1,\; \mathbf{x}_{ij}^T\bm{\beta} + u_j), \label{eq:pg_omega}\\
+  \bm{\beta} \mid \bm{\omega}, \mathbf{u}, \mathbf{y}
+    &\sim \mathcal{N}(V_\beta(\bm{X}^T\bm{\kappa} - \bm{X}^T\mathrm{diag}(\bm{\omega})\mathbf{u}[\mathrm{g}]),\;V_\beta),
+    \quad V_\beta = (\lambda\bm{I} + \bm{X}^T\mathrm{diag}(\bm{\omega})\bm{X})^{-1},\\
+  u_j \mid \bm{\beta}, \bm{\omega}_j, \tau_u, \mathbf{y}
+    &\sim \mathcal{N}(V_j^*m_j^*,\; V_j^*),
+    \quad V_j^* = \bigl(\textstyle\sum_{i\in j}\omega_{ij} + \tau_u\bigr)^{-1},
+    \quad m_j^* = \textstyle\sum_{i\in j}(\kappa_{ij} - \omega_{ij}\mathbf{x}_{ij}^T\bm{\beta}),\\
+  \tau_u \mid \mathbf{u}
+    &\sim \mathrm{Gamma}\!\left(\alpha_u + \tfrac{J}{2},\;
+      \gamma_u + \tfrac{1}{2}\textstyle\sum_j u_j^2\right).
+\end{align}
+
+PG draws use the truncated series with $T=50$ terms.
+Three chains run for 2000 iterations each with 500 burn-in, yielding
+$3 \times 1500 = 4500$ post-burnin samples.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Optimisation Problem Formulation}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection*{Decision Variables and Constraints}
+
+Optimisation is over $\bm{\theta} \in \R^{17}$.
+All constraints ($\bm{\Sigma}_\beta \succ 0$, $v_j > 0$, $a_u, b_u > 0$) are satisfied
+automatically by the parameterisation.
+
+\subsection*{Objective Function}
+
+Maximise the Jaakkola--Jordan ELBO $\mathcal{L}(\bm{\theta}):\R^{17}\to\R$ at optimal
+$\xi_{ij}^* = \sqrt{\bar{\psi}_{ij}^2 + \mathbf{x}_{ij}^T\bm{\Sigma}_\beta\mathbf{x}_{ij} + v_j}$.
+
+\subsection*{Optimisation Components}
+
+\begin{description}
+\item[CAVI.]
+  Closed-form coordinate updates (Equations~\ref{eq:cavi_Sigma}--above).
+  Unit step; exit when $|\Delta\mathcal{L}| < 10^{-8}$.
+
+\item[Gradient ascent.]
+  Direction: central FD gradient ($h=10^{-5}$).
+  Armijo backtracking, $\alpha_0=0.5$, $c_1=0.1$, $\rho=0.5$.
+  Exit: $|\Delta\mathcal{L}| < 10^{-7}$ or 2000 iterations.
+
+\item[Newton's method.]
+  FD Hessian ($17\times17$); regularised to ensure ascent direction.
+  Armijo backtracking; exit at 50 iterations.
+
+\item[BFGS.]
+  Inverse-Hessian approximation via rank-2 BFGS update.
+  Wolfe conditions (scipy); exit at $\|\bm{g}\|<10^{-7}$ or 2000 iterations.
+\end{description}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Numerical Study}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Test Case Design}
+
+\begin{itemize}
+  \item Model: $y_{ij} \sim \mathrm{Bernoulli}(\sigmoid(\beta_0 + \beta_1 x_{ij} + u_j))$
+  \item True parameters: $\bm{\beta}_{\mathrm{true}} = (-1.0,\; 2.0)$,
+    $\tau_{u,\mathrm{true}}=2.0$
+  \item Groups: $J=5$, $n_j=30$, $N=150$
+  \item Covariates: $x_{ij} \sim \mathrm{Uniform}(-2, 2)$
+  \item Prior: $\bm{\beta} \sim \N(\bm{0}, 10\bm{I})$;
+    $\tau_u \sim \mathrm{Gamma}(1, 0.1)$
+  \item Seed: \texttt{82171165} (student ID)
+\end{itemize}
+
+\subsection{Gradient Verification}
+
+The gradient of the ELBO with respect to the 17-dimensional $\bm{\theta}$ was verified
+against central finite differences at a CAVI warm-start point.
+All 17 components agreed to relative error below $10^{-3}$.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{hierarchical_logistic_elbo_gradient_check.png}
+  \caption{Finite-difference gradient verification at the CAVI warm-start:
+    $h=10^{-5}$ versus $h=10^{-7}$.
+    All 17 components agree, confirming correct gradient implementation.}
+  \label{fig:gradcheck}
+\end{figure}
+
+\subsection{ELBO Landscape}
+
+Figure~\ref{fig:landscape} shows the 2-D ELBO slice in the
+$(\mu_{\beta_0}, \mu_{\beta_1})$ plane with all other parameters at the warm start.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.62\linewidth]{hierarchical_logistic_elbo_landscape.png}
+  \caption{ELBO landscape in the $(\mu_{\beta_0},\mu_{\beta_1})$ plane.
+    Red star: CAVI warm start; white cross: true $\bm{\beta}$.}
+  \label{fig:landscape}
+\end{figure}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Results}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Generated Data}
+
+Figure~\ref{fig:data} shows the 150 binary observations grouped by $j$.
+Group random effects $u_j$ shift the group-specific logistic curve relative to
+the population curve $\sigmoid(\beta_0 + \beta_1 x)$.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{hierarchical_logistic_data_scatter.png}
+  \caption{Generated hierarchical logistic data ($N=150$, $J=5$).
+    Dotted lines show group-specific sigmoid curves; solid: population mean.}
+  \label{fig:data}
+\end{figure}
+
+\subsection{ELBO Convergence}
+
+Figure~\ref{fig:elbocv} shows the ELBO history for all methods.
+CAVI converges in 37 iterations; BFGS in 31.
+Both reach ELBO $= -54.91$.
+Newton's method converges in 9 iterations but to a suboptimal point
+(ELBO $= -77.36$) --- the same failure mode seen in Case Study~4.
+Gradient ascent requires 416 iterations to reach the same optimum as CAVI.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{hierarchical_logistic_elbo_convergence.png}
+  \caption{ELBO convergence: CAVI (left) and gradient-based methods (right).
+    Newton converges to a suboptimal point.}
+  \label{fig:elbocv}
+\end{figure}
+
+\subsection{Step-Size and Condition-Number Behaviour}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\linewidth]{hierarchical_logistic_gradient_stepsize.png}
+  \caption{Armijo step sizes for gradient ascent (log scale).}
+  \label{fig:stepsize}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.65\linewidth]{hierarchical_logistic_newton_condition.png}
+  \caption{Hessian condition number at each Newton iteration.
+    Poor conditioning explains Newton's convergence to a suboptimal point.}
+  \label{fig:cond}
+\end{figure}
+
+\subsection{P\'{o}lya--Gamma Gibbs Sampler Diagnostics}
+
+Figures~\ref{fig:trace_b0}--\ref{fig:trace_tauu} show trace plots for three
+monitored parameters.
+ACF plots (Figures~\ref{fig:acf_b0}--\ref{fig:acf_tauu}) show rapid decorrelation.
+Figure~\ref{fig:rhat} confirms $\hat{R} < 1.01$ for all parameters.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{hierarchical_logistic_gibbs_trace_beta0.png}
+  \caption{PG Gibbs trace: $\beta_0$. Red dashed: true value.}
+  \label{fig:trace_b0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{hierarchical_logistic_gibbs_trace_beta1.png}
+  \caption{PG Gibbs trace: $\beta_1$.}
+  \label{fig:trace_b1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{hierarchical_logistic_gibbs_trace_tau_u.png}
+  \caption{PG Gibbs trace: $\tau_u$.}
+  \label{fig:trace_tauu}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{hierarchical_logistic_gibbs_acf_beta0.png}
+  \caption{ACF for $\beta_0$ (chain 1). Red dashed: 95\% band.}
+  \label{fig:acf_b0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{hierarchical_logistic_gibbs_acf_beta1.png}
+  \caption{ACF for $\beta_1$.}
+  \label{fig:acf_b1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{hierarchical_logistic_gibbs_acf_tau_u.png}
+  \caption{ACF for $\tau_u$.}
+  \label{fig:acf_tauu}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.55\linewidth]{hierarchical_logistic_gibbs_rhat.png}
+  \caption{Gelman--Rubin $\hat{R}$ diagnostic.
+    All values below 1.01 confirm chain convergence.}
+  \label{fig:rhat}
+\end{figure}
+
+\subsection{Random Effects Recovery}
+
+Figure~\ref{fig:re} compares CAVI and Gibbs estimates of the five group random effects.
+Both methods capture the direction and magnitude of each $u_j$; CAVI shows tighter
+credible intervals consistent with the general variance collapse finding.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{hierarchical_logistic_random_effects.png}
+  \caption{Random effect estimates $u_j$ for CAVI (left) and PG Gibbs (right).
+    Stars: true values; bars: $\pm 2$ posterior SD.}
+  \label{fig:re}
+\end{figure}
+
+\subsection{Posterior Comparison: VI versus Gibbs}
+
+Figures~\ref{fig:vbgibbs_b0}--\ref{fig:vbgibbs_tauu} overlay the VI Gaussian
+approximations against the PG Gibbs histograms.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{hierarchical_logistic_vb_gibbs_beta0.png}
+  \caption{Posterior comparison for $\beta_0$: Gibbs histogram versus VI.
+    The VI curves are noticeably narrower than Gibbs (SD ratio $\approx 0.46$).}
+  \label{fig:vbgibbs_b0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{hierarchical_logistic_vb_gibbs_beta1.png}
+  \caption{Posterior comparison for $\beta_1$. Similar collapse to $\beta_0$.}
+  \label{fig:vbgibbs_b1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.80\linewidth]{hierarchical_logistic_vb_gibbs_tau_u.png}
+  \caption{Posterior comparison for $\tau_u$.
+    CAVI and BFGS overestimate $\E[\tau_u]$ relative to Gibbs, possibly due to
+    the variance collapse in $u_j$ causing an artificially small $\sum_j(m_j^2+v_j)$.}
+  \label{fig:vbgibbs_tauu}
+\end{figure}
+
+\subsection{Posterior Standard-Deviation Ratios}
+
+Figure~\ref{fig:sdratios} shows $\sigma_{\mathrm{VI}}/\sigma_{\mathrm{Gibbs}}$ for
+each converged method.
+CAVI, gradient ascent, and BFGS all give SD ratios $\approx 0.46$ for both $\beta_0$
+and $\beta_1$, indicating that the VI posteriors are roughly half as wide as the
+Gibbs reference.
+This is a more symmetric collapse than in Case Study~4 (where only $\beta_0$ collapsed),
+because both fixed effects are confounded with the group random effects in the
+non-conjugate hierarchical logistic model.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{hierarchical_logistic_sd_ratios.png}
+  \caption{Posterior SD ratios (VI / Gibbs). Dashed: ideal 1.0.
+    All converged VI methods show $\approx 0.46$ collapse for both fixed effects.}
+  \label{fig:sdratios}
+\end{figure}
+
+\subsection{Posterior Mean Errors}
+
+Figure~\ref{fig:meanerr} shows absolute mean errors.
+CAVI, gradient ascent, and BFGS recover posterior means close to the Gibbs reference.
+Newton's method has large mean errors due to its convergence to the wrong optimum.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{hierarchical_logistic_mean_errors.png}
+  \caption{Absolute posterior mean errors relative to PG Gibbs.}
+  \label{fig:meanerr}
+\end{figure}
+
+\subsection{Performance Summary}
+
+Table~\ref{tab:perf} summarises convergence and runtime.
+Table~\ref{tab:post} summarises posterior means and SD ratios.
+
+\begin{table}[H]
+  \centering
+  \caption{Optimisation performance: hierarchical logistic regression.}
+  \label{tab:perf}
+  \input{../results/tables/hierarchical_logistic_performance.tex}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{Posterior summary: hierarchical logistic regression.}
+  \label{tab:post}
+  \input{../results/tables/hierarchical_logistic_posterior_summary.tex}
+\end{table}
+
+\subsection{Computational Cost}
+
+Figure~\ref{fig:timing} shows the runtime comparison.
+CAVI is the fastest at 15\,ms, $1050\times$ faster than the PG Gibbs sampler (15.8\,s).
+BFGS is $81\times$ faster than Gibbs.
+Gradient ascent is only $9\times$ faster despite finding the same optimum as CAVI.
+Newton's method achieves $23\times$ speedup but converges to a suboptimal point.
+The PG Gibbs is substantially more expensive than the conjugate Gibbs in Case Study~4
+because each iteration requires $N \times T = 150 \times 50 = 7500$ Gamma variates
+for the PG augmentation.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{hierarchical_logistic_timing_comparison.png}
+  \caption{Runtime comparison (log scale). Annotated speedup factors relative to PG Gibbs.}
+  \label{fig:timing}
+\end{figure}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Discussion}
+%─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Posterior variance collapse.}
+Both $\beta_0$ and $\beta_1$ exhibit SD ratios $\approx 0.46$ for all well-converged VI methods.
+Unlike Case Study~4 (where collapse was confined to $\beta_0$), here \emph{both} fixed
+effects are affected.
+The mechanism is the same: mean-field VI discards the posterior correlation between
+$\bm{\beta}$ and $\mathbf{u}$; in the logistic model, the JJ variational parameters
+$\lambda_{ij}$ depend on $\bm{\Sigma}_\beta$ as well as $v_j$, so tightening the bound
+in one factor indirectly narrows both.
+In comparison, the simple logistic case (Case Study~3) showed near-zero collapse, because
+without group structure there is no confounding between $\bm{\beta}$ and latent effects.
+
+\paragraph{Overestimation of $\tau_u$.}
+The converged VI methods give $\E[\tau_u] \approx 10$, roughly $25\%$ higher than the
+Gibbs reference ($\approx 8$).
+When the mean-field approximation collapses $q(u_j)$ to be too narrow
+($v_j$ too small), the CAVI update for $b_u$ underestimates
+$\sum_j(m_j^2 + v_j)$, driving $b_u$ down and $\E[\tau_u] = a_u/b_u$ up.
+This is a secondary bias induced by the primary variance collapse.
+
+\paragraph{Newton's method.}
+Newton's method fails in the same manner as in Case Study~4: the $17\times17$
+FD Hessian is poorly conditioned throughout, because the ELBO mixes parameters that
+operate on very different scales.
+The 9-iteration convergence to ELBO $= -77.36$ is fast but to the wrong point.
+
+\paragraph{Comparison with Case Study~4.}
+The hierarchical logistic model is computationally more demanding (PG augmentation
+vs conjugate Gibbs), but the VI methods are similarly fast in absolute terms.
+The qualitative finding --- CAVI/BFGS converge; Newton fails; gradient ascent is
+much slower than BFGS --- is consistent across both hierarchical case studies.
+The difference in variance collapse (symmetric in CS5, asymmetric in CS4) reflects the
+differing roles of the intercept in linear versus logistic hierarchical models.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Conclusion}
+%─────────────────────────────────────────────────────────────────────────────
+
+Hierarchical Bayesian logistic regression with $J=5$ groups and $D=17$ unconstrained
+parameters confirms and extends the findings from Case Study~4.
+CAVI and BFGS both find the mean-field ELBO optimum with speedups of
+$1050\times$ and $81\times$ over the PG Gibbs sampler respectively.
+Both converged VI methods exhibit posterior variance collapse for all fixed effects
+(SD ratio $\approx 0.46$), more severe than the simple logistic case (Case Study~3)
+and more symmetric than the hierarchical linear case (Case Study~4).
+Newton's method consistently fails to find the correct optimum in the hierarchical
+setting due to Hessian ill-conditioning, whereas BFGS --- which builds a positive-definite
+inverse-Hessian approximation from gradient information --- succeeds at a small fraction
+of the Gibbs cost.
+
+\printbibliography
+
+\end{document}
