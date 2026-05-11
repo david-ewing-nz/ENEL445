@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="David Ewing (82171165) " />
+  <meta name="dcterms.date" content="2026-05-11" />
+  <title> Case Study 1 — Bayesian Linear Regression: Gradient-Based Optimisation and Posterior Variance Collapse </title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    div.abstract {
+      margin: 2em 2em 2em 2em;
+      text-align: left;
+      font-size: 85%;
+    }
+    div.abstract-title {
+      font-weight: bold;
+      text-align: center;
+      padding: 0;
+      margin-bottom: 0.5em;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <script
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"
+  type="text/javascript"></script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title"> Case Study 1 — Bayesian Linear Regression:<br />
+Gradient-Based Optimisation and Posterior Variance Collapse </h1>
+<p class="author">David Ewing (82171165)<br /></p>
+<p class="date">11 May 2026</p>
+<div class="abstract">
+<div class="abstract-title">Abstract</div>
+<p>Mean-field Variational Inference (VI) is useful because it turns
+Bayesian posterior computation into an optimisation problem, but this
+convenience comes with a cost. The approximation can become too
+confident, giving posterior variances that are smaller than they should
+be. This report studies that issue—posterior variance collapse—in a
+controlled Bayesian linear regression case study.</p>
+<p>The linear case is chosen deliberately. It is simple enough for the
+main quantities to be checked directly, but still rich enough to show
+the difference between optimisation success and reliable Bayesian
+uncertainty. With Gaussian–Gamma conjugate priors, Coordinate Ascent
+Variational Inference (CAVI) gives closed-form updates and provides the
+analytical baseline for the numerical work. Gradient ascent, Newton’s
+method, and BFGS are then applied to the same ELBO so that their
+behaviour can be compared against that baseline.</p>
+<p>The ELBO is derived under the mean-field factorisation <span
+class="math display">\[\begin{aligned}
+q(\bm{\beta},\tau_e)=q(\bm{\beta})q(\tau_e),
+\end{aligned}\]</span> where <span
+class="math inline">\(q(\bm{\beta})\)</span> is Gaussian and <span
+class="math inline">\(q(\tau_e)\)</span> is Gamma. The variational
+parameters are the coefficient mean <span
+class="math inline">\(\bm{\mu}_\beta\)</span>, coefficient covariance
+<span class="math inline">\(\bm{\Sigma}_\beta\)</span>, and Gamma
+parameters <span class="math inline">\(a_e\)</span> and <span
+class="math inline">\(b_e\)</span>. Because these quantities must remain
+valid during optimisation, the covariance matrix is represented through
+a Cholesky factor and the positive Gamma parameters are represented in
+log-space.</p>
+<p>Each optimiser is described using the same course framework: starting
+point, search direction, step-size rule, and stopping condition. For the
+line-search methods, a proposed direction must be an ascent direction,
+<span class="math display">\[\begin{aligned}
+\nabla\text{ELBO}(\bm{\phi}^{(t)})^T\bm{d}^{(t)} &gt; 0.
+\end{aligned}\]</span> Gradient ascent uses Armijo backtracking, while
+BFGS uses Wolfe conditions to preserve the curvature condition needed
+for the inverse-Hessian update. Newton’s method is included to test
+whether curvature information improves the optimisation, while also
+exposing the practical difficulty that the Hessian may not always give a
+safe ascent direction.</p>
+<p>The comparison is not limited to ELBO convergence. The methods are
+also compared on runtime, iteration count, posterior mean accuracy, and
+posterior standard-deviation ratios against the analytical posterior and
+a Gibbs sampler reference. A secondary experiment adds entropy
+regularisation to the ELBO to test whether explicitly rewarding broader
+covariance estimates can reduce posterior variance collapse.</p>
+<p>The central question is therefore not only which method maximises the
+ELBO. It is also whether the resulting approximation remains honest
+about uncertainty. This distinction is the main reason for using the
+linear model first: the posterior, CAVI baseline, and Gibbs reference
+can all be checked in the same setting before moving to less tractable
+models.</p>
+</div>
+</header>
+<h1 id="introduction">Introduction</h1>
+<p>Bayesian linear regression is the simplest non-trivial model in which
+all components of variational inference—the ELBO, its gradient, and the
+posterior approximation—can be derived and verified in closed form,
+making it the natural baseline for comparing optimisation methods.</p>
+<p>Bayesian inference provides principled uncertainty quantification but
+requires computing intractable posterior distributions. For most
+real-world models, the posterior integral,</p>
+<p><span class="math display">\[p(\bm{\theta} \mid \bm{y}) =
+\frac{p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})}{\displaystyle\int
+p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})\, d\bm{\theta}},\]</span> is
+typically intractable. In this case study, <span
+class="math inline">\(\bm{\theta} = (\bm{\beta}, \tau_e)\)</span>—the
+regression coefficients and the observation noise precision—so the
+posterior of interest is <span class="math display">\[p(\bm{\beta},
+\tau_e \mid \bm{y}) \propto p(\bm{y} \mid \bm{\beta},
+\tau_e)\,p(\bm{\beta})\,p(\tau_e).\]</span> The substitution <span
+class="math inline">\(\bm{\theta} = (\bm{\beta}, \tau_e)\)</span> is
+specific to this case study; other case studies in this project define
+<span class="math inline">\(\bm{\theta}\)</span> according to their own
+model parameters. Conjugate Gaussian–Gamma priors make this case study a
+deliberate exception: the posterior is analytically tractable and CAVI
+coordinate updates are closed-form, providing a verified reference
+against which gradient-based VI methods can be compared.</p>
+<p>Variational Inference (VI) converts this inference problem into an
+optimisation problem, making it directly amenable to the gradient-based
+methods in this course. Instead of computing the true posterior, VI
+finds the “best” approximation <span
+class="math inline">\(q(\bm{\theta})\)</span> from a tractable family
+<span class="math inline">\(Q(\bm{\theta})\)</span> by maximising the
+Evidence Lower Bound (ELBO). This transforms intractable integration
+into tractable optimisation—a natural testbed for the gradient-based
+methods.</p>
+<p>A well-known failure mode of mean-field VI is <em>posterior variance
+collapse</em>: the optimised approximation <span
+class="math inline">\(q(\bm{\theta})\)</span> is systematically
+overconfident, underestimating posterior uncertainty. This is a direct
+consequence of the KL direction minimised during ELBO maximisation,
+compounded by the mean-field factorisation assumption.<a href="#fn1"
+class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>
+<p>This report applies four optimisation methods—CAVI, gradient ascent,
+Newton’s method, and BFGS—to the ELBO and compares their convergence
+behaviour, computational cost, and posterior quality. As a secondary
+investigation, the ELBO is augmented with an entropy regularisation term
+<span class="math inline">\(\lambda H[q(\bm{\beta})]\)</span>, <span
+class="math display">\[\mathcal{L}_{\mathrm{reg}}(\bm{\phi}) =
+\mathcal{L}(\bm{\phi}) + \lambda H[q(\bm{\beta})],\]</span> to examine
+whether explicitly incentivising broader posteriors can mitigate
+variance collapse.</p>
+<p>Throughout all gradient-based methods, the variational covariance
+<span class="math inline">\(\bm{\Sigma}_\beta\)</span> must remain
+symmetric positive definite at every iteration.<a href="#fn2"
+class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a></p>
+<p>The classical foundation for the variational framework used here is
+least-squares regression, as developed in lectures by Prof. Roy S. Smith
+(Erskine Visiting Fellow, ETH Zürich, ENEL445 2026). The design matrix
+<span class="math inline">\(\bm{X}\)</span><a href="#fn3"
+class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> and
+coefficient vector <span class="math inline">\(\bm{\beta}\)</span><a
+href="#fn4" class="footnote-ref" id="fnref4"
+role="doc-noteref"><sup>4</sup></a> follow the standard over-determined
+formulation (<span class="math inline">\(n &gt; p\)</span><a href="#fn5"
+class="footnote-ref" id="fnref5" role="doc-noteref"><sup>5</sup></a>),
+so that the normal equations <span
+class="math inline">\((\bm{X}^T\bm{X})\bm{\beta} =
+\bm{X}^T\bm{y}\)</span> have a unique solution and the Bayesian
+posterior mean reduces to this solution in the limit of a flat prior.
+The noise model adopted here—errors on <span
+class="math inline">\(\bm{y}\)</span> only, with noise precision <span
+class="math inline">\(\tau_e\)</span>—corresponds to the equation-error
+form; this is an explicit modelling assumption rather than a derived
+result.</p>
+<h2 id="numerical-study-and-required-optimisation-components">Numerical
+Study and Required Optimisation Components</h2>
+<p>This report formulates variational inference for Bayesian linear
+regression as a constrained optimisation problem and applies four
+methods: Coordinate Ascent Variational Inference (CAVI), gradient
+ascent, Newton’s method, and BFGS. Each method is characterised by four
+components from the course framework: entry conditions, search
+direction, line search, and exit conditions. All four methods share the
+same initial point so that comparisons reflect method behaviour rather
+than initialisation.</p>
+<h3 class="unnumbered" id="entry-conditions">Entry Conditions</h3>
+<p>All methods are initialised at the prior mean: <span
+class="math inline">\(\bm{\mu}_\beta = \bm{0}\)</span>, <span
+class="math inline">\(\bm{\Sigma}_\beta = \bm{I}_p\)</span>, <span
+class="math inline">\(a_e = \alpha_e\)</span>, <span
+class="math inline">\(b_e = \gamma_e\)</span>. In the unconstrained
+parameterisation this corresponds to <span class="math inline">\(\bm{L}
+= \bm{I}_p\)</span> (so <span class="math inline">\(\tilde{\ell}_{ii} =
+0\)</span> and off-diagonal entries zero), <span
+class="math inline">\(\eta_a = \log \alpha_e\)</span>, and <span
+class="math inline">\(\eta_b = \log \gamma_e\)</span>. CAVI does not
+require an explicit initialisation of the search direction and uses the
+same starting variational parameters.</p>
+<h3 class="unnumbered" id="search-direction">Search Direction</h3>
+<p>For all gradient-based methods, the proposed search direction must be
+an ascent direction before a step is accepted: <span
+class="math display">\[\begin{aligned}
+\nabla \text{ELBO}(\bm{\phi}^{(t)})^T \bm{d}^{(t)} &gt; 0.
+\end{aligned}\]</span> Gradient ascent uses <span
+class="math inline">\(\bm{d}^{(t)} =
+\nabla\mathcal{L}(\bm{\xi}^{(t)})\)</span> directly. Newton’s method
+uses <span class="math inline">\(\bm{d}^{(t)} =
+-[\nabla^2\mathcal{L}(\bm{\xi}^{(t)})]^{-1}\nabla\mathcal{L}(\bm{\xi}^{(t)})\)</span>,
+falling back to the gradient direction if the Hessian is not positive
+definite. BFGS approximates the inverse Hessian as <span
+class="math inline">\(\bm{B}_t\)</span> and uses <span
+class="math inline">\(\bm{d}^{(t)} = \bm{B}_t
+\nabla\mathcal{L}(\bm{\xi}^{(t)})\)</span>. CAVI replaces the search
+direction with closed-form coordinate updates derived analytically from
+the model.</p>
+<h3 class="unnumbered" id="line-search">Line Search</h3>
+<p>The step size <span class="math inline">\(\alpha^{(t)}\)</span> is
+determined per method. Gradient ascent uses Armijo backtracking:
+starting from an initial step size, <span
+class="math inline">\(\alpha^{(t)}\)</span> is halved until sufficient
+increase in the ELBO is achieved. BFGS uses Wolfe conditions, combining
+sufficient increase with a curvature condition that ensures <span
+class="math display">\[\begin{aligned}
+\bm{y}_t^T \bm{s}_t &gt; 0,
+\end{aligned}\]</span> where <span class="math inline">\(\bm{s}_t =
+\bm{\xi}^{(t+1)} - \bm{\xi}^{(t)}\)</span> and <span
+class="math inline">\(\bm{y}_t = \nabla\mathcal{L}(\bm{\xi}^{(t+1)}) -
+\nabla\mathcal{L}(\bm{\xi}^{(t)})\)</span>. This positivity condition is
+required for the BFGS update to preserve positive definiteness of <span
+class="math inline">\(\bm{B}_t\)</span>. Newton’s method uses a fixed
+step size of 1 unless the Hessian is indefinite. CAVI has no line
+search: each coordinate update exactly maximises the ELBO with respect
+to that parameter in closed form.</p>
+<h3 class="unnumbered" id="exit-conditions">Exit Conditions</h3>
+<p>Exit conditions are applied uniformly across the optimisation
+methods. Iteration terminates when any of the following conditions is
+satisfied:</p>
+<ol>
+<li><p>Gradient norm: <span class="math inline">\(\lVert \nabla
+\text{ELBO}\rVert &lt; \varepsilon_g\)</span>.</p></li>
+<li><p>Relative ELBO change: <span class="math inline">\(\lvert \Delta
+\text{ELBO}\rvert / \lvert \text{ELBO}\rvert &lt;
+\varepsilon_r\)</span>.</p></li>
+<li><p>Parameter change: <span class="math inline">\(\lVert \Delta
+\bm{\phi} \rVert &lt; \varepsilon_\phi\)</span>.</p></li>
+<li><p>Maximum iterations: <span class="math inline">\(t \geq
+t_{\max}\)</span>.</p></li>
+</ol>
+<p>CAVI additionally monitors the maximum relative change in its
+variational parameters: <span class="math display">\[\begin{aligned}
+\max_i \frac{\lvert \phi_i^{(t+1)} - \phi_i^{(t)} \rvert}{\lvert
+\phi_i^{(t+1)} \rvert} &lt; \varepsilon.
+\end{aligned}\]</span></p>
+<h2 id="bayesian-regression-model">Bayesian Regression Model</h2>
+<p>The Bayesian regression model is <span
+class="math display">\[\begin{aligned}
+\bm{y} &amp;\sim \mathcal{N}(\bm{X}\bm{\beta}, \tau_e^{-1} \bm{I}_n)
+\quad \text{(likelihood)},\\
+\bm{\beta} &amp;\sim \mathcal{N}(\bm{0}, \lambda_\beta^{-1} \bm{I}_p)
+\quad \text{(prior on coefficients)},\\
+\tau_e &amp;\sim \text{Gamma}(\alpha_e, \gamma_e) \quad \text{(prior on
+precision)}.
+\end{aligned}\]</span> Here, <span class="math inline">\(\bm{X}\)</span>
+is the design matrix, <span class="math inline">\(\bm{y}\)</span> is the
+response vector, <span class="math inline">\(\bm{\beta}\)</span> is the
+coefficient vector, and <span class="math inline">\(\tau_e\)</span> is
+the observation-noise precision.</p>
+<h2 id="mean-field-variational-approximation">Mean-Field Variational
+Approximation</h2>
+<p>The mean-field approximation is <span
+class="math display">\[\begin{aligned}
+q(\bm{\beta}, \tau_e) &amp;= q(\bm{\beta})\,q(\tau_e),\\
+q(\bm{\beta}) &amp;= \mathcal{N}(\bm{\mu}_\beta, \bm{\Sigma}_\beta),\\
+q(\tau_e) &amp;= \text{Gamma}(a_e, b_e).
+\end{aligned}\]</span> The variational parameters are <span
+class="math display">\[\begin{aligned}
+\bm{\phi} = (\bm{\mu}_\beta,\bm{\Sigma}_\beta,a_e,b_e),
+\end{aligned}\]</span> with dimension <span
+class="math inline">\(d=p+p(p+1)/2+2\)</span>. For <span
+class="math inline">\(p=3\)</span>, this gives <span
+class="math inline">\(d=3+6+2=11\)</span> parameters to optimise.</p>
+<h2 id="key-notation">Key Notation</h2>
+<div class="center">
+<div class="tabular">
+<p><span>@ll@</span> Symbol &amp; Meaning<br />
+<br />
+<span class="math inline">\(\bm{X}\)</span> &amp; Design matrix (<span
+class="math inline">\(n \times p\)</span>)<br />
+<span class="math inline">\(\bm{y}\)</span> &amp; Response vector<br />
+<span class="math inline">\(\bm{\beta}\)</span> &amp; Regression
+coefficient vector<br />
+<span class="math inline">\(\tau_e\)</span> &amp; Observation-noise
+precision<br />
+<span class="math inline">\(\alpha_e,\,\gamma_e\)</span> &amp; Shape and
+rate of the prior on <span class="math inline">\(\tau_e\)</span><br />
+<span class="math inline">\(p\)</span> &amp; Number of predictors<br />
+<span class="math inline">\(n\)</span> &amp; Number of
+observations<br />
+<br />
+<span class="math inline">\(q(\cdot)\)</span> &amp; Variational
+approximating distribution<br />
+<span class="math inline">\(\bm{\phi}\)</span> &amp; Full variational
+parameter vector <span
+class="math inline">\((\bm{\mu}_\beta,\bm{\Sigma}_\beta,a_e,b_e)\)</span><br />
+<span class="math inline">\(\bm{\mu}_\beta\)</span> &amp; Mean of
+variational posterior <span
+class="math inline">\(q(\bm{\beta})\)</span><br />
+<span class="math inline">\(\bm{\Sigma}_\beta\)</span> &amp; Covariance
+of variational posterior <span
+class="math inline">\(q(\bm{\beta})\)</span><br />
+<span class="math inline">\(a_e,\,b_e\)</span> &amp; Shape and rate of
+variational <span
+class="math inline">\(q(\tau_e)=\mathrm{Gamma}(a_e,b_e)\)</span><br />
+<span class="math inline">\(\mathcal{L}(\bm{\phi})\)</span> &amp;
+Evidence Lower Bound (ELBO)<br />
+<span class="math inline">\(H[q(\bm{\beta})]\)</span> &amp; Differential
+entropy of <span class="math inline">\(q(\bm{\beta})\)</span><br />
+<span class="math inline">\(\lambda\)</span> &amp; Entropy
+regularisation weight<br />
+<br />
+<span class="math inline">\(\bm{L}\)</span> &amp; Lower-triangular
+Cholesky factor, <span
+class="math inline">\(\bm{\Sigma}_\beta=\bm{L}\bm{L}^T\)</span><br />
+<span class="math inline">\(\tilde{\ell}_{ii}\)</span> &amp;
+Log-diagonal entry, <span
+class="math inline">\(L_{ii}=e^{\tilde{\ell}_{ii}}\)</span> (ensures
+<span class="math inline">\(L_{ii}&gt;0\)</span>)<br />
+<span class="math inline">\(\bm{\xi}\)</span> &amp; Unconstrained
+optimisation vector <span
+class="math inline">\((\bm{\mu}_\beta,\tilde{\ell}_{11},\ell_{21},\ldots,\eta_a,\eta_b)\)</span><br />
+<span class="math inline">\(\eta_a,\,\eta_b\)</span> &amp; Log-space
+parameters, <span class="math inline">\(a_e=e^{\eta_a}\)</span>, <span
+class="math inline">\(b_e=e^{\eta_b}\)</span><br />
+<br />
+<span class="math inline">\(\bm{d}^{(t)}\)</span> &amp; Search direction
+at iteration <span class="math inline">\(t\)</span><br />
+<span class="math inline">\(\alpha_t\)</span> &amp; Step size
+(line-search parameter) at iteration <span
+class="math inline">\(t\)</span><br />
+<span class="math inline">\(\nabla\mathcal{L}\)</span> &amp; Gradient of
+the ELBO w.r.t. <span class="math inline">\(\bm{\xi}\)</span><br />
+<span class="math inline">\(\nabla^2\mathcal{L}\)</span> &amp; Hessian
+of the ELBO w.r.t. <span class="math inline">\(\bm{\xi}\)</span><br />
+<span class="math inline">\(\bm{B}_t\)</span> &amp; BFGS inverse-Hessian
+approximation at iteration <span class="math inline">\(t\)</span><br />
+<br />
+<span class="math inline">\(\psi(x)\)</span> &amp; Digamma function,
+<span
+class="math inline">\(\psi(x)=\tfrac{d}{dx}\log\Gamma(x)\)</span><br />
+<span class="math inline">\(\psi^{(1)}(x)\)</span> &amp; Trigamma
+function, <span
+class="math inline">\(\psi^{(1)}(x)=\tfrac{d}{dx}\psi(x)\)</span><br />
+<br />
+<span class="math inline">\(\Phi\)</span> &amp; Regressor matrix <span
+class="math inline">\(=\bm{X}\)</span> in this report<br />
+<span class="math inline">\(\theta\)</span> &amp; Coefficient vector
+<span class="math inline">\(=\bm{\beta}\)</span> in this report<br />
+<span class="math inline">\(d\)</span> &amp; Number of parameters <span
+class="math inline">\(=p\)</span> in this report<br />
+<span class="math inline">\(J(\theta)\)</span> &amp; Cost function <span
+class="math inline">\(=\mathcal{L}(\bm{\phi})\)</span> (ELBO) in this
+report<br />
+</p>
+</div>
+</div>
+<h1 id="optimisation-problem-formulation">Optimisation Problem
+Formulation</h1>
+<p>All four methods—CAVI, gradient ascent, Newton’s method, and
+BFGS—operate on the same objective and respect the same constraints. The
+formulation below follows the standard form from the course, so that
+differences in performance reflect the methods themselves rather than
+problem differences.</p>
+<h2 class="unnumbered" id="decision-variables">Decision Variables</h2>
+<p>For Bayesian linear regression with <span
+class="math inline">\(p\)</span> predictors, the variational parameters
+(decision variables) are:</p>
+<ul>
+<li><p><span class="math inline">\(\bm{\mu}_\beta \in
+\mathbb{R}^p\)</span>: posterior mean of regression
+coefficients</p></li>
+<li><p><span class="math inline">\(\bm{\Sigma}_\beta \in \mathbb{R}^{p
+\times p}\)</span>: posterior covariance (symmetric positive definite,
+<span class="math inline">\(\bm{\Sigma}_\beta \succ 0\)</span>)</p></li>
+<li><p><span class="math inline">\(a_e, b_e &gt; 0\)</span>: shape and
+rate parameters of the variational Gamma factor for precision</p></li>
+</ul>
+<p>Here, <span class="math inline">\(a_e\)</span> and <span
+class="math inline">\(b_e\)</span> parameterise <span
+class="math inline">\(q(\tau_e)=\mathrm{Gamma}(a_e,b_e)\)</span>; the
+model prior on <span class="math inline">\(\tau_e\)</span> is specified
+in the Test Case section.</p>
+<p>Total dimension: <span class="math inline">\(d = p + \frac{p(p+1)}{2}
++ 2 = 11\)</span> variables for <span class="math inline">\(p=3\)</span>
+predictors.</p>
+<h2 class="unnumbered" id="objective-function">Objective Function</h2>
+<p>Maximise the Evidence Lower Bound (ELBO):</p>
+<p><span class="math display">\[\begin{aligned}
+\text{ELBO}(\bm{\phi})
+&amp;= \mathbb{E}_q[\log p(\bm{y}, \bm{\beta}, \tau_e)] + H(q) \\
+&amp;= \mathbb{E}_q[\log p(\bm{y}, \bm{\beta}, \tau_e)] -
+\mathbb{E}_q[\log q(\bm{\beta}, \tau_e)] .
+\end{aligned}\]</span></p>
+<p>where <span class="math inline">\(\bm{\phi} = (\bm{\mu}_\beta,
+\bm{\Sigma}_\beta, a_e, b_e)\)</span> are the variational parameters.
+The first term, <span class="math inline">\(\mathbb{E}_q[\log p(\bm{y},
+\bm{\beta}, \tau_e)]\)</span>, is the expected log joint: it rewards
+approximations <span class="math inline">\(q\)</span> that place mass
+where the data and prior are jointly well explained. The second term,
+<span class="math inline">\(H(q) = -\mathbb{E}_q[\log q(\bm{\beta},
+\tau_e)]\)</span>, is the <em>differential entropy</em> of the
+approximating distribution: it rewards approximations that are broad and
+diffuse, penalising overconfident solutions. Maximising the ELBO
+therefore balances data fit against posterior spread — the entropy term
+is precisely what variance collapse works against.</p>
+<h2 class="unnumbered" id="constraints">Constraints</h2>
+<ul>
+<li><p><span class="math inline">\(\bm{\Sigma}_\beta \succ 0\)</span>:
+Covariance must be strictly positive definite; <span
+class="math inline">\(\bm{\Sigma}_\beta^{-1}\)</span> appears in the
+ELBO and CAVI updates, so a semi-definite covariance causes those
+computations to fail.</p></li>
+<li><p><span class="math inline">\(a_e, b_e &gt; 0\)</span>: Gamma
+parameters must be positive</p></li>
+<li><p>Optional: Minimum variance constraints <span
+class="math inline">\(\sigma^2_{\beta_j} \geq
+\sigma^2_{\text{min}}\)</span> to prevent underdispersion</p></li>
+</ul>
+<p><strong>Constraint Handling via Reparameterisation:</strong></p>
+<p>To enforce <span class="math inline">\(\bm{\Sigma}_\beta \succ
+0\)</span>, use Cholesky decomposition: <span
+class="math display">\[\begin{aligned}
+\bm{\Sigma}_\beta &amp;= \bm{L}\bm{L}^T
+\end{aligned}\]</span> where <span class="math inline">\(\bm{L} \in
+\mathbb{R}^{p \times p}\)</span> is lower triangular with positive
+diagonal entries. The unconstrained parameters are:</p>
+<ul>
+<li><p><span class="math inline">\(L_{ii} = e^{\ell_{ii}}\)</span> for
+<span class="math inline">\(i=1,\ldots,p\)</span> (exponentiate to
+ensure positivity)</p></li>
+<li><p><span class="math inline">\(L_{ij} = \ell_{ij}\)</span> for <span
+class="math inline">\(i &gt; j\)</span> (off-diagonal entries
+unconstrained)</p></li>
+</ul>
+<p>Total Cholesky parameters: <span
+class="math inline">\(\frac{p(p+1)}{2}\)</span> elements of <span
+class="math inline">\(\bm{\ell}\)</span>.</p>
+<p>To enforce <span class="math inline">\(a_e, b_e &gt; 0\)</span>, use
+log-space parameterisation: <span class="math display">\[\begin{aligned}
+a_e &amp;= e^{\eta_a}, \quad b_e = e^{\eta_b}
+\end{aligned}\]</span> where <span class="math inline">\(\eta_a, \eta_b
+\in \mathbb{R}\)</span> are unconstrained.</p>
+<p><strong>Unconstrained parameter vector:</strong> <span
+class="math inline">\(\bm{\xi} = (\bm{\mu}_\beta, \bm{\ell}, \eta_a,
+\eta_b) \in \mathbb{R}^d\)</span> with <span class="math inline">\(d = p
++ \frac{p(p+1)}{2} + 2 = 11\)</span> for <span
+class="math inline">\(p=3\)</span>.</p>
+<h1 id="sec:posterior-variance-collapse">Posterior Variance
+Collapse</h1>
+<p>Because this case study uses conjugate Gaussian–Gamma priors, the
+true posterior <span class="math inline">\(p(\bm{\beta}, \tau_e \mid
+\bm{y})\)</span> is available as a Normal–Gamma distribution. That makes
+the linear case a useful check on the whole numerical study. Posterior
+variance collapse can be measured against an exact reference, rather
+than inferred only from a sampler. The Gibbs sampler is still included,
+but here it is a practical comparison point rather than the only
+standard of comparison.</p>
+<p>In this report, posterior variance collapse means that the
+variational covariance <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span> is too small. The most
+visible symptom is that the diagonal entries of <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span> understate the
+uncertainty in the regression coefficients. The posterior intervals then
+look more precise than the evidence justifies.</p>
+<p>For that reason, the results are read in two ways. First, the
+optimisers are judged in the usual numerical sense: whether they reach a
+high ELBO, how quickly they converge, and how much computation they
+require. Second, the resulting posterior spread is checked directly. A
+good optimiser is not automatically a good uncertainty
+approximation.</p>
+<h2 id="why-collapse-occurs">Why Collapse Occurs</h2>
+<p>The first source of collapse is the mean-field assumption itself:
+<span class="math display">\[\begin{aligned}
+q(\bm{\beta},\tau_e) = q(\bm{\beta})\,q(\tau_e).
+\end{aligned}\]</span> This assumption is convenient, but it removes the
+posterior dependence between the regression coefficients and the noise
+precision. In the exact Normal–Gamma posterior, a larger noise precision
+is associated with tighter coefficient estimates. Once the approximation
+forces <span class="math inline">\(\bm{\beta}\)</span> and <span
+class="math inline">\(\tau_e\)</span> to be independent, part of that
+joint uncertainty can no longer be represented.</p>
+<p>The second cause is the direction of the KL divergence implied by the
+ELBO. Standard VI minimises <span class="math display">\[\begin{aligned}
+\mathrm{KL}[q\|p] &amp;= \int
+q(\bm{\theta})\log\frac{q(\bm{\theta})}{p(\bm{\theta}\mid\bm{y})}\,d\bm{\theta}
+\notag\\
+                   &amp;= \int_0^\infty \int_{\mathbb{R}^p}
+q(\bm{\beta},\tau_e)\log\frac{q(\bm{\beta},\tau_e)}{p(\bm{\beta},\tau_e\mid\bm{y})}\,d\bm{\beta}\,d\tau_e
+\notag\\
+                   &amp;= \int_0^\infty \int_{\mathbb{R}^p}
+q(\bm{\beta})\,q(\tau_e)\log\frac{q(\bm{\beta})\,q(\tau_e)}{p(\bm{\beta},\tau_e\mid\bm{y})}\,d\bm{\beta}\,d\tau_e.
+\end{aligned}\]</span> The three-line integral is deceptively simple to
+implement. Because each variational factor belongs to the exponential
+family, both KL contributions reduce to closed-form entropy formulas
+(see Appendix <a href="#app:entropy" data-reference-type="ref"
+data-reference="app:entropy">13</a>), so the entire KL computation
+reduces to two lines in <code>linear_run.ipynb</code>:</p>
+<pre><code># -E[log q(beta)] = Gaussian entropy (closed-form)
+sign, logdet = np.linalg.slogdet(Sigma)
+neg_lq_beta = 0.5 * logdet + 0.5 * p * (1 + np.log(2 * np.pi))
+
+# -E[log q(tau_e)] = Gamma entropy (closed-form)
+neg_lq_tau = a_e - np.log(b_e) + gammaln(a_e) + (1 - a_e) * digamma(a_e)</code></pre>
+<p>This objective penalises <span class="math inline">\(q\)</span>
+heavily when it puts probability mass in regions where the true
+posterior is small. It is less severe when <span
+class="math inline">\(q\)</span> simply fails to cover parts of the true
+posterior support. In practice, the approximation is encouraged to sit
+on the high-density centre of <span
+class="math inline">\(p(\bm{\beta},\tau_e\mid\bm{y})\)</span> rather
+than cover the full posterior spread. Since the analytical posterior is
+available in this case, this narrowing can be measured directly.</p>
+<h2 id="diagnostic">Diagnostic</h2>
+<p>The numerical experiments compare the variational posterior against
+two references: the analytically derived true posterior (available
+because of conjugate priors) and a Gibbs sampler. For each coefficient
+<span class="math inline">\(\beta_j\)</span>, two standard-deviation
+ratios are computed: <span class="math display">\[\begin{aligned}
+\frac{\sigma_{\mathrm{VB}}}{\sigma_{\mathrm{true}}}, \qquad
+\frac{\sigma_{\mathrm{VB}}}{\sigma_{\mathrm{Gibbs}}}.
+\end{aligned}\]</span> Ratios below one confirm that the variational
+approximation is narrower than the reference (<em>posterior variance
+collapse</em>). The ratio against the true posterior is the definitive
+diagnostic; the ratio against Gibbs serves as a consistency check and
+provides the comparison metric used in the other case studies where the
+true posterior is not available.</p>
+<h2 id="approaches-considered">Approaches Considered</h2>
+<p>Three approaches are considered for reducing or diagnosing posterior
+variance collapse. Of these, only entropy regularisation (Approach 3) is
+implemented in this report; the first two are discussed to motivate that
+choice.</p>
+<h3 id="informative-prior-on-tau_e">Informative Prior on <span
+class="math inline">\(\tau_e\)</span></h3>
+<p>A stronger prior on <span class="math inline">\(\tau_e\)</span> can
+limit how large the expected precision becomes. Since larger precision
+corresponds to smaller observation-noise variance, controlling <span
+class="math inline">\(\tau_e\)</span> can indirectly prevent <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span> from becoming too
+small. The limitation is that this changes the statistical model and
+requires a defensible prior choice.</p>
+<h3 id="minimum-variance-constraint">Minimum Variance Constraint</h3>
+<p>A direct constraint can be imposed on the diagonal entries of <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span>: <span
+class="math display">\[\begin{aligned}
+\Sigma_{\beta,jj} \geq \sigma^2_{\min}, \qquad j=1,\ldots,p.
+\end{aligned}\]</span> This prevents individual coefficient variances
+from falling below a chosen threshold. The limitation is that the
+threshold is external to the original ELBO objective.</p>
+<h3 id="entropy-regularisation">Entropy Regularisation</h3>
+<p>The most direct objective-based approach considered here is entropy
+regularisation: <span class="math display">\[\begin{aligned}
+\mathcal{L}_{\mathrm{reg}}(\bm{\phi})
+= \mathcal{L}(\bm{\phi}) + \lambda H[q(\bm{\beta})].
+\end{aligned}\]</span> For <span
+class="math inline">\(q(\bm{\beta})=\mathcal{N}(\bm{\mu}_\beta,\bm{\Sigma}_\beta)\)</span>,
+the entropy is <span class="math display">\[\begin{aligned}
+H[q(\bm{\beta})]
+&amp;= \frac{1}{2}\log\det(2\pi e\,\bm{\Sigma}_\beta)\\
+&amp;= \frac{p}{2}(1+\log 2\pi) +
+\frac{1}{2}\log\det(\bm{\Sigma}_\beta).
+\end{aligned}\]</span> The regularised gradient with respect to the
+covariance matrix gains the additional term <span
+class="math display">\[\begin{aligned}
+\nabla_{\bm{\Sigma}_\beta}\mathcal{L}_{\mathrm{reg}}
+= \nabla_{\bm{\Sigma}_\beta}\mathcal{L}
++ \frac{\lambda}{2}\bm{\Sigma}_\beta^{-1}.
+\end{aligned}\]</span> This term rewards broader covariance estimates
+and directly counters the tendency toward overly narrow posterior
+approximations.</p>
+<h1 id="sec:elbo-evaluation">ELBO Evaluation</h1>
+<p>Before comparing the optimisation methods, the ELBO implementation is
+checked numerically. This step is mainly a safeguard: if the gradient or
+reparameterisation is wrong, later convergence plots would be difficult
+to interpret.</p>
+<h2 id="gradient-verification">Gradient Verification</h2>
+<p>The analytical gradient <span
+class="math inline">\(\nabla_{\bm{\xi}}\mathcal{L}\)</span> is computed
+with respect to all unconstrained parameters <span
+class="math inline">\(\bm{\xi} = (\bm{\mu}_\beta,\, \tilde{\ell}_{11},
+\ell_{21}, \tilde{\ell}_{22},\, \eta_a, \eta_b)\)</span>. Each component
+is checked against a central finite-difference approximation: <span
+class="math display">\[\begin{aligned}
+  \frac{\partial \mathcal{L}}{\partial \xi_i} \approx
+\frac{\mathcal{L}(\bm{\xi} + h\bm{e}_i) - \mathcal{L}(\bm{\xi} -
+h\bm{e}_i)}{2h}, \qquad h = 10^{-5}.
+\end{aligned}\]</span> The relative error between the analytical and
+numerical gradient must satisfy <span
+class="math inline">\(\|\nabla_{\mathrm{analytical}} -
+\nabla_{\mathrm{FD}}\|_\infty / \|\nabla_{\mathrm{analytical}}\|_\infty
+\leq 10^{-5}\)</span> for all components before any optimiser is run.
+The result is displayed as a bar chart
+(<code>linear_elbo_gradient_check.png</code>) comparing analytical and
+finite-difference values side by side for each unconstrained parameter.
+The gradient check table is saved to
+<code>results/tables/linear_gradient_check.tex</code>.</p>
+<h2 id="elbo-landscape">ELBO Landscape</h2>
+<p>A two-dimensional slice of the ELBO surface is computed by varying
+<span class="math inline">\(\mu_{\beta_0}\)</span> and <span
+class="math inline">\(\mu_{\beta_1}\)</span> over a grid while holding
+all other parameters fixed at their CAVI optimum. This visualises the
+objective surface that the gradient-based optimisers are navigating and
+confirms that the CAVI solution lies at the maximum. The result is saved
+as <code>linear_elbo_landscape.png</code>.</p>
+<h1 id="optimisation-methods">Optimisation Methods</h1>
+<p>The optimisation methods are used for more than finding a maximum of
+the ELBO. Each method also produces a variational posterior, and that
+posterior has to be checked for uncertainty collapse. The comparison
+therefore has both an optimisation side and an inference side.</p>
+<h2 id="cavi-baseline">CAVI Baseline</h2>
+<p>CAVI is used as the analytical baseline because the linear
+Gaussian–Gamma model is conjugate. Instead of choosing a generic search
+direction, CAVI updates one variational block at a time using
+closed-form expressions: <span class="math display">\[\begin{aligned}
+\bm{\Sigma}_\beta &amp;\leftarrow \left(\frac{a_e}{b_e} \bm{X}^T\bm{X} +
+\lambda_\beta \bm{I}_p\right)^{-1},\\
+\bm{\mu}_\beta &amp;\leftarrow \frac{a_e}{b_e} \bm{\Sigma}_\beta
+\bm{X}^T\bm{y},\\
+a_e &amp;\leftarrow \alpha_e + \frac{n}{2},\\
+b_e &amp;\leftarrow \gamma_e + \frac{1}{2}\left[\|\bm{y} -
+\bm{X}\bm{\mu}_\beta\|^2 +
+\text{tr}(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)\right].
+\end{aligned}\]</span> CAVI is expected to increase the ELBO
+monotonically<a href="#fn6" class="footnote-ref" id="fnref6"
+role="doc-noteref"><sup>6</sup></a>, with linear convergence and <span
+class="math inline">\(O(np^2)\)</span> cost per iteration. In this
+report it is the reference point, not the method being challenged in the
+conjugate case.</p>
+<h2 id="gradient-ascent">Gradient Ascent</h2>
+<p>Gradient ascent applies the first-order update in the unconstrained
+parameterisation: <span class="math display">\[\begin{aligned}
+\bm{\xi}^{(t+1)} = \bm{\xi}^{(t)} + \alpha_t
+\nabla\text{ELBO}(\bm{\xi}^{(t)}).
+\end{aligned}\]</span> The search direction is the gradient, so the
+ascent condition is satisfied whenever the gradient is non-zero: <span
+class="math display">\[\begin{aligned}
+\nabla\text{ELBO}(\bm{\xi}^{(t)})^T \nabla\text{ELBO}(\bm{\xi}^{(t)})
+&gt; 0.
+\end{aligned}\]</span> The step size is selected using Armijo
+backtracking so that each accepted step produces sufficient increase in
+the ELBO.</p>
+<h2 id="newtons-method">Newton’s Method</h2>
+<p>Newton’s method uses second-order curvature information. For
+maximisation, the ideal Newton direction is <span
+class="math display">\[\begin{aligned}
+\bm{d}^{(t)} =
+-[\nabla^2\text{ELBO}(\bm{\xi}^{(t)})]^{-1}\nabla\text{ELBO}(\bm{\xi}^{(t)}).
+\end{aligned}\]</span> Near a well-conditioned local maximum, Newton’s
+method can converge quadratically. Away from the optimum, however, the
+Hessian may fail to be negative definite, so the raw Newton direction
+may not be an ascent direction. Regularisation is therefore applied when
+necessary so that the search direction satisfies <span
+class="math display">\[\begin{aligned}
+\nabla\text{ELBO}(\bm{\xi}^{(t)})^T\bm{d}^{(t)} &gt; 0.
+\end{aligned}\]</span></p>
+<h2 id="bfgs">BFGS</h2>
+<p>BFGS is included as the practical middle ground between gradient
+ascent and a full Newton method. It does not form the Hessian directly;
+instead, it builds inverse-curvature information from successive
+parameter and gradient changes. Define <span
+class="math display">\[\begin{aligned}
+\bm{s}_t &amp;= \bm{\xi}^{(t+1)} - \bm{\xi}^{(t)},\\
+\bm{y}_t &amp;= \nabla\text{ELBO}(\bm{\xi}^{(t+1)}) -
+\nabla\text{ELBO}(\bm{\xi}^{(t)}).
+\end{aligned}\]</span> The BFGS update requires the curvature condition
+<span class="math display">\[\begin{aligned}
+\bm{y}_t^T\bm{s}_t &gt; 0
+\end{aligned}\]</span> to maintain positive definiteness of the
+approximate inverse Hessian. Wolfe line-search conditions are used for
+this reason. BFGS has <span
+class="math inline">\(O(\dim(\bm{\xi})^2)\)</span> per-iteration cost
+and is expected to provide a practical balance between gradient ascent
+and Newton’s method.</p>
+<h2 id="shared-ascent-check-and-exit-conditions">Shared Ascent Check and
+Exit Conditions</h2>
+<p>For all line-search methods, the search direction must satisfy the
+ascent condition before a step is accepted: <span
+class="math display">\[\begin{aligned}
+\nabla\text{ELBO}(\bm{\xi}^{(t)})^T\bm{d}^{(t)} &gt; 0.
+\end{aligned}\]</span> Exit conditions are applied uniformly across
+methods using gradient norm, relative ELBO change, parameter change, and
+maximum iteration count. The detailed implementation of these conditions
+is given in Section <a href="#sec:implementation-details"
+data-reference-type="ref"
+data-reference="sec:implementation-details">6</a>.</p>
+<h1 id="sec:implementation-details">Test Cases and Implementation
+Details</h1>
+<p>The numerical work uses one generated linear regression data set. The
+full implementation structure—ELBO evaluation, optimisers, and Gibbs
+sampler—is recorded in Appendix <a href="#app:python-code"
+data-reference-type="ref" data-reference="app:python-code">12</a>.</p>
+<h2 id="test-case-1-linear-bayesian-regression">Test Case 1: Linear
+Bayesian Regression</h2>
+<p>The first test case is a linear Bayesian regression problem. It is
+the baseline setting because the data-generating process matches the
+model being fitted: <span class="math display">\[\begin{aligned}
+y_i &amp;= \beta_0 + \beta_1 x_i + \varepsilon_i,\\
+\varepsilon_i &amp;\sim \mathcal{N}(0,\sigma_e^2).
+\end{aligned}\]</span> The design matrix is <span
+class="math display">\[\begin{aligned}
+\bm{X} =
+\begin{bmatrix}
+1 &amp; x_1\\
+1 &amp; x_2\\
+\vdots &amp; \vdots\\
+1 &amp; x_n
+\end{bmatrix}.
+\end{aligned}\]</span> This case is used to check whether each
+optimisation method can reproduce the CAVI solution and to measure
+posterior variance collapse in the simplest regression setting.</p>
+<pre><code>def generate_linear_case(n=100, sigma=0.5, seed=1):
+    rng = np.random.default_rng(seed)
+    x = rng.normal(size=n)
+    X = np.column_stack([np.ones(n), x])
+    beta_true = np.array([1.0, 2.0])
+    y = X @ beta_true + rng.normal(scale=sigma, size=n)
+    return X, y, beta_true</code></pre>
+<h2 id="code-structure">Code Structure</h2>
+<p>The following workflow is applied to the linear test case:</p>
+<ol>
+<li><p>Generate <span class="math inline">\(\bm{X}\)</span>, <span
+class="math inline">\(\bm{y}\)</span>, and <span
+class="math inline">\(\bm{\beta}_{\mathrm{true}}\)</span>.</p></li>
+<li><p>Fit all four methods (CAVI, gradient ascent, Newton’s method,
+BFGS) and record the ELBO trajectory for each.</p></li>
+<li><p>Run the Gibbs sampler reference implementation.</p></li>
+<li><p>Compare posterior means, posterior standard deviations,
+convergence speed, and runtime.</p></li>
+</ol>
+<pre><code>X, y, beta_true = generate_linear_case()
+results = run_all_methods(X, y, beta_true)</code></pre>
+<h1 id="assessment-framework">Assessment Framework</h1>
+<p>Each method is assessed against three criteria. The first is
+convergence: whether the method reaches the same ELBO value as the CAVI
+fixed point. The second is posterior accuracy: whether the variational
+posterior matches the Gibbs sampler and, in this linear case, the
+analytically available posterior. The Gibbs sampler is used as an
+uncertainty reference, not as an ELBO optimiser, so it is not judged on
+optimisation speed. The third is computational cost, measured using
+wall-clock time and iteration count. Analytical gradients are checked
+against central finite differences to relative error <span
+class="math inline">\(\leq 10^{-5}\)</span> before the optimiser
+comparison is made.</p>
+<h1 id="sec:results">Results and Discussion</h1>
+<h2 id="test-case-linear-bayesian-regression">Test Case: Linear Bayesian
+Regression</h2>
+<p>The test case uses <span class="math inline">\(n=50\)</span>
+observations generated from <span class="math inline">\(y_i = \beta_0 +
+\beta_1 x_i + \varepsilon_i\)</span> with true parameters <span
+class="math inline">\(\beta_0=2.0\)</span>, <span
+class="math inline">\(\beta_1=1.5\)</span>, and noise precision <span
+class="math inline">\(\tau_e=4.0\)</span> (noise standard deviation
+<span class="math inline">\(\sigma_e = 0.5\)</span>). Figure <a
+href="#fig:data" data-reference-type="ref"
+data-reference="fig:data">1</a> shows the generated dataset.</p>
+<figure id="fig:data">
+<img src="linear_data_scatter.png" style="width:75.0%" />
+<figcaption>Generated linear regression data (<span
+class="math inline">\(n=50\)</span>). The solid line is the true
+regression function <span class="math inline">\(\beta_0 + \beta_1
+x\)</span>; the shaded band is <span
+class="math inline">\(\pm\sigma_e\)</span>.</figcaption>
+</figure>
+<figure id="fig:prior_post">
+<img src="linear_prior_likelihood_posterior.png" style="width:92.0%" />
+<figcaption>Prior, observed data, and CAVI posterior for the linear
+predictor. The grey dashed line is the prior mean (<span
+class="math inline">\(y=0\)</span>, i.e. <span
+class="math inline">\(\bm{\mu}_\beta=\bm{0}\)</span>) and the grey band
+is the 95% prior predictive interval under <span
+class="math inline">\(\bm{\beta}\sim\mathcal{N}(\bm{0},10\bm{I})\)</span>;
+it bleeds beyond the plot boundaries, reflecting the prior’s large
+uncertainty before any data are seen. The blue band is the CAVI
+posterior 95% credible interval; the 50 observations pull the posterior
+mean (blue line) close to the true line (red dashed), demonstrating
+effective Bayesian updating.</figcaption>
+</figure>
+<h3
+id="posterior-contraction-and-the-role-of-posterior-collapse">Posterior
+Contraction and the Role of Posterior Collapse</h3>
+<h4 id="posterior-contraction-applicable-here.">Posterior contraction
+(applicable here).</h4>
+<p>Figure <a href="#fig:prior_post" data-reference-type="ref"
+data-reference="fig:prior_post">2</a> illustrates a fundamental property
+of Bayesian inference: <em>posterior contraction</em>. Under the prior
+<span
+class="math inline">\(\bm{\beta}\sim\mathcal{N}(\bm{0},10\bm{I})\)</span>,
+the 95% predictive interval for the regression mean spans roughly <span
+class="math inline">\(\pm 2\sqrt{10\,(1+x^2)}\approx\pm 6\)</span>–20
+units across the data range, reflecting near-total ignorance about <span
+class="math inline">\(\bm{\beta}\)</span> before any data are seen.
+After conditioning on <span class="math inline">\(n=50\)</span>
+observations, the CAVI posterior 95% credible interval for the
+regression mean shrinks to a few tenths of a unit — an
+order-of-magnitude reduction in uncertainty. This is exactly what Bayes’
+theorem guarantees: as <span class="math inline">\(n\)</span> increases,
+the likelihood dominates the prior and the posterior concentrates around
+the true parameter values at a rate of <span
+class="math inline">\(O(n^{-1/2})\)</span> per parameter <span
+class="citation" data-cites="vaart1998asymptotic"></span>. The tight
+blue band in Figure <a href="#fig:prior_post" data-reference-type="ref"
+data-reference="fig:prior_post">2</a> is therefore a feature, not a
+defect: it shows that 50 observations are sufficient to identify the
+linear relationship almost exactly. Crucially, the remaining width of
+the blue band represents genuine, irreducible uncertainty about the
+<em>regression line</em>; the much wider tomato band shows the
+observation noise <span class="math inline">\(\pm 2\sigma_e = \pm
+1.0\)</span>, which is a separate quantity describing where individual
+data points fall, not where the mean lies.</p>
+<h4 id="posterior-collapse-not-applicable-in-this-case-study.">Posterior
+collapse (not applicable in this case study).</h4>
+<p>Posterior collapse is a distinct, pathological failure mode that can
+afflict mean-field variational inference in <em>hierarchical</em>
+models. It occurs when the CAVI updates for a precision hyperparameter
+<span class="math inline">\(\tau_\beta\)</span> drive that precision to
+infinity: the factor <span class="math inline">\(q(\tau_\beta)\)</span>
+concentrates on an implausibly large value, which in turn forces <span
+class="math inline">\(q(\bm{\beta})\)</span> to collapse toward the
+prior mean, discarding information from the data. Each update reinforces
+the other in a degenerate fixed point that maximises the ELBO locally
+but not globally <span class="citation"
+data-cites="turner2011two"></span>. The collapse can be detected by
+comparing CAVI posterior variances against those of a Gibbs sampler: a
+CAVI variance dramatically smaller than Gibbs variance, without a
+corresponding gain in posterior mean accuracy, is a red flag.</p>
+<p>This failure mode is <strong>not applicable to Case Study 1</strong>.
+The model has no precision hyperparameter to collapse: <span
+class="math inline">\(\tau_e\)</span> is treated as a latent variable
+with a flat (improper) prior, but it does not gate the variance of <span
+class="math inline">\(\bm{\beta}\)</span>. The CAVI updates for <span
+class="math inline">\(\bm{\beta}\)</span> are guaranteed to converge to
+the exact posterior because the model is conjugate Gaussian–Gamma, and
+the mean-field factorisation <span
+class="math inline">\(q(\bm{\beta})q(\tau_e)\)</span> is sufficient to
+recover the true joint posterior marginals <span class="citation"
+data-cites="bishop2006pattern"></span>. Posterior collapse, and its
+mitigation via entropy regularisation or tighter variational families,
+becomes relevant in the hierarchical case studies that follow.</p>
+<h3 id="gradient-verification-1">Gradient Verification</h3>
+<p>Before running any optimiser, the analytical gradient <span
+class="math inline">\(\nabla_{\bm{\xi}}\text{ELBO}\)</span> was verified
+by comparison with central finite differences at a non-trivial starting
+point. Table <a href="#tab:gradcheck" data-reference-type="ref"
+data-reference="tab:gradcheck">[tab:gradcheck]</a> reports both gradient
+values and their relative error. For parameters with non-negligible
+gradient magnitude (<span class="math inline">\(\eta_a\)</span>, <span
+class="math inline">\(\eta_b\)</span>), the relative error is below
+<span class="math inline">\(10^{-7}\)</span>, confirming that the
+analytical gradient is correctly implemented. The large apparent errors
+for <span class="math inline">\(\mu_0\)</span>, <span
+class="math inline">\(\mu_1\)</span>, and <span
+class="math inline">\(u_{ij}\)</span> reflect the fact that the OLS
+initialisation places those parameters near the optimum (both values are
+numerically zero; dividing near-zero by near-zero produces an unstable
+ratio).</p>
+<div class="tblr">
+<p><span>colspec=<span>lrrr</span>,
+hline<span>1,2,Z</span>=<span>solid</span></span> Parameter &amp;
+Gradient (<span class="math inline">\(h=10^{-5}\)</span>) &amp; Gradient
+(<span class="math inline">\(h=10^{-7}\)</span>) &amp; Rel. error<br />
+<span class="math inline">\(\mu_0\)</span> &amp; -0.000000 &amp;
+-0.000000 &amp; 9.90e-01<br />
+<span class="math inline">\(\mu_1\)</span> &amp; 0.000000 &amp;
+-0.000000 &amp; 1.01e+00<br />
+<span class="math inline">\(u_{11}\)</span> &amp; -0.000000 &amp;
+0.000000 &amp; 3.55e+02<br />
+<span class="math inline">\(u_{21}\)</span> &amp; 0.000000 &amp;
+0.000000 &amp; 0.00e+00<br />
+<span class="math inline">\(u_{22}\)</span> &amp; -0.000000 &amp;
+0.000000 &amp; 1.78e+02<br />
+<span class="math inline">\(\eta_a\)</span> &amp; 1.020267 &amp;
+1.020267 &amp; 7.68e-08<br />
+<span class="math inline">\(\eta_b\)</span> &amp; -1.000000 &amp;
+-1.000000 &amp; 1.15e-08<br />
+</p>
+</div>
+<figure id="fig:gradcheck">
+<img src="linear_elbo_gradient_check.png" style="width:85.0%" />
+<figcaption>Analytical vs. finite-difference gradient components. Bars
+coincide visually for all components, confirming gradient
+correctness.</figcaption>
+</figure>
+<h3 id="elbo-landscape-1">ELBO Landscape</h3>
+<p>Figure <a href="#fig:landscape" data-reference-type="ref"
+data-reference="fig:landscape">4</a> shows a two-dimensional slice of
+the ELBO surface varying <span
+class="math inline">\(\mu_{\beta_0}\)</span> and <span
+class="math inline">\(\mu_{\beta_1}\)</span> while holding all other
+parameters at the CAVI optimum. The surface is smooth and unimodal, with
+the maximum at the CAVI solution, confirming that CAVI has found the
+global optimum of the variational objective within the mean-field
+family.</p>
+<figure id="fig:landscape">
+<img src="linear_elbo_landscape.png" style="width:65.0%" />
+<figcaption>Two-dimensional ELBO slice varying <span
+class="math inline">\(\mu_{\beta_0}\)</span> and <span
+class="math inline">\(\mu_{\beta_1}\)</span> at the CAVI optimum. The
+cross marks the CAVI solution.</figcaption>
+</figure>
+<h3 id="optimisation-performance">Optimisation Performance</h3>
+<p>Table <a href="#tab:performance" data-reference-type="ref"
+data-reference="tab:performance">[tab:performance]</a> summarises the
+performance of all four VB methods and the Gibbs reference. CAVI
+converges in 9 iterations at 0.9 ms, making it 1764<span
+class="math inline">\(\times\)</span> faster than the Gibbs sampler
+(1535 ms for <span class="math inline">\(3\times5000\)</span> samples).
+Newton’s Method converges in 2 iterations (11.5 ms, 133<span
+class="math inline">\(\times\)</span> speedup) but reaches a worse final
+ELBO (<span class="math inline">\(-44.95\)</span>), indicating it did
+not find the CAVI optimum. BFGS takes 25 iterations (41 ms, 37<span
+class="math inline">\(\times\)</span>) and achieves a better ELBO than
+Newton but still falls short of CAVI. Gradient Ascent (2000 iterations,
+1709 ms) offers no practical speed advantage over Gibbs: the
+finite-difference gradient overhead dominates on this small problem.</p>
+<div class="tblr">
+<p><span>colspec=<span>lrrrrr</span>,
+hline<span>1,2,Z</span>=<span>solid</span></span> Method &amp;
+Iterations &amp; Runtime (ms) &amp; Speedup vs Gibbs &amp; Final ELBO
+&amp; Converged<br />
+CAVI &amp; 9 &amp; 0.9 &amp; 1982x &amp; -0.014 &amp; Yes<br />
+Gradient Ascent &amp; 2000 &amp; 1941.1 &amp; 1x &amp; -27.012 &amp;
+Yes<br />
+Newton’s Method &amp; 2 &amp; 10.3 &amp; 171.3x &amp; -44.950 &amp;
+Yes<br />
+BFGS &amp; 25 &amp; 48.0 &amp; 37x &amp; -26.658 &amp; Yes<br />
+Gibbs (3 chains) &amp; 3 x 5000 &amp; 1756.6 &amp; 1x (reference) &amp;
+N/A (MCMC) &amp; Yes<br />
+</p>
+</div>
+<figure id="fig:timing">
+<img src="linear_timing_comparison.png" style="width:80.0%" />
+<figcaption>Computational cost on a log scale. Annotations show speedup
+relative to the Gibbs reference (dashed line). CAVI is the clear winner;
+Gradient Ascent with finite-difference gradients loses its speed
+advantage entirely.</figcaption>
+</figure>
+<h3 id="elbo-convergence">ELBO Convergence</h3>
+<p>Figure <a href="#fig:elbocv" data-reference-type="ref"
+data-reference="fig:elbocv">6</a> shows the ELBO trajectory for each
+method. CAVI increases monotonically and converges within 9 iterations.
+Gradient Ascent improves slowly over 2000 iterations and plateaus at a
+much lower ELBO value (<span class="math inline">\(-27.0\)</span>) than
+CAVI (<span class="math inline">\(-0.014\)</span>). BFGS converges more
+rapidly than Gradient Ascent but still does not match the CAVI solution,
+suggesting the approximate Hessian is not sufficiently accurate near the
+optimum. Newton’s Method reaches its (poor) optimum in 2 steps,
+consistent with the Hessian being ill-conditioned at the true
+maximum.</p>
+<figure id="fig:elbocv">
+<img src="linear_elbo_convergence.png" style="width:80.0%" />
+<figcaption>ELBO vs. iteration for each method. Only methods that update
+the ELBO iteratively are shown. The dashed horizontal line is the CAVI
+optimum.</figcaption>
+</figure>
+<h3 id="posterior-accuracy-and-variance-collapse">Posterior Accuracy and
+Variance Collapse</h3>
+<p>Table <a href="#tab:posterior" data-reference-type="ref"
+data-reference="tab:posterior">[tab:posterior]</a> reports posterior
+means and standard-deviation ratios <span
+class="math inline">\(\sigma_{\mathrm{VB}}/\sigma_{\mathrm{Gibbs}}\)</span>
+for all methods. All methods recover the posterior means accurately: the
+largest mean error is less than 0.01 relative to the Gibbs reference.
+The SD ratios reveal the degree of variance collapse. CAVI achieves
+near-unity ratios (<span class="math inline">\(0.98\)</span>–<span
+class="math inline">\(0.98\)</span>) for <span
+class="math inline">\(\beta_0\)</span> and <span
+class="math inline">\(\beta_1\)</span>, indicating minimal collapse in
+this conjugate linear setting. Newton’s Method and Gradient Ascent show
+larger deviations, particularly for <span
+class="math inline">\(\tau_e\)</span>, consistent with their failure to
+reach the CAVI optimum.</p>
+<div class="tblr">
+<p><span>colspec=<span>lrrrrrr</span>,
+hline<span>1,2,Z</span>=<span>solid</span></span> Method &amp; <span
+class="math inline">\(\mu_{\beta_0}\)</span> &amp; <span
+class="math inline">\(\mu_{\beta_1}\)</span> &amp; <span
+class="math inline">\(\mathrm{E}[\tau_e]\)</span> &amp; SD ratio <span
+class="math inline">\(\beta_0\)</span> &amp; SD ratio <span
+class="math inline">\(\beta_1\)</span> &amp; SD ratio <span
+class="math inline">\(\tau_e\)</span><br />
+CAVI &amp; 2.0614 &amp; 1.4987 &amp; 6.4074 &amp; 0.979 &amp; 0.981
+&amp; 0.983<br />
+Gradient Ascent &amp; 2.0614 &amp; 1.4985 &amp; 6.7853 &amp; 0.946 &amp;
+0.955 &amp; 1.665<br />
+Newton’s Method &amp; 2.0614 &amp; 1.4987 &amp; 6.6743 &amp; 0.889 &amp;
+2.585 &amp; 3.621<br />
+BFGS &amp; 2.0614 &amp; 1.4987 &amp; 6.6743 &amp; 0.959 &amp; 0.961
+&amp; 1.004<br />
+Gibbs (ref) &amp; 2.0616 &amp; 1.4984 &amp; 6.3925 &amp; 1.000 &amp;
+1.000 &amp; 1.000<br />
+</p>
+</div>
+<figure id="fig:sdratios">
+<img src="linear_sd_ratios.png" style="width:80.0%" />
+<figcaption>Standard-deviation ratios <span
+class="math inline">\(\sigma_{\mathrm{VB}}/\sigma_{\mathrm{Gibbs}}\)</span>
+for each parameter and method. The dashed line at 1 is the Gibbs
+reference. Ratios below 1 indicate underestimated
+uncertainty.</figcaption>
+</figure>
+<p>Figures <a href="#fig:comp_b0" data-reference-type="ref"
+data-reference="fig:comp_b0">8</a>–<a href="#fig:comp_tau"
+data-reference-type="ref" data-reference="fig:comp_tau">10</a> compare
+VB posterior means (bars) against the Gibbs mean (pink dashed) and the
+true parameter value (black dotted) for each parameter. All VB methods
+recover the correct location; the dotted True line lies at or near the
+top of every bar.</p>
+<figure id="fig:comp_b0">
+<img src="linear_comparison_beta0.png" style="width:85.0%" />
+<figcaption>Posterior mean (left) and standard deviation (right) for
+<span class="math inline">\(\beta_0\)</span>. Dashed pink: Gibbs
+mean/SD. Dotted black: true value.</figcaption>
+</figure>
+<figure id="fig:comp_b1">
+<img src="linear_comparison_beta1.png" style="width:85.0%" />
+<figcaption>Posterior mean and SD for <span
+class="math inline">\(\beta_1\)</span>.</figcaption>
+</figure>
+<figure id="fig:comp_tau">
+<img src="linear_comparison_tau_e.png" style="width:85.0%" />
+<figcaption>Posterior mean and SD for <span
+class="math inline">\(\tau_e\)</span>.</figcaption>
+</figure>
+<p>Figures <a href="#fig:vbg_b0" data-reference-type="ref"
+data-reference="fig:vbg_b0">11</a>–<a href="#fig:vbg_tau"
+data-reference-type="ref" data-reference="fig:vbg_tau">13</a> overlay
+the full posterior densities from VB and Gibbs for each parameter,
+illustrating that the variational distributions are centred correctly
+but narrower than the MCMC reference.</p>
+<figure id="fig:vbg_b0">
+<img src="linear_vb_gibbs_beta0.png" style="width:80.0%" />
+<figcaption>VB and Gibbs posterior densities for <span
+class="math inline">\(\beta_0\)</span>. The vertical dotted line is the
+true value.</figcaption>
+</figure>
+<figure id="fig:vbg_b1">
+<img src="linear_vb_gibbs_beta1.png" style="width:80.0%" />
+<figcaption>VB and Gibbs posterior densities for <span
+class="math inline">\(\beta_1\)</span>.</figcaption>
+</figure>
+<figure id="fig:vbg_tau">
+<img src="linear_vb_gibbs_tau_e.png" style="width:80.0%" />
+<figcaption>VB and Gibbs posterior densities for <span
+class="math inline">\(\tau_e\)</span>.</figcaption>
+</figure>
+<h3 id="gibbs-sampler-diagnostics">Gibbs Sampler Diagnostics</h3>
+<p>Figures <a href="#fig:trace_b0" data-reference-type="ref"
+data-reference="fig:trace_b0">14</a>–<a href="#fig:rhat"
+data-reference-type="ref" data-reference="fig:rhat">15</a> show the
+Gibbs convergence diagnostics. All chains mix well within the first
+500 iterations; trace plots show no trend or sticking. The Gelman–Rubin
+<span class="math inline">\(\hat{R}\)</span> statistic is below <span
+class="math inline">\(1.01\)</span> for all parameters, indicating that
+the 3 chains have converged to the same posterior.</p>
+<figure id="fig:trace_b0">
+<img src="linear_gibbs_trace_beta0.png" style="width:80.0%" />
+<figcaption>Gibbs trace plot for <span
+class="math inline">\(\beta_0\)</span> across 3 chains.</figcaption>
+</figure>
+<figure id="fig:rhat">
+<img src="linear_gibbs_rhat.png" style="width:80.0%" />
+<figcaption>Gelman–Rubin <span class="math inline">\(\hat{R}\)</span>
+statistic for all parameters. All values are below the standard
+convergence threshold of 1.01.</figcaption>
+</figure>
+<h2 id="discussion">Discussion</h2>
+<p>The linear test case is a favourable setting for mean-field VI. The
+posterior is unimodal and close to Gaussian, so the factorisation <span
+class="math inline">\(q(\bm{\beta},\tau_e) =
+q(\bm{\beta})\,q(\tau_e)\)</span> does less damage here than it would in
+a more strongly coupled model. CAVI also has the advantage of using the
+conjugate structure directly. Its SD ratios of 0.98–0.98 are therefore
+close to one, even though the approximation still imposes independence
+between <span class="math inline">\(\bm{\beta}\)</span> and <span
+class="math inline">\(\tau_e\)</span>.</p>
+<p>The gradient-based methods reveal two distinct failure modes:</p>
+<ul>
+<li><p>Newton’s method and BFGS converge to local optima substantially
+worse than the CAVI solution, showing that generic optimisers without
+analytical gradients can fail even on a convex ELBO landscape.</p></li>
+<li><p>Gradient ascent with finite-difference gradients offers no speed
+advantage over Gibbs on small problems: the <span
+class="math inline">\(O(2d)\)</span> function evaluations per gradient
+step dominate the total cost at <span class="math inline">\(d=7\)</span>
+unconstrained parameters.</p></li>
+</ul>
+<p>For the broader study, the result is a useful warning. When conjugacy
+is available, CAVI should be treated as the natural method and the
+generic gradient methods should not be expected to improve on it. When
+conjugacy is unavailable, however, gradient-based ELBO optimisation
+becomes much more important. In that setting, analytical gradients or
+automatic differentiation will be needed; finite-difference gradients
+are unlikely to scale well.</p>
+<h1 id="conclusion">Conclusion</h1>
+<p>This report has used Bayesian linear regression as a checked setting
+for comparing CAVI, gradient ascent, Newton’s method, and BFGS on the
+same variational inference problem. The formulation is an ELBO
+maximisation problem, but the numerical question is broader than
+maximisation alone.</p>
+<p>The main issue is whether a converged variational approximation also
+gives a credible account of posterior uncertainty. Cholesky and
+log-space reparameterisations keep the covariance and Gamma parameters
+valid during optimisation, while the Gibbs sampler and the analytical
+posterior provide references for posterior spread.</p>
+<p>The key conclusion is that optimisation performance and uncertainty
+quality must be read separately. A method can make progress on the ELBO
+while still producing a posterior approximation that is too narrow. That
+distinction is the main lesson of the linear case study and the reason
+posterior standard-deviation ratios are reported alongside convergence
+results.</p>
+<h1 id="app:vb-collapse">VB Posterior Variance Collapse</h1>
+<h2 class="unnumbered" id="why-variance-collapse-happens">Why Variance
+Collapse Happens</h2>
+<p>Variational inference finds <span
+class="math inline">\(q(\bm{\theta})\)</span> by minimising the KL
+divergence from <span class="math inline">\(q\)</span> to the true
+posterior <span class="math inline">\(p(\bm{\theta}\mid\bm{y})\)</span>:
+<span class="math display">\[\mathrm{KL}[q \| p] = \int q(\bm{\theta})
+\log \frac{q(\bm{\theta})}{p(\bm{\theta}\mid\bm{y})} \,
+d\bm{\theta}\]</span> This is the forward, or exclusive, KL divergence.
+Its asymmetry matters for this report. The approximation is penalised
+when it puts mass in places where the true posterior is small, but it is
+not penalised in the same way for missing parts of the posterior tail.
+The resulting approximation tends to stay near the high-density centre
+of the posterior and can be too narrow.</p>
+<p>The mean-field factorisation adds a second restriction. By forcing
+<span class="math inline">\(q(\bm{\beta}, \tau_e) =
+q(\bm{\beta})\,q(\tau_e)\)</span>, it removes any posterior correlation
+between the coefficients and the precision. In this linear model the
+effect is mild, but it is still visible in the standard-deviation
+ratios.</p>
+<h2 class="unnumbered" id="observation">Observation</h2>
+<p>Comparison of the VB posterior against the Gibbs sampler confirms
+this: the mean-field VB approximation systematically underestimates
+posterior variance. The SD ratio (<span
+class="math inline">\(\sigma_{\mathrm{VB}} /
+\sigma_{\mathrm{Gibbs}}\)</span>) is reported for each parameter and
+method in Section <a href="#sec:results" data-reference-type="ref"
+data-reference="sec:results">8</a>. Ratios below 1.0 confirm collapse;
+the magnitude of the shortfall motivates the entropy regularisation
+approach described above.</p>
+<h2 class="unnumbered" id="three-approaches-to-prevent-collapse">Three
+Approaches to Prevent Collapse</h2>
+<h3 class="unnumbered" id="informative-prior-on-tau_e-1">1. Informative
+Prior on <span class="math inline">\(\tau_e\)</span></h3>
+<p>Set non-zero prior hyperparameters <span
+class="math inline">\((\alpha_e, \gamma_e)\)</span> to place a lower
+bound on the posterior variance. A tight prior on <span
+class="math inline">\(\tau_e\)</span> prevents the precision from being
+driven too high, which in turn keeps <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span> from collapsing.</p>
+<p><strong>Mechanism:</strong> The CAVI update for <span
+class="math inline">\(b_e\)</span> is: <span
+class="math display">\[\begin{aligned}
+  b_e &amp;\leftarrow \gamma_e + \frac{1}{2}\left[\|\bm{y} -
+\bm{X}\bm{\mu}_\beta\|^2 +
+\mathrm{tr}(\bm{X}^T\bm{X}\bm{\Sigma}_\beta)\right]
+\end{aligned}\]</span> With <span class="math inline">\(\gamma_e &gt;
+0\)</span>, <span class="math inline">\(b_e\)</span> has a minimum
+floor, bounding <span class="math inline">\(\mathbb{E}[\tau_e] =
+a_e/b_e\)</span> from above.</p>
+<p><strong>Limitation:</strong> Changes the model; requires prior
+elicitation.</p>
+<h3 class="unnumbered" id="variance-lower-bound-constraint">2. Variance
+Lower Bound Constraint</h3>
+<p>After each CAVI update, clip <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span> so its diagonal never
+falls below a minimum threshold <span
+class="math inline">\(\sigma^2_{\min}\)</span>: <span
+class="math display">\[\begin{aligned}
+  \Sigma_{\beta,jj} &amp;\leftarrow \max\!\left(\Sigma_{\beta,jj},\;
+\sigma^2_{\min}\right) \quad \forall j
+\end{aligned}\]</span></p>
+<p>This was already noted in the Constraints section as an optional
+minimum variance constraint. In code:</p>
+<pre><code>Sigma_diag = np.diag(self.Sigma_beta)
+np.fill_diagonal(self.Sigma_beta,
+    np.maximum(Sigma_diag, sigma_min))</code></pre>
+<p><strong>Limitation:</strong> Ad hoc; does not arise from a principled
+objective modification.</p>
+<h3 class="unnumbered" id="entropy-regularisation-of-the-elbo">3.
+Entropy Regularisation of the ELBO</h3>
+<p>Add a regularisation term proportional to the entropy <span
+class="math inline">\(H[q]\)</span> of the variational distribution to
+the objective: <span class="math display">\[\begin{aligned}
+  \mathcal{L}_{\text{reg}}(\bm{\phi}) &amp;= \mathcal{L}(\bm{\phi}) +
+\lambda \cdot H[q(\bm{\beta})]
+\end{aligned}\]</span></p>
+<p>For <span class="math inline">\(q(\bm{\beta}) =
+\mathcal{N}(\bm{\mu}_\beta, \bm{\Sigma}_\beta)\)</span>, the Gaussian
+entropy is: <span class="math display">\[\begin{aligned}
+  H[q(\bm{\beta})] &amp;= \frac{1}{2} \log \det(2\pi e\,
+\bm{\Sigma}_\beta)
+               = \frac{p}{2}(1 + \log 2\pi) +
+\frac{1}{2}\log\det(\bm{\Sigma}_\beta)
+\end{aligned}\]</span></p>
+<p>The regularised gradient with respect to <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span> gains an additional
+term: <span class="math display">\[\begin{aligned}
+  \nabla_{\bm{\Sigma}_\beta} \mathcal{L}_{\text{reg}} &amp;=
+\nabla_{\bm{\Sigma}_\beta} \mathcal{L} + \frac{\lambda}{2}
+\bm{\Sigma}_\beta^{-1}
+\end{aligned}\]</span></p>
+<p>This directly rewards larger <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span>, counteracting the
+collapse tendency. The hyperparameter <span
+class="math inline">\(\lambda &gt; 0\)</span> controls the strength of
+the correction.</p>
+<p>Of the three options, this is the one used in the numerical
+comparison because it modifies the objective directly and can be handled
+by the same gradient-based methods already implemented for this
+report.</p>
+<h2 class="unnumbered" id="selected-approach-for-this-paper">Selected
+Approach for This Paper</h2>
+<p>Entropy regularisation (Approach 3) is implemented and compared
+against the unregularised ELBO. The regularisation parameter <span
+class="math inline">\(\lambda\)</span> is treated as a hyperparameter
+tuned by comparing posterior interval coverage against the Gibbs
+reference. Results are presented as a secondary comparison alongside the
+main method comparison in Section <a href="#sec:results"
+data-reference-type="ref" data-reference="sec:results">8</a>.</p>
+<h1 id="app:cholesky">Cholesky Reparameterisation: Structural Constraint
+Satisfaction</h1>
+<h2 class="unnumbered" id="why-reparameterisation">Why
+Reparameterisation?</h2>
+<p>The gradient-based optimisers require a parameter vector they can
+update freely, but the variational parameters are not all free. In
+particular, <span class="math inline">\(\bm{\Sigma}_\beta\)</span> must
+remain positive definite and <span
+class="math inline">\(a_e,b_e\)</span> must remain positive. Four
+possible strategies are:</p>
+<ol>
+<li><p><strong>Ignore them</strong> — the algorithm crashes when <span
+class="math inline">\(\log|\bm{\Sigma}_\beta|\)</span> becomes undefined
+or <span class="math inline">\(a_e \leq 0\)</span>.</p></li>
+<li><p><strong>Add a penalty term</strong> — introduces a tuning
+parameter and ill-conditioning as <span class="math inline">\(\rho \to
+\infty\)</span>.</p></li>
+<li><p><strong>Project back to the feasible set</strong> after each step
+— costs <span class="math inline">\(O(p^3)\)</span> per iteration and is
+non-differentiable at the boundary, breaking quasi-Newton methods such
+as BFGS.</p></li>
+<li><p><strong>Reparameterise</strong> so the constraints are encoded
+structurally and cannot be violated.</p></li>
+</ol>
+<p>This report uses reparameterisation throughout. It avoids penalty
+tuning, avoids projection steps, and gives the optimisers a smooth
+unconstrained parameter vector.</p>
+<h2 class="unnumbered" id="diagonal-positivity-three-options">Diagonal
+Positivity: Three Options</h2>
+<p>Once <span class="math inline">\(\bm{\Sigma}_\beta =
+\bm{L}\bm{L}^T\)</span> is adopted, a residual constraint remains: the
+diagonal entries <span class="math inline">\(L_{ii}\)</span> must be
+strictly positive for <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span> to be positive definite
+rather than merely positive semidefinite. Three options exist:</p>
+<ol>
+<li><p><strong>Ignore the diagonal constraint</strong> — positivity can
+still be violated, recovering the original problem.</p></li>
+<li><p><strong>Softplus</strong>: <span class="math inline">\(L_{ii} =
+\log(1 + e^{u_i})\)</span> — valid but less standard and numerically
+less clean.</p></li>
+<li><p><strong>Log-space</strong>: <span class="math inline">\(L_{ii} =
+e^{\tilde{\ell}_{ii}}\)</span>, keeping <span
+class="math inline">\(\tilde{\ell}_{ii} \in \mathbb{R}\)</span> fully
+unconstrained — used here.</p></li>
+</ol>
+<p>The parameter count is unchanged at <span
+class="math inline">\(p(p+1)/2\)</span> free entries: <span
+class="math inline">\(p\)</span> log-diagonal entries <span
+class="math inline">\(\tilde{\ell}_{ii}\)</span> and <span
+class="math inline">\(p(p-1)/2\)</span> unconstrained off-diagonal
+entries <span class="math inline">\(\ell_{ij}\)</span>, <span
+class="math inline">\(i &gt; j\)</span>.</p>
+<h2 class="unnumbered" id="the-problem-with-direct-optimisation">The
+Problem with Direct Optimisation</h2>
+<p>The covariance matrix <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span> must satisfy <span
+class="math inline">\(\bm{\Sigma}_\beta \succ 0\)</span> (symmetric
+positive definite) at every iteration. If the optimiser updates <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span> directly, a gradient
+step of the form <span class="math display">\[\begin{aligned}
+  \bm{\Sigma}_\beta^{(t+1)} &amp;= \bm{\Sigma}_\beta^{(t)} + \alpha_t
+\,\nabla_{\bm{\Sigma}_\beta}\mathcal{L}
+\end{aligned}\]</span> can produce a matrix that is <em>not</em>
+positive definite. Standard gradient-based methods operate on
+unconstrained Euclidean space and have no built-in mechanism to respect
+the positive-definiteness constraint — the constraint is simply violated
+as a by-product of the update, leading to numerical failure (negative
+variances, failed Cholesky in later steps, NaN in the ELBO).</p>
+<h2 class="unnumbered"
+id="the-cholesky-solution-structural-guarantee">The Cholesky Solution:
+Structural Guarantee</h2>
+<p>Cholesky decomposition eliminates the constraint by parameterising
+<span class="math inline">\(\bm{\Sigma}_\beta\)</span> in terms of a
+lower-triangular factor <span class="math inline">\(\bm{L}\)</span>:
+<span class="math display">\[\begin{aligned}
+  \bm{\Sigma}_\beta &amp;= \bm{L}\bm{L}^T, \qquad L_{ii} &gt; 0 \quad
+\forall i
+\end{aligned}\]</span></p>
+<p>The useful property is simple: any lower-triangular matrix <span
+class="math inline">\(\bm{L}\)</span> with strictly positive diagonal
+entries produces a valid symmetric positive definite matrix:</p>
+<ul>
+<li><p><strong>Symmetry:</strong> <span
+class="math inline">\((\bm{L}\bm{L}^T)^T = (\bm{L}^T)^T\bm{L}^T =
+\bm{L}\bm{L}^T\)</span> — automatically symmetric.</p></li>
+<li><p><strong>Positive definiteness:</strong> For any non-zero <span
+class="math inline">\(\bm{v} \in \mathbb{R}^p\)</span>, <span
+class="math display">\[\begin{aligned}
+    \bm{v}^T \bm{L}\bm{L}^T \bm{v} = \|\bm{L}^T\bm{v}\|^2 &gt; 0
+  
+\end{aligned}\]</span> provided <span
+class="math inline">\(\bm{L}^T\)</span> has full column rank, which
+holds whenever all <span class="math inline">\(L_{ii} &gt; 0\)</span>
+(since <span class="math inline">\(\bm{L}\)</span> is lower triangular,
+its rank equals the number of non-zero diagonal entries).</p></li>
+</ul>
+<p>Updating <span class="math inline">\(\bm{L}\)</span> therefore avoids
+the main failure of direct covariance updates. The constraint is not
+repaired after the fact by a penalty or projection; it is built into the
+parameterisation.</p>
+<h2 class="unnumbered"
+id="unconstrained-optimisation-over-bmell">Unconstrained Optimisation
+Over <span class="math inline">\(\bm{\ell}\)</span></h2>
+<p>The remaining difficulty is that <span class="math inline">\(L_{ii}
+&gt; 0\)</span> is still an inequality constraint. This is resolved by
+log-parameterising the diagonal: <span
+class="math display">\[\begin{aligned}
+  L_{ii} &amp;= e^{\ell_{ii}}, \quad \ell_{ii} \in \mathbb{R}\qquad
+\text{(diagonal)}\\
+  L_{ij} &amp;= \ell_{ij}, \quad \ell_{ij} \in \mathbb{R}\qquad
+\text{(lower off-diagonal)}
+\end{aligned}\]</span></p>
+<p>Since <span class="math inline">\(e^{\ell_{ii}} &gt; 0\)</span> for
+all <span class="math inline">\(\ell_{ii} \in \mathbb{R}\)</span>, the
+optimisation is now over a <em>fully unconstrained</em> parameter vector
+<span class="math inline">\(\bm{\ell} \in
+\mathbb{R}^{p(p+1)/2}\)</span>. No projection, no clipping, no penalty —
+any point in <span class="math inline">\(\mathbb{R}^{p(p+1)/2}\)</span>
+maps to a valid <span class="math inline">\(\bm{L}\)</span>, and hence a
+valid <span class="math inline">\(\bm{\Sigma}_\beta =
+\bm{L}\bm{L}^T\)</span>.</p>
+<h2 class="unnumbered"
+id="analogy-with-log-space-parameterisation">Analogy with Log-Space
+Parameterisation</h2>
+<p>This is the same idea used for the Gamma parameters <span
+class="math inline">\(a_e, b_e &gt; 0\)</span>: instead of constraining
+<span class="math inline">\(a_e &gt; 0\)</span> directly, we optimise
+over unconstrained <span class="math inline">\(\eta_a = \log a_e \in
+\mathbb{R}\)</span> and recover <span class="math inline">\(a_e =
+e^{\eta_a}\)</span>, which is always positive. Cholesky + log-diagonal
+does the same thing for the cone of symmetric positive definite
+matrices: it provides a smooth bijection between unconstrained Euclidean
+space and the constraint set, so standard optimisation machinery applies
+without modification.</p>
+<h1 id="app:python-code">Python Implementation Structure</h1>
+<h2 class="unnumbered" id="computational-complexity">Computational
+Complexity</h2>
+<ul>
+<li><p>Gradient computation: <span
+class="math inline">\(O(np^2)\)</span> per evaluation (dominated by
+matrix operations)</p></li>
+<li><p>Hessian computation: <span class="math inline">\(O(np^2 +
+d^3)\)</span> for Newton’s method</p></li>
+<li><p>Must handle special functions: digamma <span
+class="math inline">\(\psi(\cdot)\)</span>, trigamma <span
+class="math inline">\(\psi&#39;(\cdot)\)</span> for the Gamma
+distribution terms in the ELBO</p></li>
+</ul>
+<p>The implementation follows a top-down sequential process across five
+stages. Each stage depends on the outputs of the previous one and saves
+its results to parquet before proceeding, so that any stage can be
+re-run independently without repeating expensive computation.</p>
+<pre><code># Stage 1: Data generation
+#    - generate_linear_case  -&gt;  data/linear_data.parquet
+#                                figs/linear_data_scatter.png
+
+# Stage 2: ELBO evaluation
+#    - unpack unconstrained parameters (mu_beta, L_chol, log_ae, log_be)
+#    - reconstruct Sigma_beta via Cholesky: Sigma = L @ L.T
+#    - reconstruct a_e, b_e via exp transforms
+#    - evaluate standard or entropy-regularised ELBO
+#    - verify analytical gradient against finite differences (&lt;= 1e-5)
+#                                figs/linear_elbo_gradient_check.png
+#                                figs/linear_elbo_landscape.png
+#                                results/tables/linear_gradient_check.tex
+
+# Stage 3: Optimisation methods
+#    - run_cavi
+#    - run_gradient_ascent    (step-size history recorded)
+#    - run_newton             (Hessian condition number tracked)
+#    - run_bfgs               (via scipy.optimize.minimize)
+#                            -&gt;  data/linear_opt.parquet
+#                                figs/linear_elbo_convergence.png
+#                                figs/linear_gradient_stepsize.png
+#                                figs/linear_newton_condition.png
+
+# Stage 4: Reference sampler
+#    - run_gibbs_sampler      (3 chains, configurable burn-in)
+#                            -&gt;  data/linear_gibbs.parquet
+#                                figs/linear_gibbs_trace_{beta0,beta1,taue}.png
+#                                figs/linear_gibbs_acf_{beta0,beta1,taue}.png
+#                                figs/linear_gibbs_rhat.png
+
+# Stage 5: Diagnostics and comparison
+#    - final ELBO per method
+#    - number of iterations / runtime / convergence status
+#    - posterior mean error:  |mu_VB - mu_Gibbs|
+#    - posterior SD ratio:    sigma_VB / sigma_Gibbs  (variance collapse)
+#    - VB vs Gibbs overlay:   figs/linear_comparison_{beta0,beta1,taue}.png
+#    - VB vs Gibbs density:   figs/linear_vb_gibbs_{beta0,beta1,taue}.png
+#                            -&gt;  figs/linear_sd_ratios.png
+#                                figs/linear_mean_errors.png
+#                                results/tables/linear_performance.tex
+#                                results/tables/linear_posterior_summary.tex</code></pre>
+<p>The implementation uses three files. <code>linear_run.ipynb</code> is
+the development environment: functions are written and debugged
+interactively in the notebook first, then migrated to the shared
+<code>.py</code> files once they are working correctly. This keeps the
+<code>.py</code> files as stable, tested code while the notebook serves
+as the exploratory workspace.</p>
+<h2 class="unnumbered" id="notebook-linear_run.ipynb">Notebook:
+<code>linear_run.ipynb</code></h2>
+<p>New functions are developed and debugged here cell by cell before
+being committed to the <code>.py</code> files. The notebook imports from
+<code>vb_algorithms_py</code> and <code>vb_utils_py</code> once a
+function has been migrated, so it gradually thins to a pure runner. Each
+of the five stage blocks saves its outputs to parquet before proceeding,
+so any stage can be re-run independently without repeating earlier
+computation.</p>
+<ol>
+<li><p><strong>Data generation</strong> — generates and saves
+<code>linear_data.parquet</code>; produces
+<code>linear_data_scatter.png</code> (1 figure).</p></li>
+<li><p><strong>ELBO evaluation</strong> — verifies analytical gradient
+against finite differences at the CAVI optimum; produces gradient-check
+bar and ELBO landscape slice (2 figures). Must pass before any optimiser
+is run.</p></li>
+<li><p><strong>Optimisation methods</strong> — runs CAVI, gradient
+ascent, Newton, and BFGS; saves <code>linear_opt.parquet</code>;
+produces ELBO convergence curves, step-size history, and Hessian
+condition-number history (3 figures).</p></li>
+<li><p><strong>Reference sampler</strong> — runs Gibbs sampler (3
+chains); saves <code>linear_gibbs.parquet</code>; produces trace plots,
+ACF plots, <span class="math inline">\(\hat{R}\)</span> bar, and
+per-component distribution plots (7 figures).</p></li>
+<li><p><strong>Diagnostics and comparison</strong> — loads all parquet
+files; produces VB/Gibbs overlay plots, SD-ratio bar, and posterior
+mean-error bar; renders the three <code>tblr</code> tables to
+<code>results/tables/</code> and displays inline PNG previews (8
+figures, 3 tables).</p></li>
+</ol>
+<p>Total outputs for the linear case: <strong>21 figures</strong> saved
+to <code>figs/</code> and <strong>3 tables</strong> saved to
+<code>results/tables/</code>.</p>
+<h2 class="unnumbered" id="file-vb_algorithms_py.py">File:
+<code>vb_algorithms_py.py</code></h2>
+<p>Contains all algorithm logic. Functions are migrated here from the
+notebook once verified.</p>
+<ul>
+<li><p><strong>ELBO evaluation</strong> — unpacks unconstrained
+parameter vector, reconstructs <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span> via Cholesky
+lower-triangular factor, reconstructs <span
+class="math inline">\(a_e\)</span> and <span
+class="math inline">\(b_e\)</span> via exp transforms, evaluates
+standard or entropy-regularised ELBO.</p></li>
+<li><p><strong>Analytical gradient</strong> — computes <span
+class="math inline">\(\nabla_{\bm{\xi}} \mathcal{L}\)</span> with
+respect to all unconstrained parameters; verified against finite
+differences to relative error <span class="math inline">\(\leq
+10^{-5}\)</span>.</p></li>
+<li><p><strong>Hessian</strong> — computes the Hessian of the ELBO for
+Newton’s method; condition number tracked per iteration.</p></li>
+<li><p><strong>CAVI baseline</strong> — coordinate ascent updates for
+<span class="math inline">\(q(\bm{\beta})\)</span> and <span
+class="math inline">\(q(\tau_e)\)</span>.</p></li>
+<li><p><strong>Gradient ascent</strong> — fixed or line-search step
+size; step-size history recorded.</p></li>
+<li><p><strong>Newton’s method</strong> — Hessian-based updates; falls
+back on gradient step if Hessian indefinite.</p></li>
+<li><p><strong>BFGS</strong> — quasi-Newton method via
+<code>scipy.optimize.minimize</code>.</p></li>
+<li><p><strong>Gibbs sampler</strong> — blocked sampler for <span
+class="math inline">\(\bm{\beta} \mid \tau_e, \bm{y}\)</span> and <span
+class="math inline">\(\tau_e \mid \bm{\beta}, \bm{y}\)</span>; multiple
+chains with configurable burn-in.</p></li>
+</ul>
+<h2 class="unnumbered" id="file-vb_utils_py.py">File:
+<code>vb_utils_py.py</code></h2>
+<p>Contains data generation, plotting, parquet I/O, and table rendering
+utilities. Functions are migrated here from the notebook once
+verified.</p>
+<ul>
+<li><p><strong>Data generation</strong> —
+<code>generate_linear_case</code>: generates design matrix <span
+class="math inline">\(\bm{X}\)</span>, response <span
+class="math inline">\(\bm{y}\)</span>, and true parameter values for the
+linear Bayesian regression test case.</p></li>
+<li><p><strong>Parquet I/O</strong> — <code>save_results_parquet</code>:
+writes numerical results to <code>results/data/*.parquet</code> as the
+source of truth; <code>load_results_parquet</code>: reloads without
+rerunning computation.</p></li>
+<li><p><strong>Table rendering</strong> — <code>render_table_tex</code>:
+reads a polars DataFrame, formats values, writes a
+<code>tabularray</code> (<code>tblr</code>) snippet to
+<code>results/tables/*.tex</code> for <code>\input{}</code> inclusion in
+the report; also compiles a standalone preview PNG for inline notebook
+display.</p></li>
+<li><p><strong>Plot helpers</strong> — <code>save_fig</code>: saves to
+<code>figs/</code> with consistent style; helpers for scatter plots, KDE
+overlays, bar charts, ACF, trace plots, ELBO curves, step-size
+histories, Hessian condition-number histories.</p></li>
+</ul>
+<h1 id="app:entropy">Closed-Form Entropy Derivations</h1>
+<p>The ELBO decomposes as <span class="math inline">\(\mathcal{L} =
+\mathbb{E}_q[\log p(\bm{y},\bm{\theta})] + H[q]\)</span>, where the
+entropy <span class="math inline">\(H[q] = -\mathbb{E}_q[\log
+q(\bm{\theta})]\)</span> factors under the mean-field assumption into
+one term per variational factor. Both factors in this model belong to
+the exponential family, so each entropy has a closed-form expression
+derived below.</p>
+<h2 id="gaussian-entropy-hqbmbeta">Gaussian Entropy: <span
+class="math inline">\(H[q(\bm{\beta})]\)</span></h2>
+<p>The general <span class="math inline">\(p\)</span>-dimensional
+multivariate Gaussian density for a random vector <span
+class="math inline">\(\bm{x}\in\mathbb{R}^p\)</span> with mean <span
+class="math inline">\(\bm{\mu}\)</span> and covariance <span
+class="math inline">\(\Sigma\)</span> is <span
+class="math display">\[\begin{aligned}
+  \mathcal{N}(\bm{x};\bm{\mu},\Sigma)
+    &amp;= \frac{1}{(2\pi)^{p/2}|\Sigma|^{1/2}}
+       \exp\!\Bigl(-\tfrac{1}{2}(\bm{x}-\bm{\mu})^{\!T}
+                   \Sigma^{-1}(\bm{x}-\bm{\mu})\Bigr).
+\end{aligned}\]</span> The variational factor for the regression
+coefficients is <span class="math inline">\(q(\bm{\beta}) =
+\mathcal{N}(\bm{\mu}_\beta, \Sigma_\beta)\)</span>, so substituting
+<span class="math inline">\(\bm{x}=\bm{\beta}\)</span>, <span
+class="math inline">\(\bm{\mu}=\bm{\mu}_\beta\)</span>, <span
+class="math inline">\(\Sigma=\Sigma_\beta\)</span>: <span
+class="math display">\[\begin{aligned}
+  q(\bm{\beta})
+    &amp;= \frac{1}{(2\pi)^{p/2}|\Sigma_\beta|^{1/2}}
+       \exp\!\Bigl(-\tfrac{1}{2}(\bm{\beta}-\bm{\mu}_\beta)^{\!T}
+                   \Sigma_\beta^{-1}(\bm{\beta}-\bm{\mu}_\beta)\Bigr).
+\end{aligned}\]</span> Taking the natural logarithm of both sides: <span
+class="math display">\[\begin{aligned}
+  \log q(\bm{\beta})
+    &amp;= \log\frac{1}{(2\pi)^{p/2}|\Sigma_\beta|^{1/2}}
+       -
+\tfrac{1}{2}(\bm{\beta}-\bm{\mu}_\beta)^{\!T}\Sigma_\beta^{-1}(\bm{\beta}-\bm{\mu}_\beta)
+       \notag\\
+    &amp;= -\tfrac{p}{2}\log(2\pi)
+       - \tfrac{1}{2}\log|\Sigma_\beta|
+       -
+\tfrac{1}{2}(\bm{\beta}-\bm{\mu}_\beta)^{\!T}\Sigma_\beta^{-1}(\bm{\beta}-\bm{\mu}_\beta).
+\end{aligned}\]</span> Taking the expectation under <span
+class="math inline">\(q(\bm{\beta})\)</span>, the first two terms are
+constants and pass through unchanged. For the quadratic term, the scalar
+<span class="math inline">\(\bm{v}^T A \bm{v} =
+\mathrm{tr}(A\bm{v}\bm{v}^T)\)</span> for any vector <span
+class="math inline">\(\bm{v}\)</span> and matrix <span
+class="math inline">\(A\)</span>, so <span
+class="math display">\[\begin{aligned}
+  \mathbb{E}_q\bigl[(\bm{\beta}-\bm{\mu}_\beta)^{\!T}\Sigma_\beta^{-1}(\bm{\beta}-\bm{\mu}_\beta)\bigr]
+    &amp;= \mathbb{E}_q\bigl[\mathrm{tr}\bigl(\Sigma_\beta^{-1}
+         (\bm{\beta}-\bm{\mu}_\beta)(\bm{\beta}-\bm{\mu}_\beta)^{\!T}\bigr)\bigr]
+\notag\\
+    &amp;= \mathrm{tr}\bigl(\Sigma_\beta^{-1}
+         \,\mathbb{E}_q\bigl[(\bm{\beta}-\bm{\mu}_\beta)(\bm{\beta}-\bm{\mu}_\beta)^{\!T}\bigr]\bigr)
+       \notag\\
+    &amp;= \mathrm{tr}(\Sigma_\beta^{-1}\Sigma_\beta) \notag\\
+    &amp;= \mathrm{tr}(I_p) = p,
+\end{aligned}\]</span> where the second equality uses linearity of
+expectation inside the trace, and the third uses the definition of <span
+class="math inline">\(\Sigma_\beta\)</span> as the covariance of <span
+class="math inline">\(q(\bm{\beta})\)</span>. Negating the full
+expectation gives the entropy: <span
+class="math display">\[\begin{aligned}
+  H[q(\bm{\beta})]
+    &amp;= -\mathbb{E}_q[\log q(\bm{\beta})] \notag\\
+    &amp;= \tfrac{p}{2}\log(2\pi)
+       + \tfrac{1}{2}\log|\Sigma_\beta|
+       + \tfrac{1}{2}p \notag\\
+    &amp;= \tfrac{1}{2}\log|\Sigma_\beta|
+       + \tfrac{p}{2}\bigl(1 + \log 2\pi\bigr).
+\end{aligned}\]</span> In code this is computed as</p>
+<pre><code>sign, logdet = np.linalg.slogdet(Sigma)          # log|Sigma|
+neg_lq_beta  = 0.5*logdet + 0.5*p*(1 + np.log(2*np.pi))</code></pre>
+<p>where <code>slogdet</code> returns the sign and log-magnitude of the
+determinant stably for near-singular matrices.</p>
+<h2 id="gamma-entropy-hqtau_e">Gamma Entropy: <span
+class="math inline">\(H[q(\tau_e)]\)</span></h2>
+<p>The variational factor for the noise precision is <span
+class="math inline">\(q(\tau_e) = \mathrm{Gamma}(a_e, b_e)\)</span>
+under the rate parameterisation, so the density is <span
+class="math inline">\(q(\tau_e) =
+b_e^{a_e}\,\tau_e^{a_e-1}\,e^{-b_e\tau_e}/\Gamma(a_e)\)</span> and its
+log is <span class="math display">\[\begin{aligned}
+  \log q(\tau_e)
+    &amp;= a_e\log b_e - \log\Gamma(a_e)
+       + (a_e-1)\log\tau_e - b_e\tau_e.
+\end{aligned}\]</span> The required expectations under <span
+class="math inline">\(q(\tau_e)\)</span> are standard results: <span
+class="math display">\[\begin{aligned}
+  \mathbb{E}[\tau_e]      &amp;= \frac{a_e}{b_e}, \qquad
+  \mathbb{E}[\log\tau_e] = \psi(a_e) - \log b_e,
+\end{aligned}\]</span> where <span
+class="math inline">\(\psi(\cdot)\)</span> is the digamma function.
+Substituting: <span class="math display">\[\begin{aligned}
+  \mathbb{E}_q[\log q(\tau_e)]
+    &amp;= a_e\log b_e - \log\Gamma(a_e)
+       + (a_e-1)\bigl(\psi(a_e)-\log b_e\bigr)
+       - b_e\cdot\frac{a_e}{b_e} \notag\\
+    &amp;= a_e\log b_e - \log\Gamma(a_e)
+       + (a_e-1)\psi(a_e) - (a_e-1)\log b_e
+       - a_e \notag\\
+    &amp;= \log b_e - \log\Gamma(a_e)
+       + (a_e-1)\psi(a_e) - a_e.
+\end{aligned}\]</span> Negating to obtain the entropy: <span
+class="math display">\[\begin{aligned}
+  H[q(\tau_e)]
+    &amp;= a_e - \log b_e + \ln\Gamma(a_e) + (1-a_e)\psi(a_e).
+\end{aligned}\]</span> In code:</p>
+<pre><code>neg_lq_tau = a_e - np.log(b_e) + gammaln(a_e) + (1 - a_e)*digamma(a_e)</code></pre>
+<p>where <code>gammaln</code> and <code>digamma</code> are imported from
+<code>scipy.special</code>.</p>
+<section id="footnotes" class="footnotes footnotes-end-of-document"
+role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>See <a href="#app:vb-collapse" data-reference-type="ref"
+data-reference="app:vb-collapse">10</a> for the full mechanistic
+explanation.<a href="#fnref1" class="footnote-back"
+role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>This structural constraint is satisfied automatically
+via Cholesky reparameterisation; see <a href="#app:cholesky"
+data-reference-type="ref" data-reference="app:cholesky">11</a>.<a
+href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p>Denoted <span class="math inline">\(\Phi\)</span> and
+called the <em>regressor matrix</em> in lectures (Prof. R. S. Smith,
+ENEL445 2026).<a href="#fnref3" class="footnote-back"
+role="doc-backlink">↩︎</a></p></li>
+<li id="fn4"><p>Denoted <span class="math inline">\(\theta\)</span> in
+lectures.<a href="#fnref4" class="footnote-back"
+role="doc-backlink">↩︎</a></p></li>
+<li id="fn5"><p>Denoted <span class="math inline">\(d\)</span> in
+lectures.<a href="#fnref5" class="footnote-back"
+role="doc-backlink">↩︎</a></p></li>
+<li id="fn6"><p>Monotonic ELBO increase means the objective is
+non-decreasing across iterations: <span
+class="math inline">\(\mathcal{L}^{(t+1)} \geq
+\mathcal{L}^{(t)}\)</span>. In CAVI, each coordinate update maximises
+the ELBO with respect to one variational factor while holding the others
+fixed, so each step cannot decrease the ELBO.<a href="#fnref6"
+class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+</body>
+</html>

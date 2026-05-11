@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="David Ewing (82171165)" />
+  <meta name="dcterms.date" content="2026-05-11" />
+  <title> Case Study 4 — Hierarchical Bayesian Linear Regression: Gradient-Based Optimisation and Posterior Variance Collapse </title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    div.abstract {
+      margin: 2em 2em 2em 2em;
+      text-align: left;
+      font-size: 85%;
+    }
+    div.abstract-title {
+      font-weight: bold;
+      text-align: center;
+      padding: 0;
+      margin-bottom: 0.5em;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <script
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"
+  type="text/javascript"></script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title"> Case Study 4 — Hierarchical Bayesian Linear
+Regression:<br />
+Gradient-Based Optimisation and Posterior Variance Collapse </h1>
+<p class="author">David Ewing (82171165)</p>
+<p class="date">11 May 2026</p>
+<div class="abstract">
+<div class="abstract-title">Abstract</div>
+<p>This report applies the gradient-based optimisation methods from
+ENEL445 to variational inference in hierarchical Bayesian linear
+regression. Extending the simple Gaussian regression setting, this model
+introduces <span class="math inline">\(J=5\)</span> group-level random
+effects <span class="math inline">\(u_j \sim
+\mathcal{N}(0,\tau_u^{-1})\)</span> alongside the noise precision <span
+class="math inline">\(\tau_e\)</span> as additional latent variables
+with Gamma priors. The Evidence Lower Bound (ELBO) for this conjugate
+model admits closed-form CAVI updates, but also serves as a smooth
+objective for gradient-based methods, with <span
+class="math inline">\(D=19\)</span> unconstrained parameters.</p>
+<p>Four optimisation methods are applied to maximise the ELBO:
+Coordinate Ascent Variational Inference (CAVI), gradient ascent with
+Armijo backtracking, Newton’s method with regularised finite-difference
+Hessian, and BFGS with Wolfe conditions. The variational family is a
+mean-field product <span class="math inline">\(q(\bm{\beta})\prod_j
+q(u_j) \cdot q(\tau_e)\cdot q(\tau_u)\)</span> with Gaussian random
+effects and Gamma precision approximations, and a Cholesky
+reparameterisation for <span
+class="math inline">\(\bm{\Sigma}_\beta\)</span>.</p>
+<p>The reference posterior is obtained from a conjugate blocked Gibbs
+sampler using 3 chains of 5000 iterations (500 burn-in each). A striking
+finding is severe posterior variance collapse for <span
+class="math inline">\(\beta_0\)</span> (SD ratio <span
+class="math inline">\(\approx 0.13\)</span> for CAVI and BFGS), driven
+by the mean-field factorisation absorbing shared group-level variance
+into the random effects <span class="math inline">\(u_j\)</span> rather
+than the population intercept. Newton’s method fails to converge to the
+correct optimum, highlighting the sensitivity of second-order methods to
+poor Hessian conditioning in high-dimensional hierarchical models.</p>
+</div>
+</header>
+<h1 id="introduction">Introduction</h1>
+<p>Hierarchical Bayesian linear regression is the natural extension of
+the simple Gaussian regression baseline (Case Study 1) to settings with
+group structure. It provides the first non-trivial test of whether
+gradient-based VI methods can navigate a substantially
+higher-dimensional posterior whilst competing with the conjugate Gibbs
+reference, and whether <em>posterior variance collapse</em> — a known
+failure mode of mean-field VI — manifests and can be detected.</p>
+<p>Bayesian inference provides principled uncertainty quantification but
+requires computing intractable posterior distributions. For most
+real-world models, the posterior integral, <span
+class="math display">\[p(\bm{\theta} \mid \bm{y}) = \frac{p(\bm{y} \mid
+\bm{\theta})\,p(\bm{\theta})}
+    {\displaystyle\int p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})\,
+d\bm{\theta}},\]</span> is intractable. In this case study, <span
+class="math inline">\(\bm{\theta} =
+(\bm{\beta},\,\mathbf{u},\,\tau_e,\,\tau_u)\)</span> — the
+population-level regression coefficients, the <span
+class="math inline">\(J\)</span> group-level random effects, the
+observation noise precision, and the random-effect precision — so the
+posterior of interest is <span
+class="math display">\[p(\bm{\beta},\mathbf{u},\tau_e,\tau_u \mid
+\mathbf{y})
+    \propto p(\mathbf{y}\mid\bm{\beta},\mathbf{u},\tau_e)\,
+             p(\bm{\beta})\,p(\mathbf{u}\mid\tau_u)\,
+             p(\tau_e)\,p(\tau_u).\]</span> The substitution <span
+class="math inline">\(\bm{\theta} =
+(\bm{\beta},\mathbf{u},\tau_e,\tau_u)\)</span> is specific to this case
+study; other case studies define <span
+class="math inline">\(\bm{\theta}\)</span> according to their own model
+parameters. Unlike Case Study 1, this posterior does not factorise into
+a product of independent conjugate terms; the random effects <span
+class="math inline">\(u_j\)</span> and the precision <span
+class="math inline">\(\tau_u\)</span> are tightly coupled, making direct
+computation challenging even for Gaussian likelihoods.</p>
+<p>Variational Inference (VI) converts this integration into
+optimisation by finding a tractable approximate posterior <span
+class="math inline">\(q\)</span> that maximises the Evidence Lower Bound
+(ELBO). This report investigates how the gradient-based methods from
+ENEL445 perform on this higher-dimensional problem, compared to the
+conjugate blocked Gibbs sampler as the reference.</p>
+<p>A well-known failure mode of mean-field VI is <em>posterior variance
+collapse</em>: the optimised approximation <span
+class="math inline">\(q(\bm{\theta})\)</span> is systematically
+overconfident, underestimating posterior uncertainty. This arises
+because the mean-field factorisation discards posterior
+<em>correlations</em> between blocks — here, between the intercept <span
+class="math inline">\(\beta_0\)</span> and the group means <span
+class="math inline">\(u_j\)</span> — forcing each factor to concentrate
+more tightly than the true marginal. <a href="#fn1" class="footnote-ref"
+id="fnref1" role="doc-noteref"><sup>1</sup></a></p>
+<p>This report applies four optimisation methods — CAVI, gradient
+ascent, Newton’s method, and BFGS — to the ELBO and compares their
+convergence behaviour, computational cost, and posterior quality. Of
+particular interest is whether the SD ratio <span
+class="math inline">\(\sigma_{\mathrm{VI}}/\sigma_{\mathrm{Gibbs}}\)</span>
+departs substantially from unity, signalling collapse, and which
+parameters are most affected.</p>
+<p>Throughout all gradient-based methods, the variational covariance
+<span class="math inline">\(\bm{\Sigma}_\beta\)</span> must remain
+symmetric positive definite at every iteration. <a href="#fn2"
+class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a></p>
+<p>The classical foundation for the variational framework used here is
+least-squares regression, as developed in lectures by Prof. Roy S. Smith
+(Erskine Visiting Fellow, ETH Zürich, ENEL445 2026). The design matrix
+<span class="math inline">\(\bm{X}\)</span> <a href="#fn3"
+class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> and
+coefficient vector <span class="math inline">\(\bm{\beta}\)</span> <a
+href="#fn4" class="footnote-ref" id="fnref4"
+role="doc-noteref"><sup>4</sup></a> follow the standard over-determined
+formulation. The noise model adopted here — errors on <span
+class="math inline">\(\bm{y}\)</span> only, with noise precision <span
+class="math inline">\(\tau_e\)</span> — corresponds to the
+equation-error form; this is an explicit modelling assumption rather
+than a derived result.</p>
+<h2 id="bayesian-regression-model">Bayesian Regression Model</h2>
+<p>The hierarchical Bayesian linear regression model is <span
+class="math display">\[\begin{aligned}
+y_{ij} \mid \bm{\beta}, u_j, \tau_e
+  &amp;\sim \mathcal{N}\!\bigl(\mathbf{x}_{ij}^T\bm{\beta} + u_j,\;
+\tau_e^{-1}\bigr),
+  \quad i=1,\ldots,n_j,\; j=1,\ldots,J, \\
+u_j \mid \tau_u &amp;\sim \mathcal{N}(0,\; \tau_u^{-1}), \\
+\bm{\beta} &amp;\sim \mathcal{N}(\bm{0},\; \lambda^{-1}\bm{I}_p), \quad
+\lambda=0.1, \\
+\tau_e &amp;\sim \mathrm{Gamma}(\alpha_e,\; \gamma_e), \quad
+\alpha_e=\gamma_e=1, \\
+\tau_u &amp;\sim \mathrm{Gamma}(\alpha_u,\; \gamma_u), \quad
+\alpha_u=\gamma_u=1.
+\end{aligned}\]</span> Here <span class="math inline">\(\bm{X}\)</span>
+is the design matrix with rows <span
+class="math inline">\(\mathbf{x}_{ij}^T = (1, x_{ij})\)</span>, <span
+class="math inline">\(\mathbf{y}\)</span> is the response vector, <span
+class="math inline">\(\bm{\beta}\)</span> is the fixed-effect
+coefficient vector, <span class="math inline">\(u_j\)</span> is the
+group-<span class="math inline">\(j\)</span> random effect, and <span
+class="math inline">\(\tau_e\)</span>, <span
+class="math inline">\(\tau_u\)</span> are the noise and random-effect
+precisions respectively.</p>
+<h2 id="mean-field-variational-approximation">Mean-Field Variational
+Approximation</h2>
+<p>The mean-field variational family factorises as <span
+class="math display">\[\begin{aligned}
+q(\bm{\beta},\mathbf{u},\tau_e,\tau_u)
+  &amp;= q(\bm{\beta})\;\prod_{j=1}^{J} q(u_j)\;\cdot\;
+q(\tau_e)\;\cdot\; q(\tau_u),
+\end{aligned}\]</span> with <span class="math display">\[\begin{aligned}
+q(\bm{\beta}) &amp;= \mathcal{N}(\bm{\mu}_\beta,\,\bm{\Sigma}_\beta), \\
+q(u_j) &amp;= \mathcal{N}(m_j,\, v_j), \quad j=1,\ldots,J, \\
+q(\tau_e) &amp;= \mathrm{Gamma}(a_e,\, b_e), \\
+q(\tau_u) &amp;= \mathrm{Gamma}(a_u,\, b_u).
+\end{aligned}\]</span> The variational parameters are <span
+class="math inline">\(\bm{\theta} = (\bm{\mu}_\beta, \bm{L},
+m_1,\ldots,m_J, \log v_1,\ldots,\log v_J,
+\log a_e, \log b_e, \log a_u, \log b_u)\)</span>, where <span
+class="math inline">\(\bm{\Sigma}_\beta = \bm{L}\bm{L}^T\)</span> and
+<span class="math inline">\(\bm{L}\)</span> is lower-triangular with
+positive diagonal, giving <span class="math inline">\(D = p + p(p+1)/2 +
+J + J + 4 = 2 + 3 + 5 + 5 + 4 = 19\)</span> unconstrained parameters for
+<span class="math inline">\(p=2\)</span>, <span
+class="math inline">\(J=5\)</span>.</p>
+<h2 id="key-notation">Key Notation</h2>
+<div class="center">
+<div class="tabular">
+<p><span>@ll@</span> Symbol &amp; Meaning<br />
+<br />
+<span class="math inline">\(\bm{X}\)</span> &amp; Design matrix (<span
+class="math inline">\(N \times p\)</span>), rows <span
+class="math inline">\(\mathbf{x}_{ij}^T\)</span><br />
+<span class="math inline">\(\mathbf{y}\)</span> &amp; Continuous
+response vector<br />
+<span class="math inline">\(\bm{\beta}\)</span> &amp; Fixed-effect
+coefficient vector<br />
+<span class="math inline">\(u_j\)</span> &amp; Group random effect for
+group <span class="math inline">\(j\)</span><br />
+<span class="math inline">\(\tau_e, \tau_u\)</span> &amp; Noise and
+random-effect precision<br />
+<span class="math inline">\(N, J, p\)</span> &amp; Total observations,
+groups, predictors<br />
+<br />
+<span class="math inline">\(q(\bm{\beta})\)</span> &amp; Variational
+Gaussian for fixed effects<br />
+<span class="math inline">\(\bm{\mu}_\beta, \bm{\Sigma}_\beta\)</span>
+&amp; Mean and covariance of <span
+class="math inline">\(q(\bm{\beta})\)</span><br />
+<span class="math inline">\(\bm{L}\)</span> &amp; Cholesky factor, <span
+class="math inline">\(\bm{\Sigma}_\beta=\bm{L}\bm{L}^T\)</span><br />
+<span class="math inline">\(m_j, v_j\)</span> &amp; Mean and variance of
+<span class="math inline">\(q(u_j)\)</span><br />
+<span class="math inline">\(a_e, b_e\)</span> &amp; Gamma parameters of
+<span class="math inline">\(q(\tau_e)\)</span><br />
+<span class="math inline">\(a_u, b_u\)</span> &amp; Gamma parameters of
+<span class="math inline">\(q(\tau_u)\)</span><br />
+<span class="math inline">\(\mathcal{L}(\bm{\theta})\)</span> &amp; ELBO
+(maximised)<br />
+<br />
+<span class="math inline">\(\bm{L}\)</span> &amp; Lower-triangular
+Cholesky factor, <span
+class="math inline">\(\bm{\Sigma}_\beta=\bm{L}\bm{L}^T\)</span><br />
+<span class="math inline">\(\tilde{\ell}_{ii}\)</span> &amp;
+Log-diagonal entry, <span
+class="math inline">\(L_{ii}=e^{\tilde{\ell}_{ii}}\)</span> (ensures
+<span class="math inline">\(L_{ii}&gt;0\)</span>)<br />
+<span class="math inline">\(\log v_j\)</span> &amp; Log-variance, <span
+class="math inline">\(v_j=e^{\log v_j}&gt;0\)</span><br />
+<span class="math inline">\(\bm{\theta}\)</span> &amp; Unconstrained
+optimisation vector (<span class="math inline">\(D=19\)</span>)<br />
+<br />
+<span class="math inline">\(\bm{d}^{(t)}\)</span> &amp; Search direction
+at iteration <span class="math inline">\(t\)</span><br />
+<span class="math inline">\(\alpha_t\)</span> &amp; Step size
+(line-search parameter) at iteration <span
+class="math inline">\(t\)</span><br />
+<span class="math inline">\(\nabla\mathcal{L}\)</span> &amp; Gradient of
+the ELBO w.r.t. <span class="math inline">\(\bm{\theta}\)</span><br />
+<span class="math inline">\(\nabla^2\mathcal{L}\)</span> &amp; Hessian
+of the ELBO w.r.t. <span
+class="math inline">\(\bm{\theta}\)</span><br />
+<span class="math inline">\(\bm{B}_t\)</span> &amp; BFGS inverse-Hessian
+approximation at iteration <span class="math inline">\(t\)</span><br />
+<br />
+<span class="math inline">\(\psi(x)\)</span> &amp; Digamma function,
+<span
+class="math inline">\(\psi(x)=\tfrac{d}{dx}\log\Gamma(x)\)</span><br />
+<span class="math inline">\(\psi^{(1)}(x)\)</span> &amp; Trigamma
+function, <span
+class="math inline">\(\psi^{(1)}(x)=\tfrac{d}{dx}\psi(x)\)</span><br />
+<br />
+<span class="math inline">\(J(\theta)\)</span> &amp; Cost function <span
+class="math inline">\(=\mathcal{L}(\bm{\theta})\)</span> in this
+report<br />
+<span class="math inline">\(\Phi\)</span> &amp; Regressor matrix <span
+class="math inline">\(=\bm{X}\)</span> in this report<br />
+</p>
+</div>
+</div>
+<h2 id="numerical-study-and-required-optimisation-components">Numerical
+Study and Required Optimisation Components</h2>
+<p>This report formulates variational inference for hierarchical
+Bayesian linear regression as an optimisation problem and applies four
+methods: Coordinate Ascent Variational Inference (CAVI), gradient
+ascent, Newton’s method, and BFGS. Each method is characterised by four
+components from the course framework: entry conditions, search
+direction, line search, and exit conditions. All four methods share the
+same initial point so that comparisons reflect method behaviour rather
+than initialisation.</p>
+<h3 class="unnumbered" id="entry-conditions">Entry Conditions</h3>
+<p>All methods are initialised at the prior mean: <span
+class="math inline">\(\bm{\mu}_\beta = \bm{0}\)</span>, <span
+class="math inline">\(\bm{\Sigma}_\beta = \bm{I}_p\)</span>, <span
+class="math inline">\(m_j = 0\)</span>, <span class="math inline">\(v_j
+= 1\)</span> for <span class="math inline">\(j=1,\ldots,J\)</span>,
+<span class="math inline">\(a_e = \alpha_e\)</span>, <span
+class="math inline">\(b_e = \gamma_e\)</span>, <span
+class="math inline">\(a_u = \alpha_u\)</span>, <span
+class="math inline">\(b_u = \gamma_u\)</span>. In the unconstrained
+parameterisation this corresponds to <span class="math inline">\(\bm{L}
+= \bm{I}_p\)</span> (so <span class="math inline">\(\tilde{\ell}_{ii} =
+0\)</span>), <span class="math inline">\(\log v_j = 0\)</span>, and the
+log-space Gamma parameters at their prior values. CAVI uses the same
+starting variational parameters.</p>
+<h3 class="unnumbered" id="search-direction">Search Direction</h3>
+<p>For all gradient-based methods, the proposed search direction must be
+an ascent direction before a step is accepted: <span
+class="math display">\[\begin{aligned}
+\nabla \text{ELBO}(\bm{\theta}^{(t)})^T \bm{d}^{(t)} &gt; 0.
+\end{aligned}\]</span> Gradient ascent uses <span
+class="math inline">\(\bm{d}^{(t)} =
+\nabla\mathcal{L}(\bm{\theta}^{(t)})\)</span> directly. Newton’s method
+uses <span class="math inline">\(\bm{d}^{(t)} =
+-[\nabla^2\mathcal{L}(\bm{\theta}^{(t)})]^{-1}\nabla\mathcal{L}(\bm{\theta}^{(t)})\)</span>,
+falling back to the gradient direction if the Hessian is not positive
+definite. BFGS approximates the inverse Hessian as <span
+class="math inline">\(\bm{B}_t\)</span> and uses <span
+class="math inline">\(\bm{d}^{(t)} = \bm{B}_t
+\nabla\mathcal{L}(\bm{\theta}^{(t)})\)</span>. CAVI replaces the search
+direction with closed-form coordinate updates derived analytically from
+the model.</p>
+<h3 class="unnumbered" id="line-search">Line Search</h3>
+<p>The step size <span class="math inline">\(\alpha^{(t)}\)</span> is
+determined per method. Gradient ascent uses Armijo backtracking:
+starting from an initial step size, <span
+class="math inline">\(\alpha^{(t)}\)</span> is halved until sufficient
+increase in the ELBO is achieved. BFGS uses Wolfe conditions, combining
+sufficient increase with a curvature condition that ensures <span
+class="math display">\[\begin{aligned}
+\bm{y}_t^T \bm{s}_t &gt; 0,
+\end{aligned}\]</span> where <span class="math inline">\(\bm{s}_t =
+\bm{\theta}^{(t+1)} - \bm{\theta}^{(t)}\)</span> and <span
+class="math inline">\(\bm{y}_t = \nabla\mathcal{L}(\bm{\theta}^{(t+1)})
+- \nabla\mathcal{L}(\bm{\theta}^{(t)})\)</span>. This positivity
+condition is required for the BFGS update to preserve positive
+definiteness of <span class="math inline">\(\bm{B}_t\)</span>. Newton’s
+method uses a fixed step size of 1 unless the Hessian is indefinite.
+CAVI has no line search: each coordinate update exactly maximises the
+ELBO with respect to that parameter in closed form.</p>
+<h3 class="unnumbered" id="exit-conditions">Exit Conditions</h3>
+<p>Exit conditions are applied uniformly across the optimisation
+methods. Iteration terminates when any of the following conditions is
+satisfied:</p>
+<ol>
+<li><p>Gradient norm: <span class="math inline">\(\lVert \nabla
+\text{ELBO}\rVert &lt; \varepsilon_g\)</span>.</p></li>
+<li><p>Relative ELBO change: <span class="math inline">\(\lvert \Delta
+\text{ELBO}\rvert / \lvert \text{ELBO}\rvert &lt;
+\varepsilon_r\)</span>.</p></li>
+<li><p>Parameter change: <span class="math inline">\(\lVert \Delta
+\bm{\theta} \rVert &lt; \varepsilon_\theta\)</span>.</p></li>
+<li><p>Maximum iterations: <span class="math inline">\(t \geq
+t_{\max}\)</span>.</p></li>
+</ol>
+<p>CAVI additionally monitors the maximum relative change in its
+variational parameters: <span class="math display">\[\begin{aligned}
+\max_i \frac{\lvert \theta_i^{(t+1)} - \theta_i^{(t)} \rvert}{\lvert
+\theta_i^{(t+1)} \rvert} &lt; \varepsilon.
+\end{aligned}\]</span></p>
+<h1 id="model-formulation">Model Formulation</h1>
+<h2 id="hierarchical-bayesian-linear-regression">Hierarchical Bayesian
+Linear Regression</h2>
+<p>The model is <span class="math display">\[\begin{aligned}
+  y_{ij} \mid \bm{\beta}, u_j, \tau_e
+    &amp;\sim \mathcal{N}\!\bigl(\mathbf{x}_{ij}^T\bm{\beta} + u_j,\;
+\tau_e^{-1}\bigr),
+    \quad i=1,\ldots,n_j,\; j=1,\ldots,J,\\
+  u_j \mid \tau_u &amp;\sim \mathcal{N}(0,\; \tau_u^{-1}),\\
+  \bm{\beta} &amp;\sim \mathcal{N}(\bm{0},\; \lambda^{-1}\bm{I}_p),
+\quad \lambda=0.1,\\
+  \tau_e &amp;\sim \mathrm{Gamma}(\alpha_e,\; \gamma_e), \quad
+\alpha_e=\gamma_e=1,\\
+  \tau_u &amp;\sim \mathrm{Gamma}(\alpha_u,\; \gamma_u), \quad
+\alpha_u=\gamma_u=1,
+\end{aligned}\]</span> where <span class="math inline">\(\mathbf{x}_{ij}
+= (1, x_{ij})^T \in \mathbb{R}^2\)</span> and <span
+class="math inline">\(\sigma(\cdot)\)</span> is the logistic sigmoid
+(not used here; included for consistency with notation across case
+studies).</p>
+<p>The test case uses <span class="math inline">\(N=150\)</span>
+observations in <span class="math inline">\(J=5\)</span> groups (30 per
+group), <span class="math inline">\(x_{ij} \sim
+\mathrm{Uniform}(-2,2)\)</span>, and true parameters <span
+class="math inline">\(\bm{\beta}_{\mathrm{true}} = (1.0,\;
+2.0)\)</span>, <span
+class="math inline">\(\tau_{e,\mathrm{true}}=4.0\)</span> (<span
+class="math inline">\(\sigma_e = 0.5\)</span>), <span
+class="math inline">\(\tau_{u,\mathrm{true}}=2.0\)</span> (<span
+class="math inline">\(\sigma_u \approx 0.707\)</span>).</p>
+<h2 id="mean-field-variational-approximation-1">Mean-Field Variational
+Approximation</h2>
+<p>The mean-field variational family factorises as <span
+class="math display">\[\begin{aligned}
+  q(\bm{\beta},\mathbf{u},\tau_e,\tau_u)
+  &amp;= q(\bm{\beta})\;\prod_{j=1}^{J} q(u_j)\;\cdot\;
+q(\tau_e)\;\cdot\; q(\tau_u),
+\end{aligned}\]</span> with <span class="math display">\[\begin{aligned}
+  q(\bm{\beta}) &amp;=
+\mathcal{N}(\bm{\mu}_\beta,\,\bm{\Sigma}_\beta),\\
+  q(u_j) &amp;= \mathcal{N}(m_j,\, v_j), \quad j=1,\ldots,J,\\
+  q(\tau_e) &amp;= \mathrm{Gamma}(a_e,\, b_e),\\
+  q(\tau_u) &amp;= \mathrm{Gamma}(a_u,\, b_u).
+\end{aligned}\]</span> The covariance <span
+class="math inline">\(\bm{\Sigma}_\beta = \bm{L}\bm{L}^T\)</span> is
+parameterised by its Cholesky factor <span
+class="math inline">\(\bm{L}\)</span> to ensure positive definiteness
+throughout optimisation.</p>
+<h2 id="unconstrained-parameterisation-and-elbo">Unconstrained
+Parameterisation and ELBO</h2>
+<p>The unconstrained parameter vector <span
+class="math inline">\(\bm{\theta} \in \mathbb{R}^{19}\)</span> is <span
+class="math display">\[\bm{\theta} = \bigl(\bm{\mu}_\beta,\;
+    \tilde{\ell}_{11}, \ell_{21}, \tilde{\ell}_{22},\;
+    m_1,\ldots,m_5,\;
+    \log v_1,\ldots,\log v_5,\;
+    \log a_e, \log b_e, \log a_u, \log b_u
+  \bigr),\]</span> where <span class="math inline">\(L_{ii} =
+e^{\tilde{\ell}_{ii}} &gt; 0\)</span> and <span
+class="math inline">\(v_j = e^{\log v_j} &gt; 0\)</span>.</p>
+<p>The ELBO is <span class="math display">\[\begin{aligned}
+  \mathcal{L}(\bm{\theta})
+  &amp;= \mathbb{E}_q\!\left[\log
+p(\mathbf{y}\mid\bm{\beta},\mathbf{u},\tau_e)\right]
+    + \mathbb{E}_q\!\left[\log p(\mathbf{u}\mid\tau_u)\right]
+    \nonumber\\
+  &amp;\quad - \mathrm{KL}\bigl(q(\bm{\beta})\|p(\bm{\beta})\bigr)
+    + \mathbb{E}_q\!\left[\log p(\tau_e)\right] + H[q(\tau_e)]
+    \nonumber\\
+  &amp;\quad + \mathbb{E}_q\!\left[\log p(\tau_u)\right] + H[q(\tau_u)]
+    + \sum_j H[q(u_j)],
+\end{aligned}\]</span> where all terms are available in closed form for
+Gaussian–Gamma conjugacy.</p>
+<h2 id="cavi-update-equations">CAVI Update Equations</h2>
+<p>The coordinate ascent updates cycle over: <span
+class="math display">\[\begin{aligned}
+  \bm{\Sigma}_\beta^{-1} &amp;\leftarrow \lambda\bm{I} +
+\mathbb{E}[\tau_e]\,\bm{X}^T\bm{X}, \label{eq:cavi_beta_cov}\\
+  \bm{\mu}_\beta &amp;\leftarrow
+\bm{\Sigma}_\beta\,\mathbb{E}[\tau_e]\,\bm{X}^T(\mathbf{y} -
+\bm{m}[\mathrm{groups}]),\\
+  v_j^{-1} &amp;\leftarrow \mathbb{E}[\tau_e]\,n_j + \mathbb{E}[\tau_u],
+\quad
+  m_j \leftarrow v_j\,\mathbb{E}[\tau_e]\!\sum_{i\in j}\!\bigl(y_{ij} -
+\mathbf{x}_{ij}^T\bm{\mu}_\beta\bigr),\\
+  a_e &amp;\leftarrow \alpha_e + \tfrac{N}{2}, \quad
+  b_e \leftarrow \gamma_e + \tfrac{1}{2}\mathbb{E}\!\left[\|\mathbf{y} -
+\bm{X}\bm{\beta} - \bm{m}[\mathrm{groups}]\|^2\right],\\
+  a_u &amp;\leftarrow \alpha_u + \tfrac{J}{2}, \quad
+  b_u \leftarrow \gamma_u + \tfrac{1}{2}\sum_j\!(m_j^2 + v_j),
+\end{aligned}\]</span> where <span
+class="math inline">\(\mathbb{E}[\tau_e] = a_e/b_e\)</span> and <span
+class="math inline">\(\mathbb{E}[\tau_u] = a_u/b_u\)</span>.</p>
+<h1 id="conjugate-gibbs-sampler">Conjugate Gibbs Sampler</h1>
+<p>The hierarchical Gaussian model is fully conjugate, so a blocked
+Gibbs sampler is available with closed-form full conditionals. Each
+sweep samples: <span class="math display">\[\begin{aligned}
+  \bm{\beta} \mid \mathbf{u}, \tau_e, \mathbf{y}
+    &amp;\sim
+\mathcal{N}(V_\beta\,\bm{X}^T\tau_e(\mathbf{y}-\bm{m}[\mathrm{groups}]),\;
+V_\beta),
+    \quad V_\beta = (\lambda\bm{I} + \tau_e\bm{X}^T\bm{X})^{-1},\\
+  u_j \mid \bm{\beta}, \tau_e, \tau_u, \mathbf{y}
+    &amp;\sim \mathcal{N}(V_j\tau_e\!\sum_{i\in j}(y_{ij} -
+\mathbf{x}_{ij}^T\bm{\beta}),\; V_j),
+    \quad V_j = (\tau_e n_j + \tau_u)^{-1},\\
+  \tau_e \mid \bm{\beta}, \mathbf{u}, \mathbf{y}
+    &amp;\sim \mathrm{Gamma}\!\left(\alpha_e + \tfrac{N}{2},\;
+      \gamma_e +
+\tfrac{1}{2}\|\mathbf{y}-\bm{X}\bm{\beta}-\mathbf{u}[\mathrm{groups}]\|^2\right),\\
+  \tau_u \mid \mathbf{u}
+    &amp;\sim \mathrm{Gamma}\!\left(\alpha_u + \tfrac{J}{2},\;
+      \gamma_u + \tfrac{1}{2}\sum_j u_j^2\right).
+\end{aligned}\]</span> The sampler runs for <span
+class="math inline">\(N_{\mathrm{warmup}} = 500\)</span> burn-in and
+<span class="math inline">\(N = 5000\)</span> retained iterations per
+chain, with 3 independent chains.</p>
+<h1 id="optimisation-problem-formulation">Optimisation Problem
+Formulation</h1>
+<h2 class="unnumbered" id="decision-variables">Decision Variables</h2>
+<p>Maximisation is carried out over <span
+class="math inline">\(\bm{\theta} \in \mathbb{R}^{19}\)</span> as
+defined above. The constraints <span
+class="math inline">\(\bm{\Sigma}_\beta \succ 0\)</span> (Cholesky),
+<span class="math inline">\(v_j &gt; 0\)</span> (<span
+class="math inline">\(\log v_j\)</span> unconstrained), <span
+class="math inline">\(a_e, b_e, a_u, b_u &gt; 0\)</span> (<span
+class="math inline">\(\log\)</span>-parameterised) are all satisfied
+automatically.</p>
+<h2 class="unnumbered" id="objective-function">Objective Function</h2>
+<p>Maximise the ELBO <span
+class="math inline">\(\mathcal{L}(\bm{\theta}):\mathbb{R}^{19}\to\mathbb{R}\)</span>.
+The function is smooth and bounded above by <span
+class="math inline">\(\log p(\mathbf{y})\)</span>. For the conjugate
+Gaussian model, CAVI converges to the global optimum of the mean-field
+ELBO; gradient-based methods may find the same optimum or converge to a
+saddle point if the Hessian is ill-conditioned.</p>
+<h2 class="unnumbered" id="optimisation-components">Optimisation
+Components</h2>
+<dl>
+<dt>CAVI.</dt>
+<dd>
+<p>Closed-form coordinate updates (Equations <a href="#eq:cavi_beta_cov"
+data-reference-type="ref"
+data-reference="eq:cavi_beta_cov">[eq:cavi_beta_cov]</a>–above). Unit
+step size; exit when <span class="math inline">\(|\Delta\mathcal{L}|
+&lt; 10^{-8}\)</span>.</p>
+</dd>
+<dt>Gradient ascent.</dt>
+<dd>
+<p>Direction: <span class="math inline">\(\bm{d}^{(t)} =
+\nabla\mathcal{L}(\bm{\theta}^{(t)})\)</span> via central FD (<span
+class="math inline">\(h=10^{-5}\)</span>). Armijo backtracking from
+<span class="math inline">\(\alpha_0=0.5\)</span>, <span
+class="math inline">\(c_1=0.1\)</span>, <span
+class="math inline">\(\rho=0.5\)</span>. Exit: <span
+class="math inline">\(|\Delta\mathcal{L}| &lt; 10^{-7}\)</span> or 2000
+iterations.</p>
+</dd>
+<dt>Newton’s method.</dt>
+<dd>
+<p>Direction: <span class="math inline">\(\bm{d}^{(t)} =
+-\bm{H}_{\mathrm{reg}}^{-1}\bm{g}^{(t)}\)</span> using a <span
+class="math inline">\(19\times 19\)</span> FD Hessian. Regularisation
+ensures the direction is an ascent direction. Armijo backtracking; exit
+at 50 iterations.</p>
+</dd>
+<dt>BFGS.</dt>
+<dd>
+<p>Quasi-Newton with inverse-Hessian approximation updated via the BFGS
+rank-2 formula. Wolfe conditions via scipy; exit at <span
+class="math inline">\(\|\bm{g}\|&lt;10^{-7}\)</span> or 2000
+iterations.</p>
+</dd>
+</dl>
+<h1 id="numerical-study">Numerical Study</h1>
+<h2 id="test-case-design">Test Case Design</h2>
+<ul>
+<li><p>Model: <span class="math inline">\(y_{ij} \sim
+\mathcal{N}(\beta_0 + \beta_1 x_{ij} + u_j,\;
+\tau_e^{-1})\)</span></p></li>
+<li><p>True parameters: <span
+class="math inline">\(\bm{\beta}_{\mathrm{true}} = (1.0,\;
+2.0)\)</span>, <span
+class="math inline">\(\tau_{e,\mathrm{true}}=4.0\)</span>, <span
+class="math inline">\(\tau_{u,\mathrm{true}}=2.0\)</span></p></li>
+<li><p>Groups: <span class="math inline">\(J=5\)</span>, <span
+class="math inline">\(n_j=30\)</span>, <span
+class="math inline">\(N=150\)</span></p></li>
+<li><p>Covariates: <span class="math inline">\(x_{ij} \sim
+\mathrm{Uniform}(-2, 2)\)</span></p></li>
+<li><p>Prior: <span class="math inline">\(\bm{\beta} \sim
+\mathcal{N}(\bm{0}, 10\bm{I})\)</span>; <span
+class="math inline">\(\tau_e, \tau_u \sim \mathrm{Gamma}(1,
+0.1)\)</span></p></li>
+<li><p>Seed: <code>82171165</code> (student ID)</p></li>
+</ul>
+<h2 id="gradient-verification">Gradient Verification</h2>
+<p>Before running any optimiser, the gradient of the ELBO with respect
+to the 19-dimensional unconstrained vector <span
+class="math inline">\(\bm{\theta}\)</span> was verified against central
+finite differences at a CAVI warm-start point. All 19 components agreed
+to relative error below <span
+class="math inline">\(10^{-3}\)</span>.</p>
+<figure id="fig:gradcheck">
+<img src="hierarchical_linear_elbo_gradient_check.png"
+style="width:95.0%" />
+<figcaption>Finite-difference gradient verification at the CAVI
+warm-start: <span class="math inline">\(h=10^{-5}\)</span> versus <span
+class="math inline">\(h=10^{-7}\)</span>. Bars coincide for all 19
+components, confirming correct gradient implementation.</figcaption>
+</figure>
+<h2 id="elbo-landscape">ELBO Landscape</h2>
+<p>Figure <a href="#fig:landscape" data-reference-type="ref"
+data-reference="fig:landscape">2</a> shows a 2-D slice of the ELBO
+surface along <span class="math inline">\(\mu_{\beta_0}\)</span> and
+<span class="math inline">\(\mu_{\beta_1}\)</span> with all other
+parameters held at the warm start. The surface is smooth with a clear
+maximum near the true values.</p>
+<figure id="fig:landscape">
+<img src="hierarchical_linear_elbo_landscape.png" style="width:60.0%" />
+<figcaption>ELBO landscape slice in the <span
+class="math inline">\((\mu_{\beta_0}, \mu_{\beta_1})\)</span> plane. Red
+star: CAVI warm start; white cross: true <span
+class="math inline">\(\bm{\beta}\)</span>.</figcaption>
+</figure>
+<h1 id="results">Results</h1>
+<h2 id="generated-data">Generated Data</h2>
+<p>Figure <a href="#fig:data" data-reference-type="ref"
+data-reference="fig:data">3</a> shows the 150 generated observations
+stratified by group. Group random effects <span
+class="math inline">\(u_j\)</span> visibly shift the regression lines
+upward or downward relative to the population curve.</p>
+<figure id="fig:data">
+<img src="hierarchical_linear_data_scatter.png" style="width:80.0%" />
+<figcaption>Generated hierarchical data (<span
+class="math inline">\(N=150\)</span>, <span
+class="math inline">\(J=5\)</span>). Dotted lines show group-specific
+regressions; the solid line is the population mean.</figcaption>
+</figure>
+<h2 id="elbo-convergence">ELBO Convergence</h2>
+<p>Figure <a href="#fig:elbocv" data-reference-type="ref"
+data-reference="fig:elbocv">4</a> shows the ELBO history for all four
+methods. CAVI and BFGS converge to essentially the same final ELBO value
+(<span class="math inline">\(-132.08\)</span>). Gradient ascent
+converges but requires the full 2000-iteration budget, reflecting the
+slow convergence of first-order methods on a 19-dimensional problem.
+Newton’s method converges in only 50 iterations but to a markedly worse
+ELBO (<span class="math inline">\(-165.28\)</span>), indicating failure
+to escape a saddle region due to ill-conditioned Hessian in the
+high-dimensional parameter space.</p>
+<figure id="fig:elbocv">
+<img src="hierarchical_linear_elbo_convergence.png" />
+<figcaption>ELBO convergence for CAVI (left) and gradient-based methods
+(right). Newton’s method converges to a suboptimal point; CAVI and BFGS
+agree.</figcaption>
+</figure>
+<h2 id="step-size-and-condition-number-behaviour">Step-Size and
+Condition-Number Behaviour</h2>
+<p>Figure <a href="#fig:stepsize" data-reference-type="ref"
+data-reference="fig:stepsize">5</a> shows the Armijo step sizes for
+gradient ascent. The step sizes remain small throughout, reflecting the
+relatively flat landscape in the 19-dimensional space. Figure <a
+href="#fig:cond" data-reference-type="ref"
+data-reference="fig:cond">6</a> shows the Hessian condition number for
+Newton’s method, which remains large throughout, explaining the
+suboptimal convergence.</p>
+<figure id="fig:stepsize">
+<img src="hierarchical_linear_gradient_stepsize.png"
+style="width:75.0%" />
+<figcaption>Armijo step sizes for gradient ascent per iteration (log
+scale).</figcaption>
+</figure>
+<figure id="fig:cond">
+<img src="hierarchical_linear_newton_condition.png"
+style="width:65.0%" />
+<figcaption>Hessian condition number at each Newton iteration. The large
+condition numbers throughout indicate ill-conditioning, consistent with
+Newton’s failure to find the CAVI optimum.</figcaption>
+</figure>
+<h2 id="gibbs-sampler-diagnostics">Gibbs Sampler Diagnostics</h2>
+<p>Figures <a href="#fig:trace_b0" data-reference-type="ref"
+data-reference="fig:trace_b0">7</a>–<a href="#fig:trace_tauu"
+data-reference-type="ref" data-reference="fig:trace_tauu">10</a> show
+trace plots for the four scalar parameters monitored (<span
+class="math inline">\(\beta_0\)</span>, <span
+class="math inline">\(\beta_1\)</span>, <span
+class="math inline">\(\tau_e\)</span>, <span
+class="math inline">\(\tau_u\)</span>). Figure <a href="#fig:acf"
+data-reference-type="ref" data-reference="fig:acf">11</a> shows the ACF
+for each parameter; all drop inside the 95% confidence band within 5–10
+lags, indicating good mixing. Figure <a href="#fig:rhat"
+data-reference-type="ref" data-reference="fig:rhat">12</a> shows the
+Gelman–Rubin <span class="math inline">\(\hat{R}\)</span> diagnostic;
+all values are below 1.01, confirming convergence of the 3 chains.</p>
+<figure id="fig:trace_b0">
+<img src="hierarchical_linear_gibbs_trace_beta0.png" />
+<figcaption>Gibbs trace: <span class="math inline">\(\beta_0\)</span>.
+Red dashed: true value.</figcaption>
+</figure>
+<figure id="fig:trace_b1">
+<img src="hierarchical_linear_gibbs_trace_beta1.png" />
+<figcaption>Gibbs trace: <span
+class="math inline">\(\beta_1\)</span>.</figcaption>
+</figure>
+<figure id="fig:trace_taue">
+<img src="hierarchical_linear_gibbs_trace_tau_e.png" />
+<figcaption>Gibbs trace: <span class="math inline">\(\tau_e\)</span>
+(noise precision).</figcaption>
+</figure>
+<figure id="fig:trace_tauu">
+<img src="hierarchical_linear_gibbs_trace_tau_u.png" />
+<figcaption>Gibbs trace: <span class="math inline">\(\tau_u\)</span>
+(random-effect precision).</figcaption>
+</figure>
+<figure id="fig:acf">
+<img src="hierarchical_linear_gibbs_acf_beta0.png"
+style="width:95.0%" />
+<figcaption>ACF for <span class="math inline">\(\beta_0\)</span> (chain
+1). Red dashed lines: 95% band.</figcaption>
+</figure>
+<figure>
+<img src="hierarchical_linear_gibbs_acf_beta1.png"
+style="width:95.0%" />
+<figcaption>ACF for <span
+class="math inline">\(\beta_1\)</span>.</figcaption>
+</figure>
+<figure>
+<img src="hierarchical_linear_gibbs_acf_tau_e.png"
+style="width:95.0%" />
+<figcaption>ACF for <span
+class="math inline">\(\tau_e\)</span>.</figcaption>
+</figure>
+<figure>
+<img src="hierarchical_linear_gibbs_acf_tau_u.png"
+style="width:95.0%" />
+<figcaption>ACF for <span
+class="math inline">\(\tau_u\)</span>.</figcaption>
+</figure>
+<figure id="fig:rhat">
+<img src="hierarchical_linear_gibbs_rhat.png" style="width:55.0%" />
+<figcaption>Gelman–Rubin <span class="math inline">\(\hat{R}\)</span>
+diagnostic for all monitored parameters. All values below 1.01 confirm
+convergence.</figcaption>
+</figure>
+<h2 id="random-effects-recovery">Random Effects Recovery</h2>
+<p>Figure <a href="#fig:re" data-reference-type="ref"
+data-reference="fig:re">13</a> compares the CAVI posterior means for
+<span class="math inline">\(u_j\)</span> against the Gibbs reference and
+the true values. Both methods recover the group-specific shifts, with
+CAVI showing slightly tighter credible intervals consistent with its
+general tendency towards variance collapse.</p>
+<figure id="fig:re">
+<img src="hierarchical_linear_random_effects.png" />
+<figcaption>Random effect estimates <span
+class="math inline">\(u_j\)</span> for CAVI (left) and Gibbs (right).
+Stars indicate true values; error bars show <span
+class="math inline">\(\pm 2\)</span> posterior SD.</figcaption>
+</figure>
+<h2 id="posterior-comparison-vi-versus-gibbs">Posterior Comparison: VI
+versus Gibbs</h2>
+<p>Figures <a href="#fig:vbgibbs_b0" data-reference-type="ref"
+data-reference="fig:vbgibbs_b0">14</a>–<a href="#fig:vbgibbs_tauu"
+data-reference-type="ref" data-reference="fig:vbgibbs_tauu">17</a>
+overlay the VI approximations against the Gibbs histograms for the four
+scalar parameters.</p>
+<figure id="fig:vbgibbs_b0">
+<img src="hierarchical_linear_vb_gibbs_beta0.png" style="width:80.0%" />
+<figcaption>Posterior comparison for <span
+class="math inline">\(\beta_0\)</span>: Gibbs histogram versus VI
+Gaussian approximations. The VI curves are dramatically narrower than
+Gibbs (collapse).</figcaption>
+</figure>
+<figure id="fig:vbgibbs_b1">
+<img src="hierarchical_linear_vb_gibbs_beta1.png" style="width:80.0%" />
+<figcaption>Posterior comparison for <span
+class="math inline">\(\beta_1\)</span>. VI and Gibbs agree well; minimal
+collapse.</figcaption>
+</figure>
+<figure id="fig:vbgibbs_taue">
+<img src="hierarchical_linear_vb_gibbs_tau_e.png" style="width:80.0%" />
+<figcaption>Posterior comparison for <span
+class="math inline">\(\tau_e\)</span>.</figcaption>
+</figure>
+<figure id="fig:vbgibbs_tauu">
+<img src="hierarchical_linear_vb_gibbs_tau_u.png" style="width:80.0%" />
+<figcaption>Posterior comparison for <span
+class="math inline">\(\tau_u\)</span>.</figcaption>
+</figure>
+<h2 id="posterior-standard-deviation-ratios">Posterior
+Standard-Deviation Ratios</h2>
+<p>Figure <a href="#fig:sdratios" data-reference-type="ref"
+data-reference="fig:sdratios">18</a> shows the ratio <span
+class="math inline">\(\sigma_{\mathrm{VI}}/\sigma_{\mathrm{Gibbs}}\)</span>
+for each method and parameter. CAVI and BFGS exhibit severe collapse for
+<span class="math inline">\(\beta_0\)</span> (SD ratio <span
+class="math inline">\(\approx 0.13\)</span>) while maintaining
+near-unity ratios for <span class="math inline">\(\beta_1\)</span>. This
+asymmetric collapse arises because <span
+class="math inline">\(\beta_0\)</span> (the intercept) is confounded
+with the group means <span class="math inline">\(u_j\)</span> under the
+mean-field factorisation: the posterior covariance between <span
+class="math inline">\(\beta_0\)</span> and <span
+class="math inline">\(\mathbf{u}\)</span> is discarded, causing <span
+class="math inline">\(q(\beta_0)\)</span> to appear far more
+concentrated than the true marginal. Newton’s method produces anomalous
+SD ratios (<span class="math inline">\(\beta_1 \approx 2.8\)</span>) due
+to its convergence to a suboptimal point.</p>
+<figure id="fig:sdratios">
+<img src="hierarchical_linear_sd_ratios.png" style="width:85.0%" />
+<figcaption>Posterior SD ratios (VI / Gibbs). Dashed line: ideal ratio
+1.0. Severe intercept collapse (<span class="math inline">\(\approx
+0.13\)</span>) for CAVI, gradient ascent, and BFGS.</figcaption>
+</figure>
+<h2 id="posterior-mean-errors">Posterior Mean Errors</h2>
+<p>Figure <a href="#fig:meanerr" data-reference-type="ref"
+data-reference="fig:meanerr">19</a> shows the absolute error <span
+class="math inline">\(|\mu_{\mathrm{VI}} -
+\mu_{\mathrm{Gibbs}}|\)</span>. Despite severe variance collapse for
+<span class="math inline">\(\beta_0\)</span>, posterior means are well
+recovered by all converged methods.</p>
+<figure id="fig:meanerr">
+<img src="hierarchical_linear_mean_errors.png" style="width:85.0%" />
+<figcaption>Absolute posterior mean errors relative to the Gibbs
+reference. Posterior means are accurate even where variance is
+collapsed.</figcaption>
+</figure>
+<h2 id="performance-summary">Performance Summary</h2>
+<p>Table <a href="#tab:perf" data-reference-type="ref"
+data-reference="tab:perf">[tab:perf]</a> summarises the convergence,
+runtime, and final ELBO for all methods. Table <a href="#tab:post"
+data-reference-type="ref" data-reference="tab:post">[tab:post]</a>
+summarises the posterior means and SD ratios.</p>
+<div class="tblr">
+<p><span>colspec=<span>lrrrr</span>,
+hline<span>1,2,Z</span>=<span>solid</span></span> Method &amp;
+Iterations &amp; Runtime (ms) &amp; Speedup vs Gibbs &amp; Final
+ELBO<br />
+CAVI &amp; 102 &amp; 26.8 &amp; 134x &amp; -132.077<br />
+Gradient Ascent &amp; 2000 &amp; 8890.5 &amp; 0x &amp; -132.086<br />
+Newton’s Method &amp; 50 &amp; 3877.6 &amp; 0.9x &amp; -165.282<br />
+BFGS &amp; 34 &amp; 116.9 &amp; 31x &amp; -132.077<br />
+Gibbs (3 chains) &amp; 3x5000 &amp; 3587.7 &amp; 1x (reference) &amp;
+N/A<br />
+</p>
+</div>
+<div class="tblr">
+<p><span>colspec=<span>lrrrrrr</span>,
+hline<span>1,2,Z</span>=<span>solid</span></span> Method &amp; <span
+class="math inline">\(\mu_{\beta_0}\)</span> &amp; <span
+class="math inline">\(\mu_{\beta_1}\)</span> &amp; <span
+class="math inline">\(\mathrm{E}[\tau_e]\)</span> &amp; <span
+class="math inline">\(\mathrm{E}[\tau_u]\)</span> &amp; SD ratio <span
+class="math inline">\(\beta_0\)</span> &amp; SD ratio <span
+class="math inline">\(\beta_1\)</span><br />
+CAVI &amp; 0.4604 &amp; 1.9877 &amp; 3.6959 &amp; 3.2818 &amp; 0.130
+&amp; 0.987<br />
+Gradient Ascent &amp; 0.4602 &amp; 1.9878 &amp; 3.6945 &amp; 3.2895
+&amp; 0.130 &amp; 0.988<br />
+Newton’s Method &amp; 0.4280 &amp; 1.9959 &amp; 2.8896 &amp; 1.9989
+&amp; 0.325 &amp; 2.779<br />
+BFGS &amp; 0.4603 &amp; 1.9877 &amp; 3.6959 &amp; 3.2818 &amp; 0.130
+&amp; 0.987<br />
+Gibbs (ref) &amp; 0.4257 &amp; 1.9872 &amp; 3.7214 &amp; 2.8239 &amp;
+1.000 &amp; 1.000<br />
+</p>
+</div>
+<h2 id="computational-cost">Computational Cost</h2>
+<p>Figure <a href="#fig:timing" data-reference-type="ref"
+data-reference="fig:timing">20</a> compares the runtimes of all methods.
+CAVI is the fastest converged method at 27 ms, 134<span
+class="math inline">\(\times\)</span> faster than the conjugate Gibbs
+sampler (3.6 s for 3 chains <span class="math inline">\(\times\)</span>
+5000 iterations). BFGS is 31<span class="math inline">\(\times\)</span>
+faster than Gibbs. Gradient ascent reaches the same final ELBO as CAVI
+but requires the full 2000-iteration budget, making it <span
+class="math inline">\(\sim\)</span> 3<span
+class="math inline">\(\times\)</span> slower than Gibbs at this problem
+size. Newton’s method, despite only 50 iterations, requires a <span
+class="math inline">\(19\times19\)</span> FD Hessian at each step
+(requiring <span class="math inline">\(19^2 = 361\)</span> ELBO
+evaluations per iteration), giving a total cost comparable to Gibbs.</p>
+<figure id="fig:timing">
+<img src="hierarchical_linear_timing_comparison.png"
+style="width:85.0%" />
+<figcaption>Runtime comparison (log scale). Annotated speedup factors
+relative to Gibbs.</figcaption>
+</figure>
+<h1 id="discussion">Discussion</h1>
+<h4 id="posterior-variance-collapse.">Posterior variance collapse.</h4>
+<p>The intercept <span class="math inline">\(\beta_0\)</span> exhibits
+severe collapse (SD ratio <span class="math inline">\(\approx
+0.13\)</span>) under all well-converged VI methods. The mechanism is the
+mean-field assumption: the true posterior has strong negative
+correlation between <span class="math inline">\(\beta_0\)</span> and the
+group means <span class="math inline">\(\bar{u} = J^{-1}\sum_j
+u_j\)</span>, because the data constrain <span
+class="math inline">\(\beta_0 + \bar{u}\)</span> far more tightly than
+either component alone. Mean-field VI factorises these two blocks,
+forcing <span class="math inline">\(q(\beta_0)\)</span> to be a narrow
+Gaussian centred at the marginal mode rather than the true marginal. The
+slope <span class="math inline">\(\beta_1\)</span> is not confounded
+with the random effects in the same way, so its VI standard deviation
+matches Gibbs closely.</p>
+<h4 id="newtons-method-failure.">Newton’s method failure.</h4>
+<p>Newton’s method converges to a point with ELBO <span
+class="math inline">\(= -165.28\)</span>, substantially worse than the
+global CAVI optimum at <span class="math inline">\(-132.08\)</span>.
+This is a consequence of the finite-difference <span
+class="math inline">\(19\times19\)</span> Hessian having poor
+conditioning throughout the trajectory: the Hessian of the ELBO mixes
+parameters that operate on very different scales (<span
+class="math inline">\(\bm{\mu}_\beta\)</span> in <span
+class="math inline">\([-2,2]\)</span>, <span class="math inline">\(\log
+b_u\)</span> near <span class="math inline">\([-3, 3]\)</span>), making
+the Newton step unreliable even with regularisation. BFGS avoids this
+issue by building an <em>adaptive</em> positive-definite inverse-Hessian
+approximation, which effectively rescales each parameter direction from
+curvature information accumulated over iterations.</p>
+<h4 id="cavi-versus-bfgs.">CAVI versus BFGS.</h4>
+<p>CAVI and BFGS converge to the same ELBO optimum with comparable
+accuracy. CAVI is <span class="math inline">\(\sim 4\times\)</span>
+faster in this implementation because each iteration requires only
+closed-form matrix operations, whereas BFGS requires <span
+class="math inline">\(2D = 38\)</span> ELBO evaluations per iteration
+for FD gradients. For models where CAVI updates are not available
+(e.g. non-conjugate likelihoods), BFGS is the natural first-choice
+gradient-based method.</p>
+<h4 id="gradient-ascent.">Gradient ascent.</h4>
+<p>First-order gradient ascent converges to the correct optimum but
+requires all 2000 iterations, making it the slowest converged method.
+The Armijo step sizes (Figure <a href="#fig:stepsize"
+data-reference-type="ref" data-reference="fig:stepsize">5</a>) show
+consistently small values, indicating that the curvature of the ELBO
+surface is poorly aligned with the gradient direction in a
+19-dimensional space — the same limitation identified in the simpler
+linear and quadratic case studies, now more pronounced.</p>
+<h1 id="conclusion">Conclusion</h1>
+<p>Hierarchical Bayesian linear regression with <span
+class="math inline">\(J=5\)</span> groups and <span
+class="math inline">\(D=19\)</span> unconstrained parameters presents a
+qualitatively more challenging optimisation problem than the
+two-parameter logistic case. CAVI and BFGS both find the global
+mean-field ELBO optimum and recover accurate posterior means, but both
+exhibit severe variance collapse for the intercept <span
+class="math inline">\(\beta_0\)</span> due to the mean-field
+factorisation ignoring the posterior correlation between the intercept
+and the random effects. Newton’s method fails to converge to this
+optimum, highlighting the limitations of finite-difference second-order
+methods when the Hessian is ill-conditioned. Gradient ascent converges
+but is an order of magnitude slower. The conjugate Gibbs sampler
+provides accurate marginal posteriors but at a cost <span
+class="math inline">\(&gt;100\times\)</span> that of CAVI for this
+problem size.</p>
+<section id="footnotes" class="footnotes footnotes-end-of-document"
+role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>The mechanistic derivation is given in Case Study 1
+(Appendix A).<a href="#fnref1" class="footnote-back"
+role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>This structural constraint is satisfied automatically
+via Cholesky reparameterisation; derivation in Case Study 1
+(Appendix B).<a href="#fnref2" class="footnote-back"
+role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p>Denoted <span class="math inline">\(\Phi\)</span> and
+called the <em>regressor matrix</em> in lectures (Prof. R. S. Smith,
+ENEL445 2026).<a href="#fnref3" class="footnote-back"
+role="doc-backlink">↩︎</a></p></li>
+<li id="fn4"><p>Denoted <span class="math inline">\(\theta\)</span> in
+lectures.<a href="#fnref4" class="footnote-back"
+role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+</body>
+</html>

@@ -52,27 +52,27 @@
   <ul>
     <li>
       <a href="20260510A-COMBINED-REPORT.pdf" target="_blank" rel="noopener noreferrer">Combined Report</a>
-      <p>All five case studies in a single document. Cross-case comparison and discussion.</p>
+      <p>Gradient-based optimisation applied to variational inference across five Bayesian regression settings: linear, quadratic, logistic, hierarchical linear, and hierarchical logistic regression. The unifying objective is maximising the Evidence Lower Bound (ELBO) using CAVI, gradient ascent (Armijo backtracking), Newton's method (regularised finite-difference Hessian), and BFGS (Wolfe conditions). Reference posteriors from Gibbs samplers. CAVI is the most efficient method across all five settings; BFGS is the recommended gradient-based alternative when closed-form CAVI updates are unavailable.</p>
     </li>
     <li>
-      <a href="20260510A-LINEAR-CASE-STUDY.pdf" target="_blank" rel="noopener noreferrer">Case Study 1 — Linear Regression</a>
-      <p>Full ELBO derivation, gradient verification, ELBO landscape, convergence figures, posterior comparison, and variance collapse analysis. <em>n</em>=50, <em>p</em>=2.</p>
+      <a href="20260511A-LINEAR-CASE-STUDY.pdf" target="_blank" rel="noopener noreferrer">Case Study 1 — Linear Regression</a>
+      <p>Mean-field VI turns Bayesian posterior computation into an optimisation problem, but can produce posterior variances that are too small — posterior variance collapse. This case study investigates that issue in a controlled Bayesian linear regression setting (<em>n</em>=50, <em>p</em>=2) with Gaussian–Gamma conjugate priors. CAVI provides closed-form updates and an analytical baseline; gradient ascent, Newton's method, and BFGS are compared on ELBO convergence, runtime, and posterior standard-deviation ratios against a Gibbs sampler reference. A secondary experiment tests entropy regularisation as a remedy for variance collapse.</p>
     </li>
     <li>
-      <a href="20260510A-QUADRATIC-CASE-STUDY.pdf" target="_blank" rel="noopener noreferrer">Case Study 2 — Quadratic Regression</a>
-      <p>Identical framework with <em>p</em>=3 and quadratic feature expansion. <em>n</em>=100.</p>
+      <a href="20260511A-QUADRATIC-CASE-STUDY.pdf" target="_blank" rel="noopener noreferrer">Case Study 2 — Quadratic Regression</a>
+      <p>Extends Case Study 1 to Bayesian quadratic regression (<em>n</em>=100, <em>p</em>=3) via feature expansion. Mean-field VI can systematically underestimate posterior uncertainty; this report investigates that posterior variance collapse using CAVI, gradient ascent, Newton's method, and BFGS applied to the ELBO. Methods are evaluated on both optimisation diagnostics (convergence, final ELBO, step-size behaviour, computational cost) and posterior standard-deviation ratios relative to a Gibbs sampler reference.</p>
     </li>
     <li>
-      <a href="20260510A-LOGISTIC-CASE-STUDY.pdf" target="_blank" rel="noopener noreferrer">Case Study 3 — Logistic Regression</a>
-      <p>Jaakkola–Jordan variational bound, Pólya–Gamma Gibbs sampler, ESS diagnostics, and 20 result figures. <em>n</em>=200, <em>p</em>=2.</p>
+      <a href="20260511A-LOGISTIC-CASE-STUDY.pdf" target="_blank" rel="noopener noreferrer">Case Study 3 — Logistic Regression</a>
+      <p>Bayesian logistic regression has no conjugate variational family; the Jaakkola–Jordan variational bound provides a tractable ELBO (<em>n</em>=200, <em>p</em>=2). Four methods are compared: CAVI, gradient ascent, Newton's method, and BFGS. The reference posterior is from a Pólya–Gamma Gibbs sampler; diagnostics include ESS and ACF plots. All four VI methods recover posterior means within 0.02 of the Gibbs reference, with CAVI converging in fewer than 50 iterations and several orders of magnitude faster than the PG sampler.</p>
     </li>
     <li>
-      <a href="20260510A-HIERARCHICAL-LINEAR-CASE-STUDY.pdf" target="_blank" rel="noopener noreferrer">Case Study 4 — Hierarchical Bayesian Linear Regression</a>
-      <p>Mixed-effects model with <em>J</em>=5 groups, CAVI and BFGS vs Newton-Raphson and GA. Severe posterior variance collapse for &beta;<sub>0</sub> (SD ratio&nbsp;0.130). <em>N</em>=150, <em>p</em>=2, <em>D</em>=19.</p>
+      <a href="20260511A-HIERARCHICAL-LINEAR-CASE-STUDY.pdf" target="_blank" rel="noopener noreferrer">Case Study 4 — Hierarchical Bayesian Linear Regression</a>
+      <p>Extends to a hierarchical model with <em>J</em>=5 group random effects and Gamma precision priors (<em>N</em>=150, <em>p</em>=2, <em>D</em>=19 unconstrained parameters). The conjugate ELBO admits closed-form CAVI updates but also serves as a smooth objective for BFGS, gradient ascent, and Newton's method. A striking finding is severe posterior variance collapse for &beta;<sub>0</sub> (SD ratio &#8776; 0.13), driven by the mean-field factorisation absorbing group-level variance into the random effects. Newton's method fails to converge to the correct optimum in this high-dimensional hierarchical setting.</p>
     </li>
     <li>
-      <a href="20260510A-HIERARCHICAL-LOGISTIC-CASE-STUDY.pdf" target="_blank" rel="noopener noreferrer">Case Study 5 — Hierarchical Bayesian Logistic Regression</a>
-      <p>Jaakkola–Jordan ELBO with random intercepts, Pólya–Gamma Gibbs gold standard. CAVI 1050&times; faster than Gibbs; symmetric variance collapse (&beta;<sub>0</sub> and &beta;<sub>1</sub> SD ratio&nbsp;~0.46). <em>N</em>=150, <em>p</em>=2, <em>D</em>=17.</p>
+      <a href="20260511A-HIERARCHICAL-LOGISTIC-CASE-STUDY.pdf" target="_blank" rel="noopener noreferrer">Case Study 5 — Hierarchical Bayesian Logistic Regression</a>
+      <p>The most challenging setting: combines the non-conjugate logistic likelihood (Case Study 3) with hierarchical random effects (Case Study 4). The Jaakkola–Jordan bound retains a tractable ELBO (<em>J</em>=5 groups, <em>N</em>=150, <em>p</em>=2, <em>D</em>=17). Reference posteriors from a Pólya–Gamma blocked Gibbs sampler. Pronounced variance collapse in both &beta;<sub>0</sub> and &beta;<sub>1</sub> (SD ratios &#8776; 0.46), reflecting the mean-field family's failure to capture posterior correlation between fixed and random effects. CAVI and BFGS are 1050&times; and 81&times; faster than the PG sampler; Newton's method again converges to a suboptimal point.</p>
     </li>
   </ul>
 
