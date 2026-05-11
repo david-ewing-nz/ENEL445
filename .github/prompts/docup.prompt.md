@@ -15,8 +15,8 @@ Work from the project root `d:\github\ENEL445` throughout.
 
 Scan `report/` for the lexicographically latest `.tex` file matching each of these six suffixes (date-letter stamp means lexicographic order = chronological order):
 
-| Slot | Pattern (files starting with a digit) |
-|------|---------------------------------------|
+| Slot | Pattern (files starting with a digit, excluding `DUMMY-*`) |
+|------|------------------------------------------------------------|
 | combined | `*-COMBINED-REPORT.tex` |
 | linear | `*-LINEAR-CASE-STUDY.tex` excluding `*HIERARCHICAL*` |
 | quadratic | `*-QUADRATIC-CASE-STUDY.tex` |
@@ -27,12 +27,12 @@ Scan `report/` for the lexicographically latest `.tex` file matching each of the
 Run this PowerShell to discover and confirm all six before proceeding:
 ```powershell
 $slots = @{
-  combined      = Get-ChildItem report\*-COMBINED-REPORT.tex | Sort-Object Name | Select-Object -Last 1
-  linear        = Get-ChildItem report\*-LINEAR-CASE-STUDY.tex | Where-Object { $_.Name -notmatch 'HIERARCHICAL' } | Sort-Object Name | Select-Object -Last 1
-  quadratic     = Get-ChildItem report\*-QUADRATIC-CASE-STUDY.tex | Sort-Object Name | Select-Object -Last 1
-  logistic      = Get-ChildItem report\*-LOGISTIC-CASE-STUDY.tex | Where-Object { $_.Name -notmatch 'HIERARCHICAL' } | Sort-Object Name | Select-Object -Last 1
-  hierlinear    = Get-ChildItem report\*-HIERARCHICAL-LINEAR-CASE-STUDY.tex | Sort-Object Name | Select-Object -Last 1
-  hierlogistic  = Get-ChildItem report\*-HIERARCHICAL-LOGISTIC-CASE-STUDY.tex | Sort-Object Name | Select-Object -Last 1
+  combined      = Get-ChildItem report\*-COMBINED-REPORT.tex | Where-Object { $_.Name -notmatch '^DUMMY' } | Sort-Object Name | Select-Object -Last 1
+  linear        = Get-ChildItem report\*-LINEAR-CASE-STUDY.tex | Where-Object { $_.Name -notmatch 'HIERARCHICAL' -and $_.Name -notmatch '^DUMMY' } | Sort-Object Name | Select-Object -Last 1
+  quadratic     = Get-ChildItem report\*-QUADRATIC-CASE-STUDY.tex | Where-Object { $_.Name -notmatch '^DUMMY' } | Sort-Object Name | Select-Object -Last 1
+  logistic      = Get-ChildItem report\*-LOGISTIC-CASE-STUDY.tex | Where-Object { $_.Name -notmatch 'HIERARCHICAL' -and $_.Name -notmatch '^DUMMY' } | Sort-Object Name | Select-Object -Last 1
+  hierlinear    = Get-ChildItem report\*-HIERARCHICAL-LINEAR-CASE-STUDY.tex | Where-Object { $_.Name -notmatch '^DUMMY' } | Sort-Object Name | Select-Object -Last 1
+  hierlogistic  = Get-ChildItem report\*-HIERARCHICAL-LOGISTIC-CASE-STUDY.tex | Where-Object { $_.Name -notmatch '^DUMMY' } | Sort-Object Name | Select-Object -Last 1
 }
 $slots.GetEnumerator() | Sort-Object Key | Format-Table Key, @{L='File';E={$_.Value.Name}}
 ```
@@ -72,9 +72,9 @@ After each compilation confirm that a PDF was produced in `results/pdf/`. If any
 For each of the six document types, check `docs/` for existing PDFs matching that type. If two or more versions are present (e.g. `20260510A-LINEAR-CASE-STUDY.pdf` and `20260509A-LINEAR-CASE-STUDY.pdf`), delete all but the most recent one — leaving the one currently linked in `index.html` in place during GitHub Pages propagation delay. Never delete the file that is currently referenced in `index.html`.
 
 ```powershell
-# Example pattern — repeat for each type
-$keep = Get-ChildItem docs\*-LINEAR-CASE-STUDY.pdf | Where-Object { $_.Name -notmatch 'HIERARCHICAL' } | Sort-Object Name | Select-Object -Last 1
-Get-ChildItem docs\*-LINEAR-CASE-STUDY.pdf | Where-Object { $_.Name -notmatch 'HIERARCHICAL' -and $_.Name -ne $keep.Name } | Remove-Item
+# Example pattern — repeat for each type. Always exclude DUMMY-* from cleanup.
+$keep = Get-ChildItem docs\*-LINEAR-CASE-STUDY.pdf | Where-Object { $_.Name -notmatch 'HIERARCHICAL' -and $_.Name -notmatch '^DUMMY' } | Sort-Object Name | Select-Object -Last 1
+Get-ChildItem docs\*-LINEAR-CASE-STUDY.pdf | Where-Object { $_.Name -notmatch 'HIERARCHICAL' -and $_.Name -notmatch '^DUMMY' -and $_.Name -ne $keep.Name } | Remove-Item
 ```
 
 ---
@@ -114,7 +114,9 @@ Do this for all six entries. The Combined Report entry uses the combined report 
 ```powershell
 cd d:\github\ENEL445
 $ts = Get-Date -Format "yyyy-MM-dd HH:mm"
-git add -A
+# Stage everything EXCEPT DUMMY files (which are managed by #docup-dummy)
+git add docs/index.html
+git add docs/2*.pdf results/pdf/2*.pdf results/html/2*.html report/2*.tex
 git commit -m "docup: publish latest case-studies/report as of $ts"
 git push
 ```
