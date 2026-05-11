@@ -1,0 +1,98 @@
+\documentclass[11pt,a4paper]{article}
+
+%  XeLaTeX
+\usepackage{fontspec}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage[useregional]{datetime2}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{tabularray}
+\usepackage{framed}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{eso-pic}
+\usepackage{mathtools}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{xcolor}
+
+\usepackage[backend=biber, style=apa, sorting=nyt]{biblatex}
+\addbibresource{D:/github/ENEL445/report/references.bib}
+
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\hypersetup{
+  pdfauthor   = {David Ewing},
+  pdfsubject  = {\jobname.tex},
+  pdfkeywords = {source: \jobname.tex}
+}
+
+\newcommand{\mymarginlabel}{\textcopyright\ David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\AddToShipoutPictureBG{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[rotate=90, anchor=north]
+      at ($(current page.north west)+(1.4cm,-13cm)$)
+      {\footnotesize\ttfamily \mymarginlabel};
+  \end{tikzpicture}%
+}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\ELBO}{\text{ELBO}}
+\newcommand{\tr}{\text{tr}}
+\setlength{\parindent}{0pt}
+
+\title{
+Case Study 1 --- Bayesian Linear Regression:\\[0.4em]
+Gradient-Based Optimisation and Posterior Variance Collapse
+}
+\author{
+  David Ewing (82171165)
+}
+\date{12 May 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.7em}
+
+Mean-field Variational Inference (VI) is useful because it turns Bayesian posterior computation into an optimisation problem, but this convenience comes with a cost. The approximation can become too confident, giving posterior variances that are smaller than they should be. This report studies that issue---posterior variance collapse---in a controlled Bayesian linear regression case study.
+
+The linear case is chosen deliberately. It is simple enough for the main quantities to be checked directly, but still rich enough to show the difference between optimisation success and reliable Bayesian uncertainty. With Gaussian--Gamma conjugate priors, Coordinate Ascent Variational Inference (CAVI) gives closed-form updates and provides the analytical baseline for the numerical work. Gradient ascent, Newton's method, and BFGS are then applied to the same ELBO so that their behaviour can be compared against that baseline.
+
+The ELBO is derived under the mean-field factorisation
+\begin{align*}
+q(\bm{\beta},\tau_e)=q(\bm{\beta})q(\tau_e),
+\end{align*}
+where $q(\bm{\beta})$ is Gaussian and $q(\tau_e)$ is Gamma. The variational parameters are the coefficient mean $\bm{\mu}_\beta$, coefficient covariance $\bm{\Sigma}_\beta$, and Gamma parameters $a_e$ and $b_e$. Because these quantities must remain valid during optimisation, the covariance matrix is represented through a Cholesky factor and the positive Gamma parameters are represented in log-space.
+
+Each optimiser is described using the same course framework: starting point, search direction, step-size rule, and stopping condition. For the line-search methods, a proposed direction must be an ascent direction,
+\begin{align*}
+\nabla\ELBO(\bm{\phi}^{(t)})^T\bm{d}^{(t)} > 0.
+\end{align*}
+Gradient ascent uses Armijo backtracking, while BFGS uses Wolfe conditions to preserve the curvature condition needed for the inverse-Hessian update. Newton's method is included to test whether curvature information improves the optimisation, while also exposing the practical difficulty that the Hessian may not always give a safe ascent direction.
+
+The comparison is not limited to ELBO convergence. The methods are also compared on runtime, iteration count, posterior mean accuracy, and posterior standard-deviation ratios against the analytical posterior and a Gibbs sampler reference. A secondary experiment adds entropy regularisation to the ELBO to test whether explicitly rewarding broader covariance estimates can reduce posterior variance collapse.
+
+The central question is therefore not only which method maximises the ELBO. It is also whether the resulting approximation remains honest about uncertainty. This distinction is the main reason for using the linear model first: the posterior, CAVI baseline, and Gibbs reference can all be checked in the same setting before moving to less tractable models.
+\end{abstract}
+
+\vspace{2em}
+
+\noindent\colorbox{black}{%
+  \parbox{\dimexpr\linewidth-2\fboxsep}{%
+    \centering
+    \vspace{8pt}
+    {\color{white}\large\bfseries Awaiting review by Professor Le Yang}%
+    \vspace{8pt}
+  }%
+}
+
+\end{document}

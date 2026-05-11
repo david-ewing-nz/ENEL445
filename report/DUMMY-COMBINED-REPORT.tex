@@ -1,0 +1,112 @@
+\documentclass[11pt,a4paper]{article}
+
+%  XeLaTeX
+\usepackage{fontspec}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage[useregional]{datetime2}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{tabularray}
+\usepackage{framed}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{eso-pic}
+\usepackage{mathtools}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{xcolor}
+
+\usepackage[backend=biber, style=apa, sorting=nyt]{biblatex}
+\addbibresource{D:/github/ENEL445/report/references.bib}
+
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\hypersetup{
+  pdfauthor   = {David Ewing},
+  pdfsubject  = {\jobname.tex},
+  pdfkeywords = {source: \jobname.tex}
+}
+
+\newcommand{\mymarginlabel}{\textcopyright\ David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\AddToShipoutPictureBG{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[rotate=90, anchor=north]
+      at ($(current page.north west)+(1.4cm,-13cm)$)
+      {\footnotesize\ttfamily \mymarginlabel};
+  \end{tikzpicture}%
+}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\ELBO}{\text{ELBO}}
+\newcommand{\tr}{\text{tr}}
+\setlength{\parindent}{0pt}
+
+\title{
+Gradient-Based Optimisation for Variational Inference:\\
+A Comparative Study Across Five Bayesian Regression Settings
+}
+\author{
+  David Ewing (82171165)\\
+  ENEL445 --- Applied Engineering Optimisation
+}
+\date{12 May 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.7em}
+
+This report applies the gradient-based optimisation methods from ENEL445 to variational
+inference across five Bayesian regression settings: linear, quadratic, logistic,
+hierarchical linear, and hierarchical logistic regression.
+The unifying objective is maximising the Evidence Lower Bound (ELBO), which converts
+intractable posterior inference into a tractable optimisation problem.
+
+Four optimisation methods are compared in each setting: Coordinate Ascent Variational
+Inference (CAVI), gradient ascent with Armijo backtracking, Newton's method with
+regularised finite-difference Hessian, and BFGS with Wolfe conditions.
+The variational family is $q(\bm{\beta}) = \N(\bm{\mu}, \bm{\Sigma})$ with a Cholesky
+reparameterisation to ensure positive definiteness throughout optimisation.
+
+Reference posteriors are obtained from Gibbs samplers.
+For the linear and quadratic cases, the conjugate structure admits closed-form Gibbs
+updates; the variational family is a Normal--Gamma approximation.
+For the logistic case, the Jaakkola--Jordan \parencite{Jaakkola2000} variational bound
+restores tractability, and a P\'{o}lya--Gamma Gibbs sampler \parencite{Polson2013}
+provides the reference.
+
+The four test cases form a designed progression in inferential difficulty:
+the linear case has a conjugate Gaussian likelihood ($n=50$, $p=2$),
+the quadratic case adds nonlinearity via feature expansion ($n=100$, $p=3$),
+the logistic case introduces a non-conjugate Bernoulli likelihood ($n=200$, $p=2$),
+the hierarchical linear case adds group random effects ($J=5$ groups, $N=150$, $p=2$),
+and the hierarchical logistic case combines the Jaakkola--Jordan bound with mixed effects
+($J=5$ groups, $N=150$, $p=2$).
+Posterior variance collapse is mild in the linear case, moderate in the quadratic case,
+minimal in the logistic case, mild in the hierarchical linear case, and symmetric
+(both coefficients) in the hierarchical logistic case.
+CAVI is the most efficient method across all five settings.
+BFGS is the recommended gradient-based alternative when closed-form CAVI updates are
+not available.
+\end{abstract}
+
+\vspace{2em}
+
+\noindent\colorbox{black}{%
+  \parbox{\dimexpr\linewidth-2\fboxsep}{%
+    \centering
+    \vspace{8pt}
+    {\color{white}\large\bfseries Awaiting review by Professor Le Yang}%
+    \vspace{8pt}
+  }%
+}
+
+\end{document}

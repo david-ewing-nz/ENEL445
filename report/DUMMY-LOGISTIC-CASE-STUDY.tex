@@ -1,0 +1,106 @@
+\documentclass[11pt,a4paper]{article}
+
+%  XeLaTeX
+\usepackage{fontspec}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage[useregional]{datetime2}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{tabularray}
+\usepackage{framed}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{eso-pic}
+\usepackage{mathtools}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{xcolor}
+
+\usepackage[backend=biber, style=apa, sorting=nyt]{biblatex}
+\addbibresource{D:/github/ENEL445/report/references.bib}
+
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\hypersetup{
+  pdfauthor   = {David Ewing},
+  pdfsubject  = {\jobname.tex},
+  pdfkeywords = {source: \jobname.tex}
+}
+
+\newcommand{\mymarginlabel}{\textcopyright\ David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\AddToShipoutPictureBG{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[rotate=90, anchor=north]
+      at ($(current page.north west)+(1.4cm,-13cm)$)
+      {\footnotesize\ttfamily \mymarginlabel};
+  \end{tikzpicture}%
+}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\ELBO}{\text{ELBO}}
+\newcommand{\tr}{\text{tr}}
+\setlength{\parindent}{0pt}
+
+\title{
+Case Study 3 --- Bayesian Logistic Regression:\\[0.4em]
+Gradient-Based Optimisation and Posterior Variance Collapse
+}
+\author{
+  David Ewing (82171165)
+}
+\date{12 May 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.7em}
+
+This report applies the gradient-based optimisation methods from ENEL445 to variational
+inference in Bayesian logistic regression.
+Unlike the Gaussian regression setting, logistic regression has no conjugate variational
+family, and the Evidence Lower Bound (ELBO) does not admit a simple closed-form update.
+The Jaakkola--Jordan \parencite{Jaakkola2000} variational lower bound provides a tractable
+ELBO for logistic regression via the local variational bound $\log\sigma(\psi) \geq
+\tfrac{\psi}{2} - \log 2\cosh(\xi/2)$, which is tight when $\xi = \sqrt{\E[\psi^2]}$.
+
+Four optimisation methods are applied to maximise the ELBO:
+Coordinate Ascent Variational Inference (CAVI), gradient ascent with Armijo backtracking,
+Newton's method with regularised finite-difference Hessian, and BFGS with Wolfe conditions.
+The variational family is $q(\bm{\beta}) = \N(\bm{\mu},\bm{\Sigma})$ with a
+Cholesky reparameterisation to preserve positive definiteness throughout optimisation.
+
+The reference posterior is obtained from a P\'{o}lya--Gamma Gibbs sampler
+\parencite{Polson2013} using a truncated sum-of-gammas approximation with $T=50$ terms.
+Diagnostics include effective sample size (ESS), autocorrelation function (ACF) plots,
+and computational cost per effective sample.
+
+The model is $y_i \sim \mathrm{Bernoulli}(\sigma(\beta_0 + \beta_1 x_i))$
+with $\bm{\beta}_{\mathrm{true}} = (-1.0,\; 2.0)$ and $n=200$ observations.
+All four VI methods recover posterior means within $0.02$ of the Gibbs reference.
+CAVI converges in fewer than 50 iterations and is several orders of magnitude faster
+than the P\'{o}lya--Gamma sampler, which requires $200$ Gamma draws per iteration.
+The fair timing comparison is each VI method versus the PG Gibbs reference within
+this notebook; differences in likelihood structure, parameter count, and Gibbs cost
+mean that cross-notebook timing figures are not controlled experiments.
+\end{abstract}
+
+\vspace{2em}
+
+\noindent\colorbox{black}{%
+  \parbox{\dimexpr\linewidth-2\fboxsep}{%
+    \centering
+    \vspace{8pt}
+    {\color{white}\large\bfseries Awaiting review by Professor Le Yang}%
+    \vspace{8pt}
+  }%
+}
+
+\end{document}

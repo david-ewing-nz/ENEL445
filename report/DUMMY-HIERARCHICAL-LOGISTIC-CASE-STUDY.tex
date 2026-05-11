@@ -1,0 +1,101 @@
+\documentclass[11pt,a4paper]{article}
+
+%  XeLaTeX
+\usepackage{fontspec}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage[useregional]{datetime2}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{tabularray}
+\usepackage{framed}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{eso-pic}
+\usepackage{mathtools}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{xcolor}
+
+\usepackage[backend=biber, style=apa, sorting=nyt]{biblatex}
+\addbibresource{D:/github/ENEL445/report/references.bib}
+
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\hypersetup{
+  pdfauthor   = {David Ewing},
+  pdfsubject  = {\jobname.tex},
+  pdfkeywords = {source: \jobname.tex}
+}
+
+\newcommand{\mymarginlabel}{\textcopyright\ David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\AddToShipoutPictureBG{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[rotate=90, anchor=north]
+      at ($(current page.north west)+(1.4cm,-13cm)$)
+      {\footnotesize\ttfamily \mymarginlabel};
+  \end{tikzpicture}%
+}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\ELBO}{\text{ELBO}}
+\newcommand{\tr}{\text{tr}}
+\setlength{\parindent}{0pt}
+
+\title{
+Case Study 5 --- Hierarchical Bayesian Logistic Regression:\\[0.4em]
+Gradient-Based Optimisation and Posterior Variance Collapse
+}
+\author{
+  David Ewing (82171165)
+}
+\date{12 May 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.7em}
+
+This report applies the gradient-based optimisation methods from ENEL445 to variational
+inference in hierarchical Bayesian logistic regression.
+This model combines two sources of analytical difficulty from previous case studies:
+the non-conjugate logistic likelihood (Case Study~3) and the hierarchical random-effects
+structure (Case Study~4).
+Group random effects $u_j \sim \mathcal{N}(0,\tau_u^{-1})$ augment the fixed effects
+$\bm{\beta}$, and the Jaakkola--Jordan \parencite{Jaakkola2000} bound is required to
+retain a tractable ELBO.
+The unconstrained parameter dimension is $D=17$.
+
+Four optimisation methods are applied: CAVI, gradient ascent with Armijo backtracking,
+Newton's method, and BFGS.
+The reference posterior is provided by a P\'{o}lya--Gamma blocked Gibbs sampler
+\parencite{Polson2013} with $T=50$ truncation terms, 3 chains $\times$ 2000 iterations.
+
+A key finding is pronounced posterior variance collapse in both $\beta_0$ and $\beta_1$
+(SD ratios $\approx 0.46$), reflecting the mean-field VI family's failure to capture
+the posterior correlation between the fixed effects and the group random effects.
+CAVI and BFGS converge to the same ELBO optimum $1050\times$ and $81\times$ faster
+than the PG Gibbs sampler respectively.
+Newton's method again fails to find the correct optimum, converging to a suboptimal
+point with markedly worse ELBO.
+\end{abstract}
+
+\vspace{2em}
+
+\noindent\colorbox{black}{%
+  \parbox{\dimexpr\linewidth-2\fboxsep}{%
+    \centering
+    \vspace{8pt}
+    {\color{white}\large\bfseries Awaiting review by Professor Le Yang}%
+    \vspace{8pt}
+  }%
+}
+
+\end{document}

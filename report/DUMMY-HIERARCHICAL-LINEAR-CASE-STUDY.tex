@@ -1,0 +1,105 @@
+\documentclass[11pt,a4paper]{article}
+
+%  XeLaTeX
+\usepackage{fontspec}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage[useregional]{datetime2}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{tabularray}
+\usepackage{framed}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{eso-pic}
+\usepackage{mathtools}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{xcolor}
+
+\usepackage[backend=biber, style=apa, sorting=nyt]{biblatex}
+\addbibresource{D:/github/ENEL445/report/references.bib}
+
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\hypersetup{
+  pdfauthor   = {David Ewing},
+  pdfsubject  = {\jobname.tex},
+  pdfkeywords = {source: \jobname.tex}
+}
+
+\newcommand{\mymarginlabel}{\textcopyright\ David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\AddToShipoutPictureBG{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[rotate=90, anchor=north]
+      at ($(current page.north west)+(1.4cm,-13cm)$)
+      {\footnotesize\ttfamily \mymarginlabel};
+  \end{tikzpicture}%
+}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\ELBO}{\text{ELBO}}
+\newcommand{\tr}{\text{tr}}
+\setlength{\parindent}{0pt}
+
+\title{
+Case Study 4 --- Hierarchical Bayesian Linear Regression:\\[0.4em]
+Gradient-Based Optimisation and Posterior Variance Collapse
+}
+\author{
+  David Ewing (82171165)
+}
+\date{12 May 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.7em}
+
+This report applies the gradient-based optimisation methods from ENEL445 to variational
+inference in hierarchical Bayesian linear regression.
+Extending the simple Gaussian regression setting, this model introduces $J=5$ group-level
+random effects $u_j \sim \mathcal{N}(0,\tau_u^{-1})$ alongside the noise precision
+$\tau_e$ as additional latent variables with Gamma priors.
+The Evidence Lower Bound (ELBO) for this conjugate model admits closed-form CAVI updates,
+but also serves as a smooth objective for gradient-based methods, with $D=19$ unconstrained
+parameters.
+
+Four optimisation methods are applied to maximise the ELBO:
+Coordinate Ascent Variational Inference (CAVI), gradient ascent with Armijo backtracking,
+Newton's method with regularised finite-difference Hessian, and BFGS with Wolfe conditions.
+The variational family is a mean-field product
+$q(\bm{\beta})\prod_j q(u_j) \cdot q(\tau_e)\cdot q(\tau_u)$
+with Gaussian random effects and Gamma precision approximations, and a
+Cholesky reparameterisation for $\bm{\Sigma}_\beta$.
+
+The reference posterior is obtained from a conjugate blocked Gibbs sampler
+using 3 chains of 5000 iterations (500 burn-in each).
+A striking finding is severe posterior variance collapse for $\beta_0$
+(SD ratio $\approx 0.13$ for CAVI and BFGS), driven by the mean-field factorisation
+absorbing shared group-level variance into the random effects $u_j$ rather than
+the population intercept.
+Newton's method fails to converge to the correct optimum, highlighting the
+sensitivity of second-order methods to poor Hessian conditioning in high-dimensional
+hierarchical models.
+\end{abstract}
+
+\vspace{2em}
+
+\noindent\colorbox{black}{%
+  \parbox{\dimexpr\linewidth-2\fboxsep}{%
+    \centering
+    \vspace{8pt}
+    {\color{white}\large\bfseries Awaiting review by Professor Le Yang}%
+    \vspace{8pt}
+  }%
+}
+
+\end{document}
