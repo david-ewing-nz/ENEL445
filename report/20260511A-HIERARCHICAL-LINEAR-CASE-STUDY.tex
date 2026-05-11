@@ -33,7 +33,7 @@
 }
 
 % Running margin label
-\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\newcommand{\mymarginlabel}{\textcopyright\ David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
 \AddToShipoutPictureBG{%
   \begin{tikzpicture}[remember picture,overlay]
     \node[rotate=90, anchor=north]
@@ -99,31 +99,233 @@ hierarchical models.
 \newpage
 
 %─────────────────────────────────────────────────────────────────────────────
-\section*{Introduction}
+\section{Introduction}
 %─────────────────────────────────────────────────────────────────────────────
 
-Hierarchical models are ubiquitous in applied statistics: they allow population-level
-parameters to be shared across groups while capturing group-specific variation through
-random effects.
-Bayesian inference in such models requires integrating out both the fixed effects
-$\bm{\beta}$, the random effects $\mathbf{u}=(u_1,\ldots,u_J)^T$, and the precision
-hyperparameters $\tau_e, \tau_u$.
-Even for Gaussian likelihoods, the joint posterior
+Hierarchical Bayesian linear regression is the natural extension of the simple
+Gaussian regression baseline (Case Study~1) to settings with group structure.
+It provides the first non-trivial test of whether gradient-based VI methods can
+navigate a substantially higher-dimensional posterior whilst competing with the conjugate
+Gibbs reference, and whether \emph{posterior variance collapse} --- a known failure
+mode of mean-field VI --- manifests and can be detected.
+
+Bayesian inference provides principled uncertainty quantification but requires computing
+intractable posterior distributions. For most real-world models, the posterior integral,
 \begin{equation*}
-  p(\bm{\beta},\mathbf{u},\tau_e,\tau_u \mid \mathbf{y})
-  \propto p(\mathbf{y}\mid\bm{\beta},\mathbf{u},\tau_e)\,
-           p(\bm{\beta})\,p(\mathbf{u}\mid\tau_u)\,
-           p(\tau_e)\,p(\tau_u)
+    p(\bm{\theta} \mid \bm{y}) = \frac{p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})}
+    {\displaystyle\int p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})\, d\bm{\theta}},
 \end{equation*}
-is high-dimensional and computationally challenging at scale.
+is intractable.
+In this case study,
+$\bm{\theta} = (\bm{\beta},\,\mathbf{u},\,\tau_e,\,\tau_u)$
+--- the population-level regression coefficients, the $J$ group-level random effects,
+the observation noise precision, and the random-effect precision --- so the posterior
+of interest is
+\begin{equation*}
+    p(\bm{\beta},\mathbf{u},\tau_e,\tau_u \mid \mathbf{y})
+    \propto p(\mathbf{y}\mid\bm{\beta},\mathbf{u},\tau_e)\,
+             p(\bm{\beta})\,p(\mathbf{u}\mid\tau_u)\,
+             p(\tau_e)\,p(\tau_u).
+\end{equation*}
+The substitution $\bm{\theta} = (\bm{\beta},\mathbf{u},\tau_e,\tau_u)$ is specific to
+this case study; other case studies define $\bm{\theta}$ according to their own model
+parameters.
+Unlike Case Study~1, this posterior does not factorise into a product of independent
+conjugate terms; the random effects $u_j$ and the precision $\tau_u$ are tightly coupled,
+making direct computation challenging even for Gaussian likelihoods.
 
 Variational Inference (VI) converts this integration into optimisation by finding
 a tractable approximate posterior $q$ that maximises the Evidence Lower Bound (ELBO).
-This report investigates how the gradient-based methods from ENEL445 perform on a
-$D=19$-dimensional hierarchical model, compared to the conjugate Gibbs reference.
-Of particular interest is \emph{posterior variance collapse}: the tendency of
-mean-field VI to underestimate marginal posterior variance when the true posterior
-has strong inter-variable correlation.
+This report investigates how the gradient-based methods from ENEL445 perform on this
+higher-dimensional problem, compared to the conjugate blocked Gibbs sampler as the
+reference.
+
+A well-known failure mode of mean-field VI is \emph{posterior variance collapse}:
+the optimised approximation $q(\bm{\theta})$ is systematically overconfident,
+underestimating posterior uncertainty.
+This arises because the mean-field factorisation discards posterior \emph{correlations}
+between blocks --- here, between the intercept $\beta_0$ and the group means $u_j$
+--- forcing each factor to concentrate more tightly than the true marginal.%
+\footnote{The mechanistic derivation is given in Case Study~1 (Appendix~A).}
+
+This report applies four optimisation methods --- CAVI, gradient ascent, Newton's
+method, and BFGS --- to the ELBO and compares their convergence behaviour,
+computational cost, and posterior quality.
+Of particular interest is whether the SD ratio
+$\sigma_{\mathrm{VI}}/\sigma_{\mathrm{Gibbs}}$ departs substantially from unity,
+signalling collapse, and which parameters are most affected.
+
+Throughout all gradient-based methods, the variational covariance $\bm{\Sigma}_\beta$
+must remain symmetric positive definite at every iteration.%
+\footnote{This structural constraint is satisfied automatically via Cholesky
+reparameterisation; derivation in Case Study~1 (Appendix~B).}
+
+The classical foundation for the variational framework used here is least-squares
+regression, as developed in lectures by Prof.\ Roy S.\ Smith (Erskine Visiting Fellow,
+ETH~Z\"{u}rich, ENEL445 2026).
+The design matrix $\bm{X}$%
+\footnote{Denoted $\Phi$ and called the \emph{regressor matrix} in lectures
+(Prof.\ R.\,S.\ Smith, ENEL445 2026).}
+and coefficient vector $\bm{\beta}$%
+\footnote{Denoted $\theta$ in lectures.}
+follow the standard over-determined formulation.
+The noise model adopted here --- errors on $\bm{y}$ only, with noise precision
+$\tau_e$ --- corresponds to the equation-error form; this is an explicit modelling
+assumption rather than a derived result.
+
+\subsection{Bayesian Regression Model}
+
+The hierarchical Bayesian linear regression model is
+\begin{align}
+y_{ij} \mid \bm{\beta}, u_j, \tau_e
+  &\sim \mathcal{N}\!\bigl(\mathbf{x}_{ij}^T\bm{\beta} + u_j,\; \tau_e^{-1}\bigr),
+  \quad i=1,\ldots,n_j,\; j=1,\ldots,J, \\
+u_j \mid \tau_u &\sim \mathcal{N}(0,\; \tau_u^{-1}), \\
+\bm{\beta} &\sim \N(\bm{0},\; \lambda^{-1}\bm{I}_p), \quad \lambda=0.1, \\
+\tau_e &\sim \mathrm{Gamma}(\alpha_e,\; \gamma_e), \quad \alpha_e=\gamma_e=1, \\
+\tau_u &\sim \mathrm{Gamma}(\alpha_u,\; \gamma_u), \quad \alpha_u=\gamma_u=1.
+\end{align}
+Here $\bm{X}$ is the design matrix with rows $\mathbf{x}_{ij}^T = (1, x_{ij})$,
+$\mathbf{y}$ is the response vector, $\bm{\beta}$ is the fixed-effect coefficient
+vector, $u_j$ is the group-$j$ random effect, and $\tau_e$, $\tau_u$ are the
+noise and random-effect precisions respectively.
+
+\subsection{Mean-Field Variational Approximation}
+
+The mean-field variational family factorises as
+\begin{align}
+q(\bm{\beta},\mathbf{u},\tau_e,\tau_u)
+  &= q(\bm{\beta})\;\prod_{j=1}^{J} q(u_j)\;\cdot\; q(\tau_e)\;\cdot\; q(\tau_u),
+\end{align}
+with
+\begin{align}
+q(\bm{\beta}) &= \N(\bm{\mu}_\beta,\,\bm{\Sigma}_\beta), \\
+q(u_j) &= \mathcal{N}(m_j,\, v_j), \quad j=1,\ldots,J, \\
+q(\tau_e) &= \mathrm{Gamma}(a_e,\, b_e), \\
+q(\tau_u) &= \mathrm{Gamma}(a_u,\, b_u).
+\end{align}
+The variational parameters are
+$\bm{\theta} = (\bm{\mu}_\beta, \bm{L}, m_1,\ldots,m_J, \log v_1,\ldots,\log v_J,
+\log a_e, \log b_e, \log a_u, \log b_u)$,
+where $\bm{\Sigma}_\beta = \bm{L}\bm{L}^T$ and $\bm{L}$ is lower-triangular with
+positive diagonal, giving $D = p + p(p+1)/2 + J + J + 4 = 2 + 3 + 5 + 5 + 4 = 19$
+unconstrained parameters for $p=2$, $J=5$.
+
+\subsection{Key Notation}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Symbol & Meaning \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Bayesian model}} \\
+$\bm{X}$ & Design matrix ($N \times p$), rows $\mathbf{x}_{ij}^T$ \\
+$\mathbf{y}$ & Continuous response vector \\
+$\bm{\beta}$ & Fixed-effect coefficient vector \\
+$u_j$ & Group random effect for group $j$ \\
+$\tau_e, \tau_u$ & Noise and random-effect precision \\
+$N, J, p$ & Total observations, groups, predictors \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Variational approximation}} \\
+$q(\bm{\beta})$ & Variational Gaussian for fixed effects \\
+$\bm{\mu}_\beta, \bm{\Sigma}_\beta$ & Mean and covariance of $q(\bm{\beta})$ \\
+$\bm{L}$ & Cholesky factor, $\bm{\Sigma}_\beta=\bm{L}\bm{L}^T$ \\
+$m_j, v_j$ & Mean and variance of $q(u_j)$ \\
+$a_e, b_e$ & Gamma parameters of $q(\tau_e)$ \\
+$a_u, b_u$ & Gamma parameters of $q(\tau_u)$ \\
+$\mathcal{L}(\bm{\theta})$ & ELBO (maximised) \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Reparameterisation}} \\
+$\bm{L}$ & Lower-triangular Cholesky factor, $\bm{\Sigma}_\beta=\bm{L}\bm{L}^T$ \\
+$\tilde{\ell}_{ii}$ & Log-diagonal entry, $L_{ii}=e^{\tilde{\ell}_{ii}}$ (ensures $L_{ii}>0$) \\
+$\log v_j$ & Log-variance, $v_j=e^{\log v_j}>0$ \\
+$\bm{\theta}$ & Unconstrained optimisation vector ($D=19$) \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Optimisation}} \\
+$\bm{d}^{(t)}$ & Search direction at iteration $t$ \\
+$\alpha_t$ & Step size (line-search parameter) at iteration $t$ \\
+$\nabla\mathcal{L}$ & Gradient of the ELBO w.r.t.\ $\bm{\theta}$ \\
+$\nabla^2\mathcal{L}$ & Hessian of the ELBO w.r.t.\ $\bm{\theta}$ \\
+$\bm{B}_t$ & BFGS inverse-Hessian approximation at iteration $t$ \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Special functions}} \\
+$\psi(x)$ & Digamma function, $\psi(x)=\tfrac{d}{dx}\log\Gamma(x)$ \\
+$\psi^{(1)}(x)$ & Trigamma function, $\psi^{(1)}(x)=\tfrac{d}{dx}\psi(x)$ \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Lecture correspondence} (Prof.\ R.\,S.\ Smith, ENEL445 2026)} \\
+$J(\theta)$ & Cost function $=\mathcal{L}(\bm{\theta})$ in this report \\
+$\Phi$ & Regressor matrix $=\bm{X}$ in this report \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Numerical Study and Required Optimisation Components}
+
+This report formulates variational inference for hierarchical Bayesian linear regression
+as an optimisation problem and applies four methods: Coordinate Ascent Variational
+Inference (CAVI), gradient ascent, Newton's method, and BFGS. Each method is
+characterised by four components from the course framework: entry conditions, search
+direction, line search, and exit conditions. All four methods share the same initial
+point so that comparisons reflect method behaviour rather than initialisation.
+
+\subsubsection*{Entry Conditions}
+
+All methods are initialised at the prior mean:
+$\bm{\mu}_\beta = \bm{0}$, $\bm{\Sigma}_\beta = \bm{I}_p$,
+$m_j = 0$, $v_j = 1$ for $j=1,\ldots,J$,
+$a_e = \alpha_e$, $b_e = \gamma_e$, $a_u = \alpha_u$, $b_u = \gamma_u$.
+In the unconstrained parameterisation this corresponds to $\bm{L} = \bm{I}_p$
+(so $\tilde{\ell}_{ii} = 0$), $\log v_j = 0$, and the log-space Gamma parameters
+at their prior values.
+CAVI uses the same starting variational parameters.
+
+\subsubsection*{Search Direction}
+
+For all gradient-based methods, the proposed search direction must be an ascent
+direction before a step is accepted:
+\begin{align}
+\nabla \ELBO(\bm{\theta}^{(t)})^T \bm{d}^{(t)} > 0.
+\end{align}
+Gradient ascent uses $\bm{d}^{(t)} = \nabla\mathcal{L}(\bm{\theta}^{(t)})$ directly.
+Newton's method uses $\bm{d}^{(t)} = -[\nabla^2\mathcal{L}(\bm{\theta}^{(t)})]^{-1}\nabla\mathcal{L}(\bm{\theta}^{(t)})$,
+falling back to the gradient direction if the Hessian is not positive definite.
+BFGS approximates the inverse Hessian as $\bm{B}_t$ and uses
+$\bm{d}^{(t)} = \bm{B}_t \nabla\mathcal{L}(\bm{\theta}^{(t)})$.
+CAVI replaces the search direction with closed-form coordinate updates derived
+analytically from the model.
+
+\subsubsection*{Line Search}
+
+The step size $\alpha^{(t)}$ is determined per method.
+Gradient ascent uses Armijo backtracking: starting from an initial step size,
+$\alpha^{(t)}$ is halved until sufficient increase in the ELBO is achieved.
+BFGS uses Wolfe conditions, combining sufficient increase with a curvature condition
+that ensures
+\begin{align}
+\bm{y}_t^T \bm{s}_t > 0,
+\end{align}
+where $\bm{s}_t = \bm{\theta}^{(t+1)} - \bm{\theta}^{(t)}$ and
+$\bm{y}_t = \nabla\mathcal{L}(\bm{\theta}^{(t+1)}) - \nabla\mathcal{L}(\bm{\theta}^{(t)})$.
+This positivity condition is required for the BFGS update to preserve positive
+definiteness of $\bm{B}_t$.
+Newton's method uses a fixed step size of 1 unless the Hessian is indefinite.
+CAVI has no line search: each coordinate update exactly maximises the ELBO with
+respect to that parameter in closed form.
+
+\subsubsection*{Exit Conditions}
+
+Exit conditions are applied uniformly across the optimisation methods.
+Iteration terminates when any of the following conditions is satisfied:
+\begin{enumerate}[label=(\roman*)]
+  \item Gradient norm: $\lVert \nabla \ELBO \rVert < \varepsilon_g$.
+  \item Relative ELBO change: $\lvert \Delta \ELBO \rvert / \lvert \ELBO \rvert < \varepsilon_r$.
+  \item Parameter change: $\lVert \Delta \bm{\theta} \rVert < \varepsilon_\theta$.
+  \item Maximum iterations: $t \geq t_{\max}$.
+\end{enumerate}
+CAVI additionally monitors the maximum relative change in its variational parameters:
+\begin{align}
+\max_i \frac{\lvert \theta_i^{(t+1)} - \theta_i^{(t)} \rvert}{\lvert \theta_i^{(t+1)} \rvert} < \varepsilon.
+\end{align}
 
 %─────────────────────────────────────────────────────────────────────────────
 \section{Model Formulation}
@@ -208,42 +410,6 @@ The coordinate ascent updates cycle over:
   b_u \leftarrow \gamma_u + \tfrac{1}{2}\sum_j\!(m_j^2 + v_j),
 \end{align}
 where $\E[\tau_e] = a_e/b_e$ and $\E[\tau_u] = a_u/b_u$.
-
-\subsection{Key Notation}
-
-\begin{center}
-\begin{tabular}{@{}ll@{}}
-\toprule
-Symbol & Meaning \\
-\midrule
-\multicolumn{2}{@{}l}{\textbf{Bayesian model}} \\
-$\bm{X}$ & Design matrix ($N \times p$), rows $\mathbf{x}_{ij}^T$ \\
-$\mathbf{y}$ & Continuous response vector \\
-$\bm{\beta}$ & Fixed-effect coefficient vector \\
-$u_j$ & Group random effect for group $j$ \\
-$\tau_e, \tau_u$ & Noise and random-effect precision \\
-$N, J, p$ & Total observations, groups, predictors \\
-\midrule
-\multicolumn{2}{@{}l}{\textbf{Variational approximation}} \\
-$q(\bm{\beta})$ & Variational Gaussian for fixed effects \\
-$\bm{\mu}_\beta, \bm{\Sigma}_\beta$ & Mean and covariance of $q(\bm{\beta})$ \\
-$\bm{L}$ & Cholesky factor, $\bm{\Sigma}_\beta=\bm{L}\bm{L}^T$ \\
-$m_j, v_j$ & Mean and variance of $q(u_j)$ \\
-$a_e, b_e$ & Gamma parameters of $q(\tau_e)$ \\
-$a_u, b_u$ & Gamma parameters of $q(\tau_u)$ \\
-$\mathcal{L}(\bm{\theta})$ & ELBO (maximised) \\
-\midrule
-\multicolumn{2}{@{}l}{\textbf{Optimisation}} \\
-$\bm{\theta}$ & Unconstrained vector ($D=19$) \\
-$\bm{d}^{(t)}$ & Search direction at iteration $t$ \\
-$\alpha_t$ & Step size at iteration $t$ \\
-\midrule
-\multicolumn{2}{@{}l}{\textbf{Lecture correspondence} (Prof.\ R.\,S.\ Smith, ENEL445 2026)} \\
-$J(\theta)$ & Cost function $=\mathcal{L}(\bm{\theta})$ in this report \\
-$\Phi$ & Regressor matrix $=\bm{X}$ in this report \\
-\bottomrule
-\end{tabular}
-\end{center}
 
 %─────────────────────────────────────────────────────────────────────────────
 \section{Conjugate Gibbs Sampler}

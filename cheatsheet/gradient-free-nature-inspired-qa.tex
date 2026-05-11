@@ -9,6 +9,21 @@
 \newcommand{\Q}[2]{\subsection*{Q#1 \quad #2}}
 \newenvironment{answer}{\medskip\textbf{Answer.}\par}{\bigskip\hrule\bigskip}
 
+\usepackage{eso-pic}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage[useregional]{datetime2}
+
+% Running margin label
+\newcommand{\mymarginlabel}{\textcopyright\ David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\AddToShipoutPictureBG{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[rotate=90, anchor=north]
+      at ($(current page.north west)+(1.4cm,-13cm)$)
+      {\scriptsize\ttfamily \mymarginlabel};
+  \end{tikzpicture}%
+}
+
 \begin{document}
 
 \begin{center}

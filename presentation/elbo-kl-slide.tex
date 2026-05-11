@@ -1,0 +1,107 @@
+\documentclass[aspectratio=169,12pt]{beamer}
+
+%% ── Packages ──────────────────────────────────────────────────────────────
+\usepackage{amsmath}
+\usepackage{bm}
+\usepackage{mathtools}   % for \underbrace spacing fixes
+\usepackage{booktabs}    % for \toprule etc.
+\usepackage{xcolor}
+
+%% ── Theme ─────────────────────────────────────────────────────────────────
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+
+%% ── Macros ────────────────────────────────────────────────────────────────
+\newcommand{\KL}{\mathrm{KL}}
+\newcommand{\tr}{\mathrm{tr}}
+
+%% ══════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+\begin{frame}{ELBO Decomposition and the Role of Entropy}
+
+\bigskip
+
+%% ── KL decomposition ──────────────────────────────────────────────────────
+The KL divergence between the variational approximation $q$ and the prior $p$
+decomposes as:
+
+\bigskip
+\begin{equation*}
+  \KL(q \| p)
+    \;=\;
+    \underbrace{-H[q]}_{\displaystyle\text{neg.\ entropy of } q}
+    \;-\;
+    \underbrace{\mathbb{E}_{q}[\log p(\bm{\beta})]}_{\displaystyle\text{expected log-prior}}
+\end{equation*}
+
+\bigskip\bigskip
+
+%% ── ELBO ──────────────────────────────────────────────────────────────────
+Maximising the Evidence Lower Bound (ELBO) therefore balances two forces:
+
+\bigskip
+\begin{equation*}
+  \mathcal{L}(\bm{\theta})
+    \;=\;
+    \underbrace{\mathbb{E}_{q}[\log p(\mathbf{y} \mid \bm{\beta})]}_{\displaystyle\text{fit the data}}
+    \;-\;
+    \underbrace{\KL(q \| p)}_{\displaystyle\text{stay close to prior}}
+\end{equation*}
+
+\end{frame}
+
+%% ══════════════════════════════════════════════════════════════════════════
+\begin{frame}{KL Direction: Collapse vs.\ Expansion}
+
+\textbf{Q:} Why does $\KL(q\|p)$ cause posterior variance \emph{collapse},
+while $\KL(p\|q)$ causes posterior variance \emph{expansion}?
+
+\bigskip
+
+The answer is entirely in \textbf{which distribution the expectation is taken under}:
+
+\medskip
+\begin{columns}[T]
+
+\column{0.48\textwidth}
+\textbf{$\KL(q\|p)$ — used in VI — ``mode-seeking''}
+\begin{equation*}
+  \mathbb{E}_{\textcolor{blue}{q}}\!\bigl[\log q(\bm{\beta}) - \log p(\bm{\beta}\mid\mathbf{y})\bigr]
+\end{equation*}
+$q$ samples its \emph{own} regions.
+Where $p\approx 0$, $q$ simply avoids that region — no penalty.\\[4pt]
+$\Rightarrow$ $q$ \textbf{collapses onto one mode}; tails of $p$ are ignored.
+
+\column{0.48\textwidth}
+\textbf{$\KL(p\|q)$ — ``mean-seeking''}
+\begin{equation*}
+  \mathbb{E}_{\textcolor{red}{p}}\!\bigl[\log p(\bm{\beta}\mid\mathbf{y}) - \log q(\bm{\beta})\bigr]
+\end{equation*}
+$p$ drives the expectation.
+Wherever $p>0$ and $q\approx 0$, $\log q\to-\infty$ — infinite penalty.\\[4pt]
+$\Rightarrow$ $q$ must \textbf{cover all of $p$'s mass}; variance expands.
+
+\end{columns}
+
+\bigskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lll@{}}
+\toprule
+& \textbf{Penalises} & \textbf{So $q$\ldots} \\
+\midrule
+$\KL(q\|p)$ & $q>0$ where $p\approx 0$ & shrinks to avoid $p$'s tails $\to$ \textbf{collapse} \\
+$\KL(p\|q)$ & $q\approx 0$ where $p>0$ & expands to cover $p$'s tails $\to$ \textbf{expansion} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\smallskip
+{\small VI uses $\KL(q\|p)$ because sampling from $q$ is tractable;
+sampling from the true posterior $p$ is the problem we are trying to solve.}
+
+\end{frame}
+
+\end{document}

@@ -33,7 +33,7 @@
 }
 
 % Running margin label
-\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\newcommand{\mymarginlabel}{\textcopyright\ David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
 \AddToShipoutPictureBG{%
   \begin{tikzpicture}[remember picture,overlay]
     \node[rotate=90, anchor=north]
@@ -115,8 +115,8 @@ other case studies in this project define $\bm{\theta}$ according to their own m
 Conjugate Gaussian--Gamma priors make this case study a deliberate exception: the posterior
 is analytically tractable and CAVI coordinate updates are closed-form, providing a verified
 reference against which gradient-based VI methods can be compared.
-Variational Inference (VI) converts this inference problem into an optimisation problem, making it directly amenable to the gradient-based methods in this course.
 
+Variational Inference (VI) converts this inference problem into an optimisation problem, making it directly amenable to the gradient-based methods in this course.
 Instead of computing the true posterior, VI finds the ``best'' approximation $q(\bm{\theta})$ from a tractable family $Q(\bm{\theta})$
 by maximising the Evidence Lower Bound (ELBO). 
 This transforms intractable integration into tractable optimisation---a natural testbed for the gradient-based methods.
@@ -124,7 +124,7 @@ This transforms intractable integration into tractable optimisation---a natural 
 A well-known failure mode of mean-field VI is \emph{posterior variance collapse}:
 the optimised approximation $q(\bm{\theta})$ is systematically overconfident,
 underestimating posterior uncertainty. This is a direct consequence of the KL direction minimised during ELBO maximisation,
-compounded by the mean-field factorisation assumption.\footnote{See Appendix~\ref{app:vb-collapse} for the full mechanistic explanation.}
+compounded by the mean-field factorisation assumption.\footnote{See \ref{app:vb-collapse} for the full mechanistic explanation.}
 
 This paper applies four optimisation methods---CAVI, gradient ascent, Newton's method, and BFGS---to the ELBO and compares their convergence behaviour, computational cost, and posterior quality.
 As a secondary investigation, the ELBO is augmented with an entropy regularisation term $\lambda H[q(\bm{\beta})]$,

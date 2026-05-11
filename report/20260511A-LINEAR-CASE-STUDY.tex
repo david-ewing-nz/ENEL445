@@ -33,7 +33,7 @@
 }
 
 % Running margin label
-\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\newcommand{\mymarginlabel}{\textcopyright\ David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
 \AddToShipoutPictureBG{%
   \begin{tikzpicture}[remember picture,overlay]
     \node[rotate=90, anchor=north]
@@ -91,7 +91,7 @@ The central question is therefore not only which method maximises the ELBO. It i
 \end{abstract}
 
 \newpage
-\section*{Introduction}
+\section{Introduction}
 
 Bayesian linear regression is the simplest non-trivial model in which all components
 of variational inference---the ELBO, its gradient, and the posterior approximation---can
@@ -126,7 +126,7 @@ the optimised approximation $q(\bm{\theta})$ is systematically overconfident,
 underestimating posterior uncertainty. This is a direct consequence of the KL direction minimised during ELBO maximisation,
 compounded by the mean-field factorisation assumption.\footnote{See \ref{app:vb-collapse} for the full mechanistic explanation.}
 
-This paper applies four optimisation methods---CAVI, gradient ascent, Newton's method, and BFGS---to the ELBO and compares their convergence behaviour, computational cost, and posterior quality.
+This report applies four optimisation methods---CAVI, gradient ascent, Newton's method, and BFGS---to the ELBO and compares their convergence behaviour, computational cost, and posterior quality.
 As a secondary investigation, the ELBO is augmented with an entropy regularisation term $\lambda H[q(\bm{\beta})]$,
 \begin{equation*}
     \mathcal{L}_{\mathrm{reg}}(\bm{\phi}) = \mathcal{L}(\bm{\phi}) + \lambda H[q(\bm{\beta})],
@@ -348,6 +348,18 @@ The second cause is the direction of the KL divergence implied by the ELBO. Stan
                    &= \int_0^\infty \int_{\R^p} q(\bm{\beta},\tau_e)\log\frac{q(\bm{\beta},\tau_e)}{p(\bm{\beta},\tau_e\mid\bm{y})}\,d\bm{\beta}\,d\tau_e \notag\\
                    &= \int_0^\infty \int_{\R^p} q(\bm{\beta})\,q(\tau_e)\log\frac{q(\bm{\beta})\,q(\tau_e)}{p(\bm{\beta},\tau_e\mid\bm{y})}\,d\bm{\beta}\,d\tau_e.
 \end{align}
+The three-line integral is deceptively simple to implement.
+Because each variational factor belongs to the exponential family, both KL contributions reduce to closed-form entropy formulas (see Appendix~\ref{app:entropy}),
+so the entire KL computation reduces to two lines in \texttt{linear\_run.ipynb}:
+\begin{verbatim}
+# -E[log q(beta)] = Gaussian entropy (closed-form)
+sign, logdet = np.linalg.slogdet(Sigma)
+neg_lq_beta = 0.5 * logdet + 0.5 * p * (1 + np.log(2 * np.pi))
+
+# -E[log q(tau_e)] = Gamma entropy (closed-form)
+neg_lq_tau = a_e - np.log(b_e) + gammaln(a_e) + (1 - a_e) * digamma(a_e)
+\end{verbatim}
+
 This objective penalises $q$ heavily when it puts probability mass in regions where the true posterior is small. It is less severe when $q$ simply fails to cover parts of the true posterior support. In practice, the approximation is encouraged to sit on the high-density centre of $p(\bm{\beta},\tau_e\mid\bm{y})$ rather than cover the full posterior spread. Since the analytical posterior is available in this case, this narrowing can be measured directly.
 
 \subsection{Diagnostic}
@@ -551,6 +563,67 @@ with true parameters $\beta_0=2.0$, $\beta_1=1.5$, and noise precision $\tau_e=4
     function $\beta_0 + \beta_1 x$; the shaded band is $\pm\sigma_e$.}
   \label{fig:data}
 \end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\linewidth]{linear_prior_likelihood_posterior.png}
+  \caption{Prior, observed data, and CAVI posterior for the linear predictor.
+    The grey dashed line is the prior mean ($y=0$, i.e.\ $\bm{\mu}_\beta=\bm{0}$)
+    and the grey band is the 95\% prior predictive interval under
+    $\bm{\beta}\sim\N(\bm{0},10\bm{I})$; it bleeds beyond the plot boundaries,
+    reflecting the prior's large uncertainty before any data are seen.
+    The blue band is the CAVI posterior 95\% credible interval; the 50 observations
+    pull the posterior mean (blue line) close to the true line (red dashed),
+    demonstrating effective Bayesian updating.}
+  \label{fig:prior_post}
+\end{figure}
+
+\subsubsection{Posterior Contraction and the Role of Posterior Collapse}
+
+\paragraph{Posterior contraction (applicable here).}
+Figure~\ref{fig:prior_post} illustrates a fundamental property of Bayesian inference:
+\emph{posterior contraction}.
+Under the prior $\bm{\beta}\sim\N(\bm{0},10\bm{I})$, the 95\% predictive interval for
+the regression mean spans roughly $\pm 2\sqrt{10\,(1+x^2)}\approx\pm 6$--20 units
+across the data range, reflecting near-total ignorance about $\bm{\beta}$ before
+any data are seen.
+After conditioning on $n=50$ observations, the CAVI posterior 95\% credible interval
+for the regression mean shrinks to a few tenths of a unit --- an order-of-magnitude
+reduction in uncertainty.
+This is exactly what Bayes' theorem guarantees: as $n$ increases, the likelihood
+dominates the prior and the posterior concentrates around the true parameter values at
+a rate of $O(n^{-1/2})$ per parameter \citep{vaart1998asymptotic}.
+The tight blue band in Figure~\ref{fig:prior_post} is therefore a feature, not a
+defect: it shows that 50 observations are sufficient to identify the linear
+relationship almost exactly.
+Crucially, the remaining width of the blue band represents genuine, irreducible
+uncertainty about the \emph{regression line}; the much wider tomato band shows the
+observation noise $\pm 2\sigma_e = \pm 1.0$, which is a separate quantity describing
+where individual data points fall, not where the mean lies.
+
+\paragraph{Posterior collapse (not applicable in this case study).}
+Posterior collapse is a distinct, pathological failure mode that can afflict
+mean-field variational inference in \emph{hierarchical} models.
+It occurs when the CAVI updates for a precision hyperparameter $\tau_\beta$ drive
+that precision to infinity: the factor $q(\tau_\beta)$ concentrates on an
+implausibly large value, which in turn forces $q(\bm{\beta})$ to collapse toward
+the prior mean, discarding information from the data.
+Each update reinforces the other in a degenerate fixed point that maximises the ELBO
+locally but not globally \citep{turner2011two}.
+The collapse can be detected by comparing CAVI posterior variances against those of a
+Gibbs sampler: a CAVI variance dramatically smaller than Gibbs variance, without a
+corresponding gain in posterior mean accuracy, is a red flag.
+
+This failure mode is \textbf{not applicable to Case Study~1}.
+The model has no precision hyperparameter to collapse: $\tau_e$ is treated as a
+latent variable with a flat (improper) prior, but it does not gate the variance of
+$\bm{\beta}$.
+The CAVI updates for $\bm{\beta}$ are guaranteed to converge to the exact
+posterior because the model is conjugate Gaussian--Gamma, and the mean-field
+factorisation $q(\bm{\beta})q(\tau_e)$ is sufficient to recover the true joint
+posterior marginals \citep{bishop2006pattern}.
+Posterior collapse, and its mitigation via entropy regularisation or tighter
+variational families, becomes relevant in the hierarchical case studies that follow.
 
 \subsubsection{Gradient Verification}
 
@@ -1028,5 +1101,118 @@ Contains data generation, plotting, parquet I/O, and table rendering utilities. 
   \item \textbf{Table rendering} — \texttt{render\_table\_tex}: reads a polars DataFrame, formats values, writes a \texttt{tabularray} (\texttt{tblr}) snippet to \texttt{results/tables/*.tex} for \verb|\input{}| inclusion in the report; also compiles a standalone preview PNG for inline notebook display.
   \item \textbf{Plot helpers} — \texttt{save\_fig}: saves to \texttt{figs/} with consistent style; helpers for scatter plots, KDE overlays, bar charts, ACF, trace plots, ELBO curves, step-size histories, Hessian condition-number histories.
 \end{itemize}
+
+%% ============================================================
+\section{Closed-Form Entropy Derivations}\label{app:entropy}
+%% ============================================================
+
+The ELBO decomposes as $\mathcal{L} = \mathbb{E}_q[\log p(\bm{y},\bm{\theta})] + H[q]$,
+where the entropy $H[q] = -\mathbb{E}_q[\log q(\bm{\theta})]$
+factors under the mean-field assumption into one term per variational factor.
+Both factors in this model belong to the exponential family,
+so each entropy has a closed-form expression derived below.
+
+\subsection{Gaussian Entropy: \texorpdfstring{$H[q(\bm{\beta})]$}{H[q(beta)]}}
+
+The general $p$-dimensional multivariate Gaussian density for a random vector
+$\bm{x}\in\mathbb{R}^p$ with mean $\bm{\mu}$ and covariance $\Sigma$ is
+\begin{align}
+  \mathcal{N}(\bm{x};\bm{\mu},\Sigma)
+    &= \frac{1}{(2\pi)^{p/2}|\Sigma|^{1/2}}
+       \exp\!\Bigl(-\tfrac{1}{2}(\bm{x}-\bm{\mu})^{\!T}
+                   \Sigma^{-1}(\bm{x}-\bm{\mu})\Bigr).
+\end{align}
+The variational factor for the regression coefficients is
+$q(\bm{\beta}) = \mathcal{N}(\bm{\mu}_\beta, \Sigma_\beta)$,
+so substituting $\bm{x}=\bm{\beta}$, $\bm{\mu}=\bm{\mu}_\beta$, $\Sigma=\Sigma_\beta$:
+\begin{align}
+  q(\bm{\beta})
+    &= \frac{1}{(2\pi)^{p/2}|\Sigma_\beta|^{1/2}}
+       \exp\!\Bigl(-\tfrac{1}{2}(\bm{\beta}-\bm{\mu}_\beta)^{\!T}
+                   \Sigma_\beta^{-1}(\bm{\beta}-\bm{\mu}_\beta)\Bigr).
+\end{align}
+Taking the natural logarithm of both sides:
+\begin{align}
+  \log q(\bm{\beta})
+    &= \log\frac{1}{(2\pi)^{p/2}|\Sigma_\beta|^{1/2}}
+       - \tfrac{1}{2}(\bm{\beta}-\bm{\mu}_\beta)^{\!T}\Sigma_\beta^{-1}(\bm{\beta}-\bm{\mu}_\beta)
+       \notag\\
+    &= -\tfrac{p}{2}\log(2\pi)
+       - \tfrac{1}{2}\log|\Sigma_\beta|
+       - \tfrac{1}{2}(\bm{\beta}-\bm{\mu}_\beta)^{\!T}\Sigma_\beta^{-1}(\bm{\beta}-\bm{\mu}_\beta).
+\end{align}
+Taking the expectation under $q(\bm{\beta})$, the first two terms are constants and pass through unchanged.
+For the quadratic term, the scalar $\bm{v}^T A \bm{v} = \mathrm{tr}(A\bm{v}\bm{v}^T)$ for any vector $\bm{v}$
+and matrix $A$, so
+\begin{align}
+  \mathbb{E}_q\bigl[(\bm{\beta}-\bm{\mu}_\beta)^{\!T}\Sigma_\beta^{-1}(\bm{\beta}-\bm{\mu}_\beta)\bigr]
+    &= \mathbb{E}_q\bigl[\mathrm{tr}\bigl(\Sigma_\beta^{-1}
+         (\bm{\beta}-\bm{\mu}_\beta)(\bm{\beta}-\bm{\mu}_\beta)^{\!T}\bigr)\bigr] \notag\\
+    &= \mathrm{tr}\bigl(\Sigma_\beta^{-1}
+         \,\mathbb{E}_q\bigl[(\bm{\beta}-\bm{\mu}_\beta)(\bm{\beta}-\bm{\mu}_\beta)^{\!T}\bigr]\bigr)
+       \notag\\
+    &= \mathrm{tr}(\Sigma_\beta^{-1}\Sigma_\beta) \notag\\
+    &= \mathrm{tr}(I_p) = p,
+\end{align}
+where the second equality uses linearity of expectation inside the trace,
+and the third uses the definition of $\Sigma_\beta$ as the covariance of $q(\bm{\beta})$.
+Negating the full expectation gives the entropy:
+\begin{align}
+  H[q(\bm{\beta})]
+    &= -\mathbb{E}_q[\log q(\bm{\beta})] \notag\\
+    &= \tfrac{p}{2}\log(2\pi)
+       + \tfrac{1}{2}\log|\Sigma_\beta|
+       + \tfrac{1}{2}p \notag\\
+    &= \tfrac{1}{2}\log|\Sigma_\beta|
+       + \tfrac{p}{2}\bigl(1 + \log 2\pi\bigr).
+\end{align}
+In code this is computed as
+\begin{verbatim}
+sign, logdet = np.linalg.slogdet(Sigma)          # log|Sigma|
+neg_lq_beta  = 0.5*logdet + 0.5*p*(1 + np.log(2*np.pi))
+\end{verbatim}
+where \texttt{slogdet} returns the sign and log-magnitude of the determinant
+stably for near-singular matrices.
+
+\subsection{Gamma Entropy: \texorpdfstring{$H[q(\tau_e)]$}{H[q(tau\_e)]}}
+
+The variational factor for the noise precision is
+$q(\tau_e) = \mathrm{Gamma}(a_e, b_e)$ under the rate parameterisation,
+so the density is
+$q(\tau_e) = b_e^{a_e}\,\tau_e^{a_e-1}\,e^{-b_e\tau_e}/\Gamma(a_e)$
+and its log is
+\begin{align}
+  \log q(\tau_e)
+    &= a_e\log b_e - \log\Gamma(a_e)
+       + (a_e-1)\log\tau_e - b_e\tau_e.
+\end{align}
+The required expectations under $q(\tau_e)$ are standard results:
+\begin{align}
+  \mathbb{E}[\tau_e]      &= \frac{a_e}{b_e}, \qquad
+  \mathbb{E}[\log\tau_e] = \psi(a_e) - \log b_e,
+\end{align}
+where $\psi(\cdot)$ is the digamma function.
+Substituting:
+\begin{align}
+  \mathbb{E}_q[\log q(\tau_e)]
+    &= a_e\log b_e - \log\Gamma(a_e)
+       + (a_e-1)\bigl(\psi(a_e)-\log b_e\bigr)
+       - b_e\cdot\frac{a_e}{b_e} \notag\\
+    &= a_e\log b_e - \log\Gamma(a_e)
+       + (a_e-1)\psi(a_e) - (a_e-1)\log b_e
+       - a_e \notag\\
+    &= \log b_e - \log\Gamma(a_e)
+       + (a_e-1)\psi(a_e) - a_e.
+\end{align}
+Negating to obtain the entropy:
+\begin{align}
+  H[q(\tau_e)]
+    &= a_e - \log b_e + \ln\Gamma(a_e) + (1-a_e)\psi(a_e).
+\end{align}
+In code:
+\begin{verbatim}
+neg_lq_tau = a_e - np.log(b_e) + gammaln(a_e) + (1 - a_e)*digamma(a_e)
+\end{verbatim}
+where \texttt{gammaln} and \texttt{digamma} are imported from \texttt{scipy.special}.
 
 \end{document}

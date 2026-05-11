@@ -33,7 +33,7 @@
 }
 
 % Running margin label
-\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\newcommand{\mymarginlabel}{\textcopyright\ David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
 \AddToShipoutPictureBG{%
   \begin{tikzpicture}[remember picture,overlay]
     \node[rotate=90, anchor=north]
@@ -110,39 +110,53 @@ Two numerical test cases are used: a linear Bayesian regression problem and a qu
 \end{abstract}
 
 \newpage
-\section*{Introduction}
+\section{Introduction}
 
-Bayesian inference provides principled uncertainty quantification but requires computing intractable posterior distributions. For most real-world models, the posterior integral,
+Bayesian quadratic regression extends the linear baseline by augmenting the design matrix
+with a squared feature $x^2$; with conjugate Gaussian--Gamma priors the model remains
+analytically tractable, making it the natural test of whether optimisation behaviour
+observed in the linear case is robust to a nonlinear feature expansion.
 
+Bayesian inference provides principled uncertainty quantification but requires computing
+intractable posterior distributions. For most real-world models, the posterior integral,
 \begin{equation*}
-    p(\bm{\theta} \mid \bm{y}) = \frac{p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})}{\displaystyle\int p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})\, d\bm{\theta}},
+  p(\bm{\theta} \mid \bm{y}) = \frac{p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})}
+    {\displaystyle\int p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})\,d\bm{\theta}},
 \end{equation*}
-\noindent 
-cannot be evaluated analytically. 
-Variational Inference (VI) converts this inference problem into an optimisation problem, making it directly amenable to the gradient-based methods in this course. \vspace{2em}
+is typically intractable.
+In this case study, $\bm{\theta} = (\bm{\beta}, \tau_e)$---the regression coefficients
+and the observation-noise precision---so the posterior of interest is
+\begin{equation*}
+  p(\bm{\beta}, \tau_e \mid \bm{y}) \propto p(\bm{y} \mid \bm{\beta}, \tau_e)\,p(\bm{\beta})\,p(\tau_e).
+\end{equation*}
+The substitution $\bm{\theta} = (\bm{\beta}, \tau_e)$ is specific to this case study;
+other case studies in this project define $\bm{\theta}$ according to their own model parameters.
+Conjugate Gaussian--Gamma priors make this case study a deliberate exception: the posterior
+is analytically tractable and CAVI coordinate updates are closed-form, providing a verified
+reference against which gradient-based VI methods can be compared.
 
-Instead of computing the true posterior, VI finds the ``best'' approximation $q(\bm{\theta})$ from a tractable family $Q(\bm{\theta})$
-by maximising the Evidence Lower Bound (ELBO). 
-This transforms intractable integration into tractable optimisation---a natural testbed for the gradient-based methods. \vspace{2em} 
+Variational Inference (VI) converts this inference problem into an optimisation problem,
+making it directly amenable to the gradient-based methods in this course.
+Instead of computing the true posterior, VI finds the ``best'' approximation $q(\bm{\theta})$
+from a tractable family $Q(\bm{\theta})$ by maximising the Evidence Lower Bound (ELBO).
+This transforms intractable integration into tractable optimisation---a natural testbed for
+the gradient-based methods.
 
-A well-known failure mode of mean-field VI is \emph{Posterior Variance Collapse}: 
-the optimised approximation $q(\bm{\theta})$ is systematically overconfident, 
-underestimating posterior uncertainty. This is a direct consequence of the KL direction minimised during ELBO maximisation, 
-compounded by the mean-field factorisation assumption.\footnote{See \ref{app:vb-collapse} for the full mechanistic explanation.}  \vspace{2em} 
+A well-known failure mode of mean-field VI is \emph{posterior variance collapse}:
+the optimised approximation $q(\bm{\theta})$ is systematically overconfident,
+underestimating posterior uncertainty. This is a direct consequence of the KL direction minimised during ELBO maximisation,
+compounded by the mean-field factorisation assumption.\footnote{See \ref{app:vb-collapse} for the full mechanistic explanation.}
 
-This paper addresses variance collapse via two complementary strategies, 
-\begin{itemize}
-\item The first applies new optimisation methods to the \emph{standard} ELBO objective: gradient ascent, Newton's method, and BFGS are compared to determine whether the choice of optimiser affects dispersion quality.
-\item The second modifies the objective function itself, augmenting the ELBO with an entropy regularisation term $\lambda H[q(\bm{\beta})]$ to create a new objective $\mathcal{L}_{\mathrm{reg}}(\bm{\phi}) = \mathcal{L}(\bm{\phi}) + \lambda H[q(\bm{\beta})]$ that explicitly incentivises broader posteriors.
-\end{itemize}
-Both the optimiser-comparison and modified-ELBO strategies are explored.  \vspace{2em} 
+This report applies four optimisation methods---CAVI, gradient ascent, Newton's method, and BFGS---to the ELBO and compares their convergence behaviour, computational cost, and posterior quality.
+As a secondary investigation, the ELBO is augmented with an entropy regularisation term $\lambda H[q(\bm{\beta})]$,
+\begin{equation*}
+    \mathcal{L}_{\mathrm{reg}}(\bm{\phi}) = \mathcal{L}(\bm{\phi}) + \lambda H[q(\bm{\beta})],
+\end{equation*}
+to examine whether explicitly incentivising broader posteriors can mitigate variance collapse.
 
-Throughout all gradient-based methods, the variational covariance $\bm{\Sigma}_\beta$ must remain symmetric positive definite at every iteration.\footnote{This structural constraint is satisfied automatically via Cholesky reparameterisation; see \ref{app:cholesky}. 
-%For the role of symmetric positive definite covariance matrices in exponential families more broadly, see Wainwright \& Jordan (2008), \S3.4, DOI: \href{https://doi.org/10.1561/2200000001}{10.1561/2200000001}.
-} 
-Standard gradient steps in Euclidean space can violate this requirement, leading to numerical failure.
- The solution is to parameterise the optimisation over the Cholesky factor $\bm{L}$ rather than $\bm{\Sigma}_\beta$ directly.
- Cholesky reparameterisation is a numerical implementation technique .   Cholesky is the domain-specific choice for satisfying the constraint $\bm{\Sigma}_\beta \succ 0$ when applying those methods to this problem. The set of symmetric positive definite matrices is not a flat subspace of $\R^{p \times p}$: it has a curved boundary, and a straight-line gradient step can cross outside it, producing an invalid covariance matrix. Cholesky reparameterisation handles this by converting the constraint into a smooth bijection between the valid set and unconstrained $\R^{p(p+1)/2}$, so standard gradient steps always remain valid. It is standard practice in variational inference and Bayesian computation.
+Throughout all gradient-based methods, the variational covariance $\bm{\Sigma}_\beta$ must
+remain positive definite at every iteration.\footnote{This structural constraint is satisfied automatically
+via Cholesky reparameterisation; see \ref{app:cholesky}.}
 
 The classical foundation for the variational framework used here is least-squares regression,
 as developed in lectures by Prof.\ Roy S.\ Smith (Erskine Visiting Fellow, ETH~Z\"{u}rich,

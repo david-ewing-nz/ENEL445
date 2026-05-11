@@ -33,7 +33,7 @@
 }
 
 % Running margin label
-\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\newcommand{\mymarginlabel}{\textcopyright\ David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
 \AddToShipoutPictureBG{%
   \begin{tikzpicture}[remember picture,overlay]
     \node[rotate=90, anchor=north]
@@ -103,6 +103,11 @@ mean that cross-notebook timing figures are not controlled experiments.
 \section*{Introduction}
 %─────────────────────────────────────────────────────────────────────────────
 
+Bayesian logistic regression is the simplest non-trivial model in which the posterior is
+\underline{genuinely non-conjugate} and no component of variational inference---the ELBO, its gradient,
+or the posterior approximation---admits a closed-form expression, making it the natural
+test case for methods that must navigate an analytically intractable objective.
+
 Bayesian inference provides principled uncertainty quantification but requires computing
 intractable posterior distributions. For most real-world models, the posterior integral,
 \begin{equation*}
@@ -114,8 +119,10 @@ In this case study, $\bm{\theta} = \bm{\beta}$---the regression coefficient vect
 the only unknown, as the Bernoulli likelihood has no noise precision parameter---so the
 posterior of interest is
 \begin{equation*}
-  p(\bm{\beta} \mid \bm{y}) \propto p(\bm{y} \mid \bm{\beta})\,p(\bm{\beta}).
+  p(\bm{\beta} \mid \bm{y}) \propto p(\bm{y} \mid \bm{\beta})\,p(\bm{\beta}),
 \end{equation*}
+where $p(\bm{y} \mid \bm{\beta}) = \prod_{i=1}^{n} \mathrm{Bernoulli}(y_i;\,\sigma(x_i^T\bm{\beta}))$
+is the logistic likelihood and $\sigma(\cdot)$ is the sigmoid function.
 The substitution $\bm{\theta} = \bm{\beta}$ is specific to this case study;
 other case studies in this project define $\bm{\theta}$ according to their own model
 parameters.
@@ -131,9 +138,7 @@ This transforms intractable integration into tractable optimisation---a natural 
 the gradient-based methods.
 
 A known failure mode of mean-field VI is posterior variance collapse, where the
-approximation underestimates posterior uncertainty;\footnote{See \ref{app:vb-collapse}
-for the mechanistic explanation and the role of the Jaakkola--Jordan bound in
-limiting collapse in this model.} this is assessed empirically in the Results section.
+approximation underestimates posterior uncertainty;\footnote{See \ref{app:vb-collapse} for the full mechanistic explanation.} this is assessed empirically in the Results section.
 
 For this model the ELBO takes the form:
 \begin{equation*}
@@ -207,7 +212,7 @@ a quadratic lower bound:
   \log\sigma(\psi_i) \geq \frac{\psi_i}{2} - \log 2\cosh\!\left(\frac{\xi_i}{2}\right)
   - \frac{\xi_i}{2}\bigl(\E_q[\psi_i^2]/\xi_i^2 - 1\bigr) \cdot \frac{\tanh(\xi_i/2)}{4}.
 \end{equation}
-At the optimal $\xi_i^* = \sqrt{\E_q[\psi_i^2]}$, where
+At the optimal $\xi_i^* = \sqrt{\E_q[\psi_i^2]}$\footnote{See \ref{app:jj-bound} for the derivation of the tightness condition and the origin of $\tanh(\xi/2)$.}, where
 $\E_q[\psi_i^2] = (x_i^T\bm{\mu})^2 + x_i^T\bm{\Sigma} x_i$,
 the bound is tight and the ELBO becomes
 \begin{equation}\label{eq:elbo}
@@ -261,6 +266,8 @@ $\mathrm{ESS}$ & Effective sample size \\
 \multicolumn{2}{@{}l}{\textbf{Lecture correspondence} (Prof.\ R.\,S.\ Smith, ENEL445 2026)} \\
 $J(\theta)$ & Cost function $=\mathcal{L}(\bm{\theta})$ (ELBO) in this report \\
 $\Phi$ & Regressor matrix $=\bm{X}$ in this report \\
+$\theta$ & Coefficient vector $=\bm{\beta}$ in this report \\
+$d$ & Number of parameters $=p$ in this report \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -826,5 +833,45 @@ The implementation is in \texttt{python/logistic\_run.ipynb} (35 cells).
 
 All figures are saved to \texttt{figs/} with the \texttt{logistic\_} prefix to avoid
 collisions with figures from other notebooks in this project.
+
+\newpage
+\section{Jaakkola--Jordan Bound: Tightness Condition}
+\label{app:jj-bound}
+%─────────────────────────────────────────────────────────────────────────────
+
+The Jaakkola--Jordan bound replaces the intractable log-sigmoid term with a quadratic
+lower bound parameterised by $\xi_i > 0$\,\parencite{Jaakkola2000}:
+\begin{equation*}
+  f(\psi_i, \xi_i) = \frac{\psi_i}{2} - \log 2\cosh\!\left(\frac{\xi_i}{2}\right)
+  - \frac{\tanh(\xi_i/2)}{4\xi_i}\bigl(\psi_i^2 - \xi_i^2\bigr).
+\end{equation*}
+This is tight when $\psi_i = \xi_i$, i.e.\ the bound touches $\log\sigma(\psi_i)$ at
+$\psi_i = \pm\xi_i$.
+
+\textbf{Origin of $\tanh(\xi/2)$.}
+Differentiating $f(\psi, \xi)$ with respect to $\xi$ and setting to zero:
+\begin{align*}
+  \frac{\partial f}{\partial \xi}
+  &= -\frac{1}{2}\cdot\frac{\sinh(\xi/2)}{\cosh(\xi/2)}
+     - \frac{\partial}{\partial\xi}\!\left[\frac{\tanh(\xi/2)}{4\xi}\right](\psi^2-\xi^2)
+     + \frac{\tanh(\xi/2)}{4\xi}\cdot 2\xi = 0.
+\end{align*}
+At $\psi = \xi$ the residual term $\psi^2 - \xi^2 = 0$ and the condition reduces to
+$\tanh(\xi/2)/2 = \tanh(\xi/2)/2$, confirming tightness.
+The coefficient $\tanh(\xi/2)/(4\xi)$ is denoted $\lambda(\xi)$ in \textcite{Jaakkola2000}
+and arises from the second derivative of $\log\cosh(\xi/2)$:
+\begin{equation*}
+  \lambda(\xi) = \frac{\tanh(\xi/2)}{4\xi}.
+\end{equation*}
+
+\textbf{Tightness condition.}
+Taking the expectation over $q(\bm{\beta}) = \mathcal{N}(\bm{\mu},\bm{\Sigma})$,
+the bound is tightest when $\xi_i$ matches the root-mean-square of $\psi_i = x_i^T\bm{\beta}$:
+\begin{equation*}
+  \xi_i^* = \sqrt{\E_q[\psi_i^2]} = \sqrt{(x_i^T\bm{\mu})^2 + x_i^T\bm{\Sigma}x_i}.
+\end{equation*}
+This follows because the bound $f(\psi_i,\xi_i)$ is maximised over $\xi_i$ when
+$\xi_i^2 = \E_q[\psi_i^2]$, i.e.\ the parameter $\xi_i$ is set equal to the
+expected magnitude of the linear predictor under $q$.
 
 \end{document}

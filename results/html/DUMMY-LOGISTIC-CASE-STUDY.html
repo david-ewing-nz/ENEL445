@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="David Ewing (82171165)" />
+  <meta name="dcterms.date" content="2026-05-12" />
+  <title> Case Study 3 — Bayesian Logistic Regression: Gradient-Based Optimisation and Posterior Variance Collapse </title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    div.abstract {
+      margin: 2em 2em 2em 2em;
+      text-align: left;
+      font-size: 85%;
+    }
+    div.abstract-title {
+      font-weight: bold;
+      text-align: center;
+      padding: 0;
+      margin-bottom: 0.5em;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <script
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"
+  type="text/javascript"></script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title"> Case Study 3 — Bayesian Logistic Regression:<br />
+Gradient-Based Optimisation and Posterior Variance Collapse </h1>
+<p class="author">David Ewing (82171165)</p>
+<p class="date">12 May 2026</p>
+<div class="abstract">
+<div class="abstract-title">Abstract</div>
+<p>This report applies the gradient-based optimisation methods from
+ENEL445 to variational inference in Bayesian logistic regression. Unlike
+the Gaussian regression setting, logistic regression has no conjugate
+variational family, and the Evidence Lower Bound (ELBO) does not admit a
+simple closed-form update. The Jaakkola–Jordan <span class="citation"
+data-cites="Jaakkola2000"></span> variational lower bound provides a
+tractable ELBO for logistic regression via the local variational bound
+<span class="math inline">\(\log\sigma(\psi) \geq
+\tfrac{\psi}{2} - \log 2\cosh(\xi/2)\)</span>, which is tight when <span
+class="math inline">\(\xi = \sqrt{\mathbb{E}[\psi^2]}\)</span>.</p>
+<p>Four optimisation methods are applied to maximise the ELBO:
+Coordinate Ascent Variational Inference (CAVI), gradient ascent with
+Armijo backtracking, Newton’s method with regularised finite-difference
+Hessian, and BFGS with Wolfe conditions. The variational family is <span
+class="math inline">\(q(\bm{\beta}) =
+\mathcal{N}(\bm{\mu},\bm{\Sigma})\)</span> with a Cholesky
+reparameterisation to preserve positive definiteness throughout
+optimisation.</p>
+<p>The reference posterior is obtained from a Pólya–Gamma Gibbs sampler
+<span class="citation" data-cites="Polson2013"></span> using a truncated
+sum-of-gammas approximation with <span
+class="math inline">\(T=50\)</span> terms. Diagnostics include effective
+sample size (ESS), autocorrelation function (ACF) plots, and
+computational cost per effective sample.</p>
+<p>The model is <span class="math inline">\(y_i \sim
+\mathrm{Bernoulli}(\sigma(\beta_0 + \beta_1 x_i))\)</span> with <span
+class="math inline">\(\bm{\beta}_{\mathrm{true}} = (-1.0,\;
+2.0)\)</span> and <span class="math inline">\(n=200\)</span>
+observations. All four VI methods recover posterior means within <span
+class="math inline">\(0.02\)</span> of the Gibbs reference. CAVI
+converges in fewer than 50 iterations and is several orders of magnitude
+faster than the Pólya–Gamma sampler, which requires <span
+class="math inline">\(200\)</span> Gamma draws per iteration. The fair
+timing comparison is each VI method versus the PG Gibbs reference within
+this notebook; differences in likelihood structure, parameter count, and
+Gibbs cost mean that cross-notebook timing figures are not controlled
+experiments.</p>
+</div>
+</header>
+<div style="background-color: black">
+<p><span><strong>Awaiting review by Professor Le
+Yang</strong></span></p>
+</div>
+</body>
+</html>

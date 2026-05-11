@@ -33,7 +33,7 @@
 }
 
 % Running margin label
-\newcommand{\mymarginlabel}{David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
+\newcommand{\mymarginlabel}{\textcopyright\ David Ewing dew59@uclive.ac.nz | \DTMnow\ | \jobname.tex}
 \AddToShipoutPictureBG{%
   \begin{tikzpicture}[remember picture,overlay]
     \node[rotate=90, anchor=north]
@@ -92,10 +92,9 @@ with $\bm{\beta}_{\mathrm{true}} = (-1.0,\; 2.0)$ and $n=200$ observations.
 All four VI methods recover posterior means within $0.02$ of the Gibbs reference.
 CAVI converges in fewer than 50 iterations and is several orders of magnitude faster
 than the P\'{o}lya--Gamma sampler, which requires $200$ Gamma draws per iteration.
-Note that timing comparisons across the linear, quadratic, and logistic notebooks
-in this project are not controlled experiments: the likelihoods, parameter counts,
-and Gibbs structures differ across cases.
-The fair within-notebook comparison is each VI method versus its own Gibbs reference.
+The fair timing comparison is each VI method versus the PG Gibbs reference within
+this notebook; differences in likelihood structure, parameter count, and Gibbs cost
+mean that cross-notebook timing figures are not controlled experiments.
 \end{abstract}
 
 \newpage
@@ -104,20 +103,39 @@ The fair within-notebook comparison is each VI method versus its own Gibbs refer
 \section*{Introduction}
 %─────────────────────────────────────────────────────────────────────────────
 
-Bayesian inference provides principled uncertainty quantification for binary classification
-through the posterior distribution
+Bayesian inference provides principled uncertainty quantification but requires computing
+intractable posterior distributions. For most real-world models, the posterior integral,
 \begin{equation*}
-  p(\bm{\beta} \mid \bm{y}) \propto p(\bm{y} \mid \bm{\beta})\,p(\bm{\beta}),
+  p(\bm{\theta} \mid \bm{y}) = \frac{p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})}
+    {\displaystyle\int p(\bm{y} \mid \bm{\theta})\,p(\bm{\theta})\,d\bm{\theta}},
 \end{equation*}
-where $p(\bm{y}\mid\bm{\beta}) = \prod_{i=1}^{n} \sigma(x_i^T\bm{\beta})^{y_i}
-(1-\sigma(x_i^T\bm{\beta}))^{1-y_i}$ is the Bernoulli log-likelihood under the logistic
-link $\sigma(\psi)=(1+e^{-\psi})^{-1}$.
-The posterior is not available in closed form because the logistic likelihood is not
-conjugate to the Gaussian prior $p(\bm{\beta})=\N(\bm{0}, \lambda^{-1}\bm{I})$.
+is typically intractable.
+In this case study, $\bm{\theta} = \bm{\beta}$---the regression coefficient vector is
+the only unknown, as the Bernoulli likelihood has no noise precision parameter---so the
+posterior of interest is
+\begin{equation*}
+  p(\bm{\beta} \mid \bm{y}) \propto p(\bm{y} \mid \bm{\beta})\,p(\bm{\beta}).
+\end{equation*}
+The substitution $\bm{\theta} = \bm{\beta}$ is specific to this case study;
+other case studies in this project define $\bm{\theta}$ according to their own model
+parameters.
+This case study is not an exception: the logistic likelihood is not conjugate to the
+Gaussian prior $p(\bm{\beta})=\N(\bm{0}, \lambda^{-1}\bm{I})$, so the posterior
+is genuinely intractable and cannot be computed analytically.
 
-Variational Inference (VI) converts posterior computation into optimisation by finding the
-best approximation $q(\bm{\beta})$ from a tractable family, maximising the Evidence Lower
-Bound (ELBO):
+Variational Inference (VI) converts this inference problem into an optimisation problem,
+making it directly amenable to the gradient-based methods in this course.
+Instead of computing the true posterior, VI finds the ``best'' approximation $q(\bm{\theta})$
+from a tractable family $Q(\bm{\theta})$ by maximising the Evidence Lower Bound (ELBO).
+This transforms intractable integration into tractable optimisation---a natural testbed for
+the gradient-based methods.
+
+A known failure mode of mean-field VI is posterior variance collapse, where the
+approximation underestimates posterior uncertainty;\footnote{See \ref{app:vb-collapse}
+for the mechanistic explanation and the role of the Jaakkola--Jordan bound in
+limiting collapse in this model.} this is assessed empirically in the Results section.
+
+For this model the ELBO takes the form:
 \begin{equation*}
   \mathcal{L}(\bm{\phi}) = \E_{q}[\log p(\bm{y}\mid\bm{\beta})] - \mathrm{KL}(q \| p)
   \leq \log p(\bm{y}).
@@ -128,10 +146,21 @@ a Gaussian $q$.
 The Jaakkola--Jordan bound replaces this term with a tight quadratic lower bound,
 restoring conjugacy and making CAVI and gradient-based methods tractable.
 
-This report is the third numerical study in this project (following linear and quadratic
-Gaussian regression), and addresses a qualitatively different challenge: the logistic
-likelihood introduces a non-conjugate computational bottleneck that gradient-based methods
-must navigate.
+This report addresses a qualitatively different challenge from conjugate Gaussian
+regression: the logistic likelihood introduces a non-conjugate computational bottleneck
+that gradient-based methods must navigate.
+
+Throughout all gradient-based methods, the variational covariance $\bm{\Sigma}$ must
+remain positive definite at every iteration.\footnote{This structural constraint is satisfied automatically
+via Cholesky reparameterisation; see \ref{app:cholesky}.}
+
+The variational framework used here draws on the linear algebra foundation developed
+in lectures by Prof.\ Roy S.\ Smith (Erskine Visiting Fellow, ETH~Z\"{u}rich, ENEL445 2026).
+The design matrix $\bm{X}$\footnote{Denoted $\Phi$ and called the
+\emph{regressor matrix} in lectures (Prof.\ R.\,S.\ Smith, ENEL445 2026).} and coefficient
+vector $\bm{\beta}$\footnote{Denoted $\theta$ in lectures.} form the linear predictor
+$x_i^T\bm{\beta}$, with $n$ observations and $p$\footnote{Denoted $d$ in lectures.}
+predictors.
 
 %─────────────────────────────────────────────────────────────────────────────
 \section{Model Formulation}
@@ -282,9 +311,9 @@ The sampler runs for $N_{\mathrm{warmup}} = 500$ burn-in iterations and
 $N = 2000$ retained samples.
 
 \textbf{Note on timing:}
-Each PG Gibbs iteration requires $n \times T = 200 \times 50 = 10\,000$ Gamma variates.
-This is substantially more expensive per sample than the conjugate Gaussian Gibbs used in
-the linear and quadratic cases, so cross-model timing comparisons are qualitative only.
+Each PG Gibbs iteration requires $n \times T = 200 \times 50 = 10\,000$ Gamma variates,
+making the sampler substantially more expensive per sample than the VI methods.
+Timing comparisons between VI and Gibbs are therefore qualitative.
 
 %─────────────────────────────────────────────────────────────────────────────
 \section{Optimisation Problem Formulation}
@@ -307,7 +336,7 @@ The constraint $\bm{\Sigma} \succ 0$ is satisfied automatically by this paramete
 Maximise the Jaakkola--Jordan ELBO (Equation~\ref{eq:elbo}) at the optimal
 $\xi_i^* = \sqrt{(x_i^T\bm{\mu})^2 + x_i^T\bm{\Sigma} x_i}$.
 The function $\mathcal{L}: \R^5 \to \R$ is smooth, bounded above by $\log p(\bm{y})$,
-and has a unique stationary point in this model (the CAVI fixed point).
+and has a unique stationary point at the CAVI fixed point under the Jaakkola--Jordan bound.
 
 \subsection*{Constraints}
 
@@ -316,9 +345,6 @@ The Cholesky parameterisation maps $\R^5$ bijectively to the space of
 valid Gaussian variational parameters.
 
 \subsection*{Optimisation Components}
-
-Each method is described in terms of the four components from the ENEL445 course:
-entry conditions, search direction, step-size rule, and exit conditions.
 
 \begin{description}
 \item[CAVI.]
@@ -617,9 +643,9 @@ with annotations giving the speedup factor relative to the PG Gibbs sampler.
   \centering
   \includegraphics[width=0.90\linewidth]{logistic_timing_comparison.png}
   \caption{Computational cost on a log scale. Annotations give speedup relative to
-    the PG Gibbs reference (dashed line). Note that cross-model timing comparisons
-    (vs.\ the linear and quadratic cases) are qualitative only: the PG sampler
-    requires $n \times T = 10\,000$ Gamma variates per iteration.}
+    the PG Gibbs reference (dashed line). Timing comparisons between VI methods and
+    the PG Gibbs sampler are qualitative: the PG sampler requires $n \times T = 10\,000$
+    Gamma variates per iteration while VI methods use only gradient evaluations.}
   \label{fig:timing}
 \end{figure}
 
@@ -627,13 +653,25 @@ with annotations giving the speedup factor relative to the PG Gibbs sampler.
 \section{Discussion}
 %─────────────────────────────────────────────────────────────────────────────
 
+The logistic case study is a more demanding setting for mean-field VI than conjugate
+linear regression. The posterior $p(\bm{\beta}\mid\bm{y})$ is not Gaussian, so the
+variational family $q(\bm{\beta})=\N(\bm{\mu},\bm{\Sigma})$ is an approximation
+regardless of the quality of the optimum found. There is no mean-field factorisation
+over separate parameter groups --- $\bm{\theta}=\bm{\beta}$ only --- so that source
+of additional error is absent. The main approximation error comes from fitting a
+Gaussian to a distribution that is only approximately Gaussian. In practice, with
+$n=200$ observations the posterior is sufficiently concentrated that the Gaussian
+approximation is accurate, as confirmed by the SD ratios of 0.90--1.10.
+
 \subsection{Posterior Variance Collapse}
 
-Unlike the linear and quadratic Gaussian regression cases, the logistic model with the
-Jaakkola--Jordan bound does not exhibit strong posterior variance collapse.
-This is because the bound is tight at the CAVI fixed point: when $\xi_i^* = \sqrt{\E_q[\psi_i^2]}$,
-the bound equals the true expectation, and the ELBO objective penalises over-concentration.
-The result is that CAVI and all gradient-based methods recover both posterior means and
+Posterior variance collapse is minimal in this model.
+All four VI methods achieve standard-deviation ratios $\sigma_{\mathrm{VI}}/\sigma_{\mathrm{Gibbs}}$
+between 0.90 and 1.10 for both parameters.
+The mechanism is the tightness of the Jaakkola--Jordan bound: at the optimal
+$\xi_i^* = \sqrt{\E_q[\psi_i^2]}$, the bound equals the true log-likelihood expectation,
+so the ELBO objective penalises over-concentration rather than permitting it.
+CAVI and all gradient-based methods consequently recover both posterior means and
 posterior standard deviations accurately relative to the PG Gibbs reference.
 
 \subsection{Optimisation Behaviour}
@@ -646,54 +684,123 @@ Newton's method converges in fewer iterations but requires a finite-difference H
 BFGS provides a good compromise: quasi-Newton curvature information with only gradient
 evaluations, and converges rapidly due to the smooth, near-quadratic ELBO landscape.
 
-\subsection{Comparison Across Test Cases}
+\subsection{Model Characteristics}
 
-\begin{center}
-\begin{tabular}{@{}llll@{}}
-\toprule
-Property & Linear & Quadratic & Logistic (this report) \\
-\midrule
-Likelihood & Gaussian & Gaussian & Bernoulli \\
-Conjugacy & Yes & Yes & No (JJ bound) \\
-Reference sampler & Gaussian Gibbs & Gaussian Gibbs & PG Gibbs \\
-Gibbs cost & Low & Low & High ($n \times T$ Gammas) \\
-Variance collapse & Mild & Moderate & Minimal \\
-CAVI updates & Closed form & Closed form & Closed form (via JJ) \\
-\bottomrule
-\end{tabular}
-\end{center}
+The Bernoulli likelihood is not conjugate to the Gaussian prior, so the ELBO
+has no closed form. The Jaakkola--Jordan bound resolves this by introducing
+local variational parameters $\xi_i$ that render the ELBO analytically tractable.
+The reference distribution is a P\'{o}lya--Gamma Gibbs sampler: exact (up to
+PG truncation) but expensive, requiring $n \times T = 10\,000$ Gamma draws per
+iteration. All timing figures are from an Alienware 17~R5 (Intel i7-8750H).
 
-Note that all timing figures across the three test cases are from the same machine
-(Alienware 17~R5, Intel i7-8750H) but are not controlled comparisons.
-Model complexity, parameter count, and Gibbs overhead differ across cases.
+For the broader study, this case study is the non-conjugate setting in which
+conjugacy is unavailable and gradient-based ELBO optimisation becomes important.
+When conjugacy is available, CAVI should be treated as the natural method and the
+generic gradient methods should not be expected to improve on it. Here conjugacy
+is not available, so CAVI and gradient-based methods rely on the Jaakkola--Jordan
+bound for tractability; the bound provides analytical gradients that make this
+feasible. Without it, finite-difference gradients at $n=200$ observations would
+not scale well.
 
 %─────────────────────────────────────────────────────────────────────────────
 \section*{Conclusion}
 %─────────────────────────────────────────────────────────────────────────────
 
 This report has applied gradient-based optimisation methods to variational inference
-in Bayesian logistic regression using the Jaakkola--Jordan ELBO.
-All four VI methods (CAVI, gradient ascent, Newton, BFGS) successfully maximise the ELBO
-and recover posterior distributions that closely match the PG Gibbs reference.
-Posterior variance collapse is minimal in this setting, in contrast to the linear and
-quadratic Gaussian cases.
+in Bayesian logistic regression using the Jaakkola--Jordan ELBO. The formulation
+is an ELBO maximisation problem, but the numerical question is broader than
+maximisation alone: all four VI methods (CAVI, gradient ascent, Newton, BFGS)
+successfully maximise the ELBO and recover posterior distributions that closely
+match the PG Gibbs reference. CAVI is the preferred method; BFGS is the
+recommended gradient-based alternative when closed-form updates are unavailable.
 
-The main practical finding is that CAVI is the preferred method for this model:
-it converges rapidly via closed-form coordinate updates derived from the JJ bound,
-requires no hyperparameter tuning, and achieves the same accuracy as more
-expensive gradient-based methods.
-BFGS is the recommended gradient-based alternative when closed-form updates are
-not available.
+The main issue is whether a converged variational approximation also gives a
+credible account of posterior uncertainty. Cholesky reparameterisation keeps the
+covariance parameters valid during optimisation, while the PG Gibbs sampler
+provides the reference for posterior spread.
 
-The PG Gibbs sampler provides an accurate reference but is computationally expensive
-due to the $n \times T$ Gamma draws required per iteration.
-For production logistic regression with $n \gg 200$, the VI methods offer a substantial
-computational advantage.
+The key conclusion is that optimisation performance and uncertainty quality must
+be read separately. A method can make progress on the ELBO while still producing
+a posterior approximation that is too narrow. That distinction is the main lesson
+of the logistic case study and the reason posterior standard-deviation ratios are
+reported alongside convergence results.
 
 \printbibliography
 
 %─────────────────────────────────────────────────────────────────────────────
 \appendix
+\renewcommand{\thesection}{Appendix~\Alph{section}}
+
+\newpage
+\section{VB Posterior Variance Collapse}
+\label{app:vb-collapse}
+
+\subsection*{Why Variance Collapse Happens}
+
+Variational inference finds $q(\bm{\beta})$ by minimising the KL divergence from $q$
+to the true posterior $p(\bm{\beta}\mid\bm{y})$:
+\begin{equation}
+  \mathrm{KL}[q \| p] = \int q(\bm{\beta}) \log \frac{q(\bm{\beta})}{p(\bm{\beta}\mid\bm{y})} \, d\bm{\beta}.
+\end{equation}
+This is the forward, or exclusive, KL divergence.
+It penalises $q$ for placing mass where the true posterior is small, but not for
+missing posterior tails.
+The approximation therefore tends to stay near the high-density centre of the posterior
+and can be too narrow.
+
+In this model the variational family $q(\bm{\beta}) = \N(\bm{\mu}, \bm{\Sigma})$ is a
+joint Gaussian over the full coefficient vector --- there is no mean-field factorisation
+across separate parameter groups (unlike the linear case where $q(\bm{\beta},\tau_e) =
+q(\bm{\beta})q(\tau_e)$ imposes an additional independence restriction).
+The only source of collapse here is the KL asymmetry itself.
+
+\subsection*{Why Collapse is Minimal in This Model}
+
+The Jaakkola--Jordan bound is tight at the CAVI fixed point: when
+$\xi_i^* = \sqrt{\E_q[\psi_i^2]}$, the bound equals the true log-likelihood expectation.
+This means the ELBO objective at the optimum correctly reflects the true likelihood
+contribution, so the entropy term in the ELBO actively penalises over-concentration.
+The KL asymmetry is therefore partially counteracted by the bound structure itself.
+
+\subsection*{Observation}
+
+All four VI methods achieve posterior standard-deviation ratios
+$\sigma_{\mathrm{VI}}/\sigma_{\mathrm{Gibbs}}$ between 0.90 and 1.10 for both
+parameters, confirming that collapse is minimal in this two-parameter logistic model
+with $n=200$ observations.
+No corrective measures (entropy regularisation, variance lower bounds) are required.
+
+\newpage
+\section{Cholesky Reparameterisation: Structural Constraint Satisfaction}
+\label{app:cholesky}
+
+\subsection*{Why Reparameterisation?}
+
+The gradient-based optimisers operate on an unconstrained Euclidean parameter vector,
+but the variational covariance $\bm{\Sigma}$ must remain positive definite at every
+iteration.
+If the optimiser updates $\bm{\Sigma}$ directly, a gradient step
+$\bm{\Sigma}^{(t+1)} = \bm{\Sigma}^{(t)} + \alpha_t\nabla_{\bm{\Sigma}}\mathcal{L}$
+can produce a matrix that is not positive definite, causing numerical failure.
+Reparameterisation encodes the constraint structurally so it cannot be violated.
+
+\subsection*{Cholesky Decomposition}
+
+The covariance is written as $\bm{\Sigma} = \bm{L}\bm{L}^T$ where $\bm{L}$ is lower
+triangular with strictly positive diagonal entries.
+For $p=2$ the factor is
+\begin{equation}
+  \bm{L} = \begin{pmatrix} e^{\tilde{\ell}_{11}} & 0 \\ \ell_{21} & e^{\tilde{\ell}_{22}} \end{pmatrix},
+\end{equation}
+giving the unconstrained optimisation vector
+$\bm{\theta} = (\mu_0, \mu_1, \tilde{\ell}_{11}, \ell_{21}, \tilde{\ell}_{22}) \in \R^5$.
+
+Any $\tilde{\ell}_{11}, \tilde{\ell}_{22} \in \R$ gives $L_{ii} = e^{\tilde{\ell}_{ii}} > 0$,
+so the resulting $\bm{\Sigma} = \bm{L}\bm{L}^T$ is always symmetric positive definite.
+No projection, penalty, or clipping is required: any point in $\R^5$ maps to a valid
+variational Gaussian, and standard optimisation machinery applies without modification.
+
+\newpage
 \section{Code Structure}
 \label{app:code}
 %─────────────────────────────────────────────────────────────────────────────
@@ -718,7 +825,6 @@ The implementation is in \texttt{python/logistic\_run.ipynb} (35 cells).
 \end{description}
 
 All figures are saved to \texttt{figs/} with the \texttt{logistic\_} prefix to avoid
-collisions with the \texttt{linear\_} and \texttt{quadratic\_} figures from the
-other test cases.
+collisions with figures from other notebooks in this project.
 
 \end{document}
