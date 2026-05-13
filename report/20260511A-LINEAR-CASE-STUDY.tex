@@ -69,7 +69,7 @@ Gradient-Based Optimisation and Posterior Variance Collapse
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.7em}
 
-Mean-field Variational Inference (VI) is useful because it turns Bayesian posterior computation into an optimisation problem, but this convenience comes with a cost. The approximation can become too confident, giving posterior variances that are smaller than they should be. This report studies that issue---posterior variance collapse---in a controlled Bayesian linear regression case study.
+Mean-field Variational Inference (VI) is useful because it turns Bayesian posterior computation into an optimisation problem, but this convenience comes with a cost. The approximation can become too confident, giving posterior variances that are smaller than they should be. In this case study, I examine that issue---posterior variance collapse---in a controlled Bayesian linear regression setting.
 
 The linear case is chosen deliberately. It is simple enough for the main quantities to be checked directly, but still rich enough to show the difference between optimisation success and reliable Bayesian uncertainty. With Gaussian--Gamma conjugate priors, Coordinate Ascent Variational Inference (CAVI) gives closed-form updates and provides the analytical baseline for the numerical work. Gradient ascent, Newton's method, and BFGS are then applied to the same ELBO so that their behaviour can be compared against that baseline.
 
@@ -126,7 +126,7 @@ the optimised approximation $q(\bm{\theta})$ is systematically overconfident,
 underestimating posterior uncertainty. This is a direct consequence of the KL direction minimised during ELBO maximisation,
 compounded by the mean-field factorisation assumption.\footnote{See \ref{app:vb-collapse} for the full mechanistic explanation.}
 
-This report applies four optimisation methods---CAVI, gradient ascent, Newton's method, and BFGS---to the ELBO and compares their convergence behaviour, computational cost, and posterior quality.
+I apply four optimisation methods---CAVI, gradient ascent, Newton's method, and BFGS---to the ELBO and compare their convergence behaviour, computational cost, and posterior quality.
 As a secondary investigation, the ELBO is augmented with an entropy regularisation term $\lambda H[q(\bm{\beta})]$,
 \begin{equation*}
     \mathcal{L}_{\mathrm{reg}}(\bm{\phi}) = \mathcal{L}(\bm{\phi}) + \lambda H[q(\bm{\beta})],
@@ -150,7 +150,7 @@ equation-error form; this is an explicit modelling assumption rather than a deri
  
 \subsection{Numerical Study and Required Optimisation Components}
 
-This report formulates variational inference for Bayesian linear regression as a constrained optimisation problem and applies four methods: Coordinate Ascent Variational Inference (CAVI), gradient ascent, Newton's method, and BFGS. Each method is characterised by four components from the course framework: entry conditions, search direction, line search, and exit conditions. All four methods share the same initial point so that comparisons reflect method behaviour rather than initialisation.
+I formulate variational inference for Bayesian linear regression as a constrained optimisation problem and apply four methods: Coordinate Ascent Variational Inference (CAVI), gradient ascent, Newton's method, and BFGS. I characterise each method using the same four components from the course framework: entry conditions, search direction, line search, and exit conditions. All four methods share the same initial point so that comparisons reflect method behaviour rather than initialisation.
 
 \subsubsection*{Entry Conditions}
 
@@ -281,6 +281,26 @@ the model prior on $\tau_e$ is specified in the Test Case section.  \vspace{1em}
 Total dimension: $d = p + \frac{p(p+1)}{2} + 2 = 11$ variables for $p=3$ predictors.
 
 \subsection*{Objective Function}
+
+To introduce the objective pedagogically, I start from two compact identities:
+
+\begin{align}
+\mathrm{KL}(q\|p)
+&= \underbrace{-H[q]}_{\text{negative entropy of }q}
+  - \underbrace{\E_q[\log p(\bm{\beta})]}_{\text{expected log-prior}},
+\end{align}
+
+\begin{align}
+\mathcal{L}(\theta)
+&= \underbrace{\E_q[\log p(\bm{y}\mid\bm{\beta})]}_{\text{fit the data}}
+  - \underbrace{\mathrm{KL}(q\|p)}_{\text{stay close to prior}}.
+\end{align}
+
+Step 1: the expected log-likelihood term rewards explanations of the observed data.
+
+Step 2: the KL term prevents overfitting by penalising departure from the prior structure.
+
+Step 3: in this report, these two ideas are written in joint-form ELBO notation over $(\bm{\beta},\tau_e)$, which is the objective optimised by all methods.
 
 Maximise the Evidence Lower Bound (ELBO):
 
@@ -596,6 +616,7 @@ a rate of $O(n^{-1/2})$ per parameter \citep{vaart1998asymptotic}.
 The tight blue band in Figure~\ref{fig:prior_post} is therefore a feature, not a
 defect: it shows that 50 observations are sufficient to identify the linear
 relationship almost exactly.
+Outside this report context, however, that visual overlap could be misread as posterior collapse, so the figure should be interpreted together with the SD-ratio and Gibbs comparisons.
 Crucially, the remaining width of the blue band represents genuine, irreducible
 uncertainty about the \emph{regression line}; the much wider tomato band shows the
 observation noise $\pm 2\sigma_e = \pm 1.0$, which is a separate quantity describing
@@ -832,15 +853,15 @@ The gradient-based methods reveal two distinct failure modes:
   \item Gradient ascent with finite-difference gradients offers no speed advantage over Gibbs on small problems: the $O(2d)$ function evaluations per gradient step dominate the total cost at $d=7$ unconstrained parameters.
 \end{itemize}
 
-For the broader study, the result is a useful warning. When conjugacy is available, CAVI should be treated as the natural method and the generic gradient methods should not be expected to improve on it. When conjugacy is unavailable, however, gradient-based ELBO optimisation becomes much more important. In that setting, analytical gradients or automatic differentiation will be needed; finite-difference gradients are unlikely to scale well.
+For the broader study, I treat this result as a useful warning. When conjugacy is available, CAVI is the natural method and generic gradient methods should not be expected to improve on it. When conjugacy is unavailable, however, gradient-based ELBO optimisation becomes much more important. In that setting, analytical gradients or automatic differentiation are needed; finite-difference gradients are unlikely to scale well.
 
 \section{Conclusion}
 
-This report has used Bayesian linear regression as a checked setting for comparing CAVI, gradient ascent, Newton's method, and BFGS on the same variational inference problem. The formulation is an ELBO maximisation problem, but the numerical question is broader than maximisation alone.
+I used Bayesian linear regression as a checked setting for comparing CAVI, gradient ascent, Newton's method, and BFGS on the same variational inference problem. The formulation is an ELBO maximisation problem, but the numerical question is broader than maximisation alone.
 
 The main issue is whether a converged variational approximation also gives a credible account of posterior uncertainty. Cholesky and log-space reparameterisations keep the covariance and Gamma parameters valid during optimisation, while the Gibbs sampler and the analytical posterior provide references for posterior spread.
 
-The key conclusion is that optimisation performance and uncertainty quality must be read separately. A method can make progress on the ELBO while still producing a posterior approximation that is too narrow. That distinction is the main lesson of the linear case study and the reason posterior standard-deviation ratios are reported alongside convergence results.
+My key conclusion is that optimisation performance and uncertainty quality must be read separately. A method can make progress on the ELBO while still producing a posterior approximation that is too narrow. That distinction is the main lesson of this linear case study and the reason I report posterior standard-deviation ratios alongside convergence results.
 
 \newpage
 \nocite{*}
