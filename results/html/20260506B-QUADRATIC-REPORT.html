@@ -1503,30 +1503,31 @@ cross marks the CAVI solution.</figcaption>
 <h3 id="optimisation-performance">Optimisation Performance</h3>
 <p>Table <a href="#tab:performance" data-reference-type="ref"
 data-reference="tab:performance">[tab:performance]</a> summarises the
-performance of all four VB methods and the Gibbs reference. CAVI
-converges in 9 iterations at 0.9 ms, making it 1764<span
+performance of all four VB methods and the Gibbs reference. In my runs,
+CAVI converges in 9 iterations at 0.9 ms, making it 1764<span
 class="math inline">\(\times\)</span> faster than the Gibbs sampler
 (1535 ms for <span class="math inline">\(3\times5000\)</span> samples).
 Newton’s Method converges in 2 iterations (11.5 ms, 133<span
-class="math inline">\(\times\)</span> speedup) but reaches a worse final
-ELBO (<span class="math inline">\(-44.95\)</span>), indicating it did
-not find the CAVI optimum. BFGS takes 25 iterations (41 ms, 37<span
-class="math inline">\(\times\)</span>) and achieves a better ELBO than
-Newton but still falls short of CAVI. Gradient Ascent (2000 iterations,
-1709 ms) offers no practical speed advantage over Gibbs: the
-finite-difference gradient overhead dominates on this small problem.</p>
+class="math inline">\(\times\)</span> speedup), but it reaches a worse
+final ELBO (<span class="math inline">\(-44.95\)</span>), so it does not
+recover the CAVI optimum. BFGS takes 25 iterations (41 ms, 37<span
+class="math inline">\(\times\)</span>) and reaches a better ELBO than
+Newton, yet it still falls short of CAVI. Gradient Ascent
+(2000 iterations, 1709 ms) offers no practical speed advantage over
+Gibbs, because the finite-difference gradient overhead dominates on this
+small problem.</p>
 <div class="tblr">
 <p><span>colspec=<span>lrrrrr</span>,
 hline<span>1,2,Z</span>=<span>solid</span></span> Method &amp;
 Iterations &amp; Runtime (ms) &amp; Speedup vs Gibbs &amp; Final ELBO
 &amp; Converged<br />
-CAVI &amp; 9 &amp; 0.9 &amp; 1764x &amp; -0.014 &amp; Yes<br />
-Gradient Ascent &amp; 2000 &amp; 1708.6 &amp; 1x &amp; -27.012 &amp;
+CAVI &amp; 9 &amp; 0.9 &amp; 1982x &amp; -0.014 &amp; Yes<br />
+Gradient Ascent &amp; 2000 &amp; 1941.1 &amp; 1x &amp; -27.012 &amp;
 Yes<br />
-Newton’s Method &amp; 2 &amp; 11.5 &amp; 133.6x &amp; -44.950 &amp;
+Newton’s Method &amp; 2 &amp; 10.3 &amp; 171.3x &amp; -44.950 &amp;
 Yes<br />
-BFGS &amp; 25 &amp; 41.2 &amp; 37x &amp; -26.658 &amp; Yes<br />
-Gibbs (3 chains) &amp; 3 x 5000 &amp; 1535.1 &amp; 1x (reference) &amp;
+BFGS &amp; 25 &amp; 48.0 &amp; 37x &amp; -26.658 &amp; Yes<br />
+Gibbs (3 chains) &amp; 3 x 5000 &amp; 1756.6 &amp; 1x (reference) &amp;
 N/A (MCMC) &amp; Yes<br />
 </p>
 </div>
@@ -1541,12 +1542,13 @@ advantage entirely.</figcaption>
 <p>Figure <a href="#fig:elbocv" data-reference-type="ref"
 data-reference="fig:elbocv">5</a> shows the ELBO trajectory for each
 method. CAVI increases monotonically and converges within 9 iterations.
-Gradient Ascent improves slowly over 2000 iterations and plateaus at a
-much lower ELBO value (<span class="math inline">\(-27.0\)</span>) than
-CAVI (<span class="math inline">\(-0.014\)</span>). BFGS converges more
-rapidly than Gradient Ascent but still does not match the CAVI solution,
-suggesting the approximate Hessian is not sufficiently accurate near the
-optimum. Newton’s Method reaches its (poor) optimum in 2 steps,
+I found that Gradient Ascent improves slowly over 2000 iterations and
+plateaus at a much lower ELBO value (<span
+class="math inline">\(-27.0\)</span>) than CAVI (<span
+class="math inline">\(-0.014\)</span>). BFGS converges more rapidly than
+Gradient Ascent but still does not match the CAVI solution, which
+suggests that the approximate Hessian is not sufficiently accurate near
+the optimum. Newton’s Method reaches its (poor) optimum in 2 steps,
 consistent with the Hessian being ill-conditioned at the true
 maximum.</p>
 <figure id="fig:elbocv">
@@ -1563,13 +1565,13 @@ means and standard-deviation ratios <span
 class="math inline">\(\sigma_{\mathrm{VB}}/\sigma_{\mathrm{Gibbs}}\)</span>
 for all methods. All methods recover the posterior means accurately: the
 largest mean error is less than 0.01 relative to the Gibbs reference.
-The SD ratios reveal the degree of variance collapse. CAVI achieves
-near-unity ratios (<span class="math inline">\(0.98\)</span>–<span
+The SD ratios show the degree of variance collapse in each method. In
+this conjugate linear setting, CAVI achieves near-unity ratios (<span
+class="math inline">\(0.98\)</span>–<span
 class="math inline">\(0.98\)</span>) for <span
 class="math inline">\(\beta_0\)</span> and <span
-class="math inline">\(\beta_1\)</span>, indicating minimal collapse in
-this conjugate linear setting. Newton’s Method and Gradient Ascent show
-larger deviations, particularly for <span
+class="math inline">\(\beta_1\)</span>, while Newton’s Method and
+Gradient Ascent show larger deviations, particularly for <span
 class="math inline">\(\tau_e\)</span>, consistent with their failure to
 reach the CAVI optimum.</p>
 <div class="tblr">
@@ -1629,7 +1631,13 @@ data-reference="fig:vbg_b0">10</a>–<a href="#fig:vbg_tau"
 data-reference-type="ref" data-reference="fig:vbg_tau">12</a> overlay
 the full posterior densities from VB and Gibbs for each parameter,
 illustrating that the variational distributions are centred correctly
-but narrower than the MCMC reference.</p>
+but narrower than the MCMC reference. For discussion purposes outside
+this document, these overlays could be misinterpreted as posterior
+collapse from visual impression alone; in this report I interpret them
+together with Table <a href="#tab:posterior" data-reference-type="ref"
+data-reference="tab:posterior">[tab:posterior]</a> and Figure <a
+href="#fig:sdratios" data-reference-type="ref"
+data-reference="fig:sdratios">6</a>.</p>
 <figure id="fig:vbg_b0">
 <img src="linear_vb_gibbs_beta0.png" style="width:80.0%" />
 <figcaption>VB and Gibbs posterior densities for <span
@@ -1777,13 +1785,13 @@ the gain per iteration.</p>
 hline<span>1,2,Z</span>=<span>solid</span></span> Method &amp;
 Iterations &amp; Runtime (ms) &amp; Speedup vs Gibbs &amp; Final ELBO
 &amp; Converged<br />
-CAVI &amp; 8 &amp; 1.1 &amp; 1494x &amp; -21.065 &amp; Yes<br />
-Gradient Ascent &amp; 2000 &amp; 3229.8 &amp; 1x &amp; -75.146 &amp;
+CAVI &amp; 8 &amp; 1.3 &amp; 2086x &amp; -21.065 &amp; Yes<br />
+Gradient Ascent &amp; 2000 &amp; 3752.9 &amp; 1x &amp; -75.146 &amp;
 Yes<br />
-Newton’s Method &amp; 2 &amp; 43.5 &amp; 39.2x &amp; -92.095 &amp;
+Newton’s Method &amp; 2 &amp; 33.8 &amp; 80.6x &amp; -92.095 &amp;
 Yes<br />
-BFGS &amp; 32 &amp; 50.2 &amp; 34x &amp; -75.139 &amp; Yes<br />
-Gibbs (3 chains) &amp; 3 x 5000 &amp; 1705.9 &amp; 1x (reference) &amp;
+BFGS &amp; 32 &amp; 45.3 &amp; 60x &amp; -75.139 &amp; Yes<br />
+Gibbs (3 chains) &amp; 3 x 5000 &amp; 2722.7 &amp; 1x (reference) &amp;
 N/A (MCMC) &amp; Yes<br />
 </p>
 </div>
