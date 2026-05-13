@@ -146,7 +146,8 @@ underestimating posterior uncertainty.
 This arises because the mean-field factorisation discards posterior \emph{correlations}
 between blocks --- here, between the intercept $\beta_0$ and the group means $u_j$
 --- forcing each factor to concentrate more tightly than the true marginal.%
-\footnote{The mechanistic derivation is given in Case Study~1 (Appendix~A).}
+\footnote{See Section~\ref{sec:variance-collapse} for the hierarchical mechanism;
+the general derivation is in Case Study~1 (Appendix~A).}
 
 This report applies four optimisation methods --- CAVI, gradient ascent, Newton's
 method, and BFGS --- to the ELBO and compares their convergence behaviour,
@@ -436,6 +437,112 @@ The sampler runs for $N_{\mathrm{warmup}} = 500$ burn-in and $N = 5000$ retained
 iterations per chain, with 3 independent chains.
 
 %─────────────────────────────────────────────────────────────────────────────
+\section{Posterior Variance Collapse}
+\label{sec:variance-collapse}
+%─────────────────────────────────────────────────────────────────────────────
+
+Posterior variance collapse means that the variational covariance $\bm{\Sigma}_\beta$
+understates the true uncertainty in the regression coefficients.
+The collapsed posterior then looks more precise than the data justify.
+In this hierarchical model the effect is more severe than in simple linear regression
+(Case Study~1) because the hierarchical coupling creates strong posterior correlations
+that the mean-field factorisation is forced to discard.
+
+\subsection{Why Collapse Occurs}
+
+The mean-field approximation factorises the variational family as
+\begin{align}
+  q(\bm{\beta},\mathbf{u},\tau_e,\tau_u)
+  = q(\bm{\beta})\;\prod_{j=1}^{J} q(u_j)\;\cdot\; q(\tau_e)\;\cdot\; q(\tau_u).
+\end{align}
+This factorisation is convenient, but it discards all posterior covariances
+between the global parameters $\bm{\beta}$ and the group-level random effects
+$u_1,\ldots,u_J$.
+
+In the true posterior these two blocks are strongly negatively correlated.
+Given the model $y_{ij} = \beta_0 + \beta_1 x_{ij} + u_j + \varepsilon_{ij}$,
+the data constrain the \emph{group mean} $\beta_0 + u_j$ far more tightly
+than either $\beta_0$ or $u_j$ alone.
+If a posterior sample has $\beta_0$ large, the group effects $u_j$ must be
+correspondingly small, and vice versa.
+The mean-field assumption severs this link: $q(\beta_0)$ and each $q(u_j)$ are
+forced to be independent, so the variational factor $q(\beta_0)$ is fitted to
+the marginal likelihood of $\beta_0$ \emph{as if the group effects were fixed
+at their posterior means}.
+This narrows $q(\beta_0)$ relative to the true marginal posterior, producing
+the collapse.
+
+The slope $\beta_1$ is not confounded with the random effects in the same way:
+the predictor $x_{ij}$ varies within each group and is not absorbed by $u_j$,
+so $q(\beta_1)$ is much less affected.
+
+\paragraph{Direction of the KL divergence.}
+Standard VI minimises $\mathrm{KL}[q\|p]$, which penalises $q$ heavily for
+putting mass where $p$ is small, but is lenient when $q$ fails to cover parts
+of the posterior tails.
+The practical effect is that the variational approximation sits on the
+high-density centre of $p(\bm{\theta}\mid\mathbf{y})$ rather than covering
+the full posterior spread, reinforcing the narrowing in $\bm{\Sigma}_\beta$.
+
+\subsection{Diagnostic}
+
+For each scalar parameter, the posterior standard-deviation ratio
+\begin{align}
+  r = \frac{\sigma_{\mathrm{VI}}}{\sigma_{\mathrm{Gibbs}}}
+\end{align}
+is computed using the Gibbs sampler as the reference (since the exact posterior
+is not available in closed form for a hierarchical model).
+A ratio below one confirms collapse; a ratio near one indicates the VI
+approximation matches the Gibbs marginal.
+
+In this study, the well-converged VI methods (CAVI, gradient ascent, BFGS)
+all produce $r \approx 0.13$ for $\beta_0$ --- the VI standard deviation is
+roughly one-eighth of the Gibbs standard deviation, a severe collapse.
+In contrast, $r \approx 1.0$ for $\beta_1$.
+The intercept--random-effect confounding is thus the dominant source of
+collapse, and the slope is effectively immune.
+
+\subsection{Approaches Considered}
+
+Three approaches to reducing or diagnosing collapse are considered.
+Only entropy regularisation (Approach~3) is implemented; the first two are
+discussed to motivate that choice.
+The mechanistic derivation and gradient formulae are given in Case Study~1
+(Appendix~A); only the hierarchical-specific adaptations are noted here.
+
+\subsubsection{Informative Prior on $\tau_e$}
+
+A stronger prior on the noise precision $\tau_e$ limits how large $\E[\tau_e]$
+can become.
+Since a large expected precision drives down $\bm{\Sigma}_\beta$ in the CAVI
+update $\bm{\Sigma}_\beta^{-1} = \lambda\bm{I} + \E[\tau_e]\bm{X}^T\bm{X}$,
+controlling $\tau_e$ can indirectly slow the collapse.
+The limitation is that this changes the statistical model and requires a
+defensible prior choice that may not generalise to other problems.
+
+\subsubsection{Minimum Variance Constraint}
+
+A direct lower bound $\Sigma_{\beta,jj} \geq \sigma^2_{\min}$ can be imposed
+on each diagonal entry of $\bm{\Sigma}_\beta$.
+This prevents the intercept variance from reaching pathologically small values
+but introduces an external threshold that is not determined by the data.
+
+\subsubsection{Entropy Regularisation}
+
+The most direct objective-based approach is entropy regularisation:
+\begin{align}
+  \mathcal{L}_{\mathrm{reg}}(\bm{\theta})
+  = \mathcal{L}(\bm{\theta}) + \lambda\, H[q(\bm{\beta})],
+\end{align}
+where $H[q(\bm{\beta})] = \tfrac{1}{2}\log\det(2\pi e\,\bm{\Sigma}_\beta)$
+is the entropy of the variational Gaussian for $\bm{\beta}$.
+The regularisation term rewards broader covariance estimates and directly
+counters the collapse tendency.
+For the Cholesky-parameterised covariance used here, the gradient with respect
+to each Cholesky factor gains a closed-form correction (derivation in Case
+Study~1, Appendix~A).
+
+%─────────────────────────────────────────────────────────────────────────────
 \section{Optimisation Problem Formulation}
 %─────────────────────────────────────────────────────────────────────────────
 
@@ -541,6 +648,22 @@ relative to the population curve.
   \caption{Generated hierarchical data ($N=150$, $J=5$).
     Dotted lines show group-specific regressions; the solid line is the population mean.}
   \label{fig:data}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\linewidth]{hierarchical_linear_likelihood_posterior.png}
+  \caption{Likelihood and CAVI posterior for the population-level regression.
+    The red dashed line is the true population mean $y=1.0+2.0x$; the tomato band is the
+    95\% noise interval $\pm 2\sigma_e = \pm 1.0$, showing where individual observations
+    fall around the population mean (ignoring group shifts).
+    The blue band is the CAVI posterior 95\% credible interval for the population
+    regression mean; $N=150$ observations across $J=5$ groups pull the posterior
+    slope close to the true value, but the intercept is visibly biased low
+    ($\hat{\beta}_0 \approx 0.46$ versus $\beta_{0,\mathrm{true}} = 1.0$).
+    This downward bias is a direct consequence of variance collapse: the CAVI intercept
+    absorbs less of the group-mean signal than the true posterior marginal would.}
+  \label{fig:likpost}
 \end{figure}
 
 \subsection{ELBO Convergence}

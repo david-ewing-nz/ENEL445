@@ -567,11 +567,10 @@ with true parameters $\beta_0=2.0$, $\beta_1=1.5$, and noise precision $\tau_e=4
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.92\linewidth]{linear_prior_likelihood_posterior.png}
-  \caption{Prior, observed data, and CAVI posterior for the linear predictor.
-    The grey dashed line is the prior mean ($y=0$, i.e.\ $\bm{\mu}_\beta=\bm{0}$)
-    and the grey band is the 95\% prior predictive interval under
-    $\bm{\beta}\sim\N(\bm{0},10\bm{I})$; it bleeds beyond the plot boundaries,
-    reflecting the prior's large uncertainty before any data are seen.
+  \caption{Likelihood and CAVI posterior for the linear predictor.
+    The red dashed line is the true regression mean $y=2.0+1.5x$ (the likelihood mean);
+    the tomato band is the 95\% noise interval $\pm 2\sigma_e = \pm 1.0$, showing where
+    individual observations are expected to fall.
     The blue band is the CAVI posterior 95\% credible interval; the 50 observations
     pull the posterior mean (blue line) close to the true line (red dashed),
     demonstrating effective Bayesian updating.}
