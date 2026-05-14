@@ -516,6 +516,20 @@ step applied before inference.
 
 \subsection{Results}
 
+The $p=3$ design matrix retains the Normal--Gamma structure intact, so all four methods
+run with the same closed-form CAVI updates as Case Study~1.
+CAVI converges in approximately 50 iterations; BFGS matches its final ELBO in fewer,
+while gradient ascent requires more iterations to reach the same limit.
+With $n=100$ the posterior is sharper than in CS1, yet all methods recover the true
+parameters $\bm{\beta}_{\mathrm{true}} = (1.0, 2.0, -1.0)^T$ reliably, and posterior
+means are nearly indistinguishable between methods.
+
+Variance collapse is present but mild: SD ratios stay above 0.97 for all three
+coefficients, which is why this case is excluded from the Laplace correction analysis.
+The intercept is marginally more affected than the slope --- the polynomial expansion
+introduces additional between-predictor correlation --- but the effect is far weaker than
+in the random-effects settings of CS4 and CS5.
+
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.85\textwidth]{quadratic_data_scatter.png}
@@ -535,16 +549,19 @@ step applied before inference.
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.85\textwidth]{quadratic_vb_gibbs_beta0.png}
-  \caption{Posterior comparison for $\beta_0$ (quadratic case).
-           Moderate variance collapse: the variational approximation is more
-           overconfident than in the linear case.}
+  \caption{Posterior comparison for $\beta_0$ (quadratic case): all four VI
+           methods against the conjugate Gibbs reference.
+           The approximation is slightly tighter than Gibbs (SD ratio above 0.97),
+           consistent with the mild collapse visible across all three coefficients.}
   \label{fig:quadratic-posterior-beta0}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.85\textwidth]{quadratic_vb_gibbs_tau_e.png}
-  \caption{Posterior comparison for $\tau_e$ (quadratic case).}
+  \caption{Posterior comparison for the noise precision $\tau_e$ (quadratic case).
+           The Gamma approximation tracks the Gibbs reference closely, with no
+           meaningful collapse in the precision parameter.}
   \label{fig:quadratic-posterior-tau}
 \end{figure}
 
@@ -597,26 +614,22 @@ the implementation uses Cholesky reparameterisation with 5 unconstrained paramet
 
 \subsection{Results}
 
-We generated synthetic data using a known logistic regression model with parameters
-$\beta_0 = -1.0$ and $\beta_1 = 2.0$.
-These are the data-generating parameters --- they define the process that produced the
-observations and represent what we are trying to recover.
+The model uses $\bm{\beta}_{\mathrm{true}} = (-1.0, 2.0)^T$ as data-generating
+parameters; inference treats these as unknown and uses only the 200 binary observations
+and the weakly informative prior $\bm{\beta}\sim\N(\bm{0},10\bm{I})$.
+With this moderate sample size the prior retains some influence, pulling the posterior
+mean to approximately $(-1.6,\;2.6)^T$ rather than landing on the true values.
+The true parameters appear on the figures as a reference point --- they fall well within
+the posterior, which confirms the sampler is correct.
 
-Inference was conducted as if the true values were unknown.
-The Gibbs sampler uses only two inputs: the 200 binary observations and the weakly
-informative prior $\bm{\beta} \sim \N(\bm{0}, 10\bm{I})$.
-It never sees the true values.
-
-The posterior distribution is the result of combining what the data say (the likelihood)
-with what we believed before seeing the data (the prior).
-The posterior mean sits at approximately $(-1.6,\; 2.6)$, offset from the true values,
-because with only 200 observations the likelihood is not strong enough to overcome the
-prior completely.
-
-The true values appear on the plots only as a benchmark --- to verify that the posterior
-is plausible.
-The fact that the true values fall within the posterior distribution confirms the sampler
-is behaving correctly.
+Variance collapse is negligible in the logistic case, which is why CS3 is excluded from
+the Laplace correction analysis.
+The Jaakkola--Jordan bound is tight at the CAVI fixed point: when
+$\xi_i^* = \sqrt{\E_q[(x_i^T\bm{\beta})^2]}$, the bound is tangent to the true
+log-likelihood, so the ELBO penalises over-concentration nearly as strongly as the
+exact posterior.
+All four VI methods recover posterior standard deviations to within 3\% of the PG Gibbs
+reference.
 
 \begin{figure}[H]
   \centering
@@ -629,10 +642,10 @@ is behaving correctly.
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.85\textwidth]{logistic_vb_gibbs_beta0.png}
-  \caption{Posterior comparison for $\beta_0$: variational approximation versus PG Gibbs
-           reference density.
-           The posterior mean is offset from the true value $\beta_0=-1.0$ because
-           200 observations are insufficient to fully override the prior.}
+  \caption{Posterior comparison for $\beta_0$ (logistic case): VI methods against the
+           PG Gibbs reference.
+           The posterior mean sits near $-1.6$ rather than the true value $-1.0$
+           because the prior retains some influence at $n=200$.}
   \label{fig:logistic-posterior}
 \end{figure}
 
