@@ -281,7 +281,13 @@ convergence behaviour, computational cost, and posterior quality. Of
 particular interest is whether the SD ratio <span
 class="math inline">\(\sigma_{\mathrm{VI}}/\sigma_{\mathrm{Gibbs}}\)</span>
 departs substantially from unity, signalling collapse, and which
-parameters are most affected.</p>
+parameters are most affected. As a secondary investigation, the ELBO is
+augmented with an entropy regularisation term <span
+class="math inline">\(\lambda H[q(\bm{\beta})]\)</span>, <span
+class="math display">\[\mathcal{L}_{\mathrm{reg}}(\bm{\theta}) =
+\mathcal{L}(\bm{\theta}) + \lambda H[q(\bm{\beta})],\]</span> to examine
+whether explicitly incentivising broader posteriors can mitigate
+variance collapse.</p>
 <p>Throughout all gradient-based methods, the variational covariance
 <span class="math inline">\(\bm{\Sigma}_\beta\)</span> must remain
 symmetric positive definite at every iteration. <a href="#fn2"
@@ -323,6 +329,21 @@ group-<span class="math inline">\(j\)</span> random effect, and <span
 class="math inline">\(\tau_e\)</span>, <span
 class="math inline">\(\tau_u\)</span> are the noise and random-effect
 precisions respectively.</p>
+<p>Writing the likelihood scalar form makes the two-level structure
+explicit: <span class="math display">\[y_{ij} = \underbrace{\beta_0 +
+\beta_1 x_{ij}}_{\text{population mean}}
+          + \underbrace{u_j}_{\text{group shift}}
+          + \varepsilon_{ij}, \qquad
+  \varepsilon_{ij} \sim \mathcal{N}(0,\,\tau_e^{-1}).\]</span> The
+<em>population mean</em> <span class="math inline">\(\beta_0 + \beta_1
+x_{ij}\)</span> is shared across all groups; the <em>group shift</em>
+<span class="math inline">\(u_j\)</span> is a group-specific offset
+drawn from <span class="math inline">\(\mathcal{N}(0,
+\tau_u^{-1})\)</span>, inducing within-group correlation. Observations
+within the same group <span class="math inline">\(j\)</span> are
+therefore not independent — they share the same realisation of <span
+class="math inline">\(u_j\)</span> — which is the defining
+characteristic of clustered, hierarchical data.</p>
 <h2 id="mean-field-variational-approximation">Mean-Field Variational
 Approximation</h2>
 <p>The mean-field variational family factorises as <span
@@ -834,7 +855,8 @@ star: CAVI warm start; white cross: true <span
 class="math inline">\(\bm{\beta}\)</span>.</figcaption>
 </figure>
 <h1 id="results">Results</h1>
-<h2 id="generated-data">Generated Data</h2>
+<h2 id="test-case-hierarchical-bayesian-linear-regression">Test Case:
+Hierarchical Bayesian Linear Regression</h2>
 <p>Figure <a href="#fig:data" data-reference-type="ref"
 data-reference="fig:data">3</a> shows the 150 generated observations
 stratified by group. Group random effects <span
@@ -842,33 +864,85 @@ class="math inline">\(u_j\)</span> visibly shift the regression lines
 upward or downward relative to the population curve.</p>
 <figure id="fig:data">
 <img src="hierarchical_linear_data_scatter.png" style="width:80.0%" />
-<figcaption>Generated hierarchical data (<span
-class="math inline">\(N=150\)</span>, <span
-class="math inline">\(J=5\)</span>). Dotted lines show group-specific
-regressions; the solid line is the population mean.</figcaption>
+<figcaption>Prior and likelihood for the hierarchical linear model
+(<span class="math inline">\(N=150\)</span>, <span
+class="math inline">\(J=5\)</span>). The grey band is the prior 95%
+predictive interval (clipped) for the population mean under <span
+class="math inline">\(\bm{\beta}\sim\mathcal{N}(\mathbf{0},10\mathbf{I})\)</span>;
+the grey dashed line is the prior mean <span
+class="math inline">\(y=0\)</span>. Coloured bands show the per-group
+likelihood 95% noise interval <span class="math inline">\(\pm 2\sigma_e
+= \pm 1.0\)</span> around each group’s true regression line <span
+class="math inline">\(\beta_0 + \beta_1 x + u_j\)</span>; dotted lines
+are the group regression means. The black dashed line is the population
+mean <span class="math inline">\(\beta_0 + \beta_1
+x\)</span>.</figcaption>
 </figure>
+<p>Figure <a href="#fig:likpost" data-reference-type="ref"
+data-reference="fig:likpost">4</a> shows the CAVI posterior bands for
+each group alongside the population posterior. Because each observation
+belongs to exactly one group, the observed <span
+class="math inline">\(y_{ij}\)</span> scatters around its <em>group
+mean</em>: <span class="math display">\[y_{ij} \mid \boldsymbol{\beta},
+u_j, \tau_e
+    \;\sim\; \mathcal{N}\!\Bigl(
+      \underbrace{\beta_0 + \beta_1 x_{ij}}_{\text{population mean}}
+      +\underbrace{u_j}_{\text{group shift}},\;
+      \underbrace{\tau_e^{-1}}_{\text{within-group variance}}
+    \Bigr).\]</span> Each coloured band in Figure <a href="#fig:likpost"
+data-reference-type="ref" data-reference="fig:likpost">4</a> shows the
+CAVI posterior uncertainty <span class="math inline">\(\pm
+2\sqrt{v_{\beta}(x)+v_j}\)</span> around the fitted group mean, where
+<span class="math inline">\(v_j\)</span> is the posterior variance of
+<span class="math inline">\(u_j\)</span> and <span
+class="math inline">\(v_{\beta}(x) = \mathbf{x}^\top
+\boldsymbol{\Sigma}_\beta \mathbf{x}\)</span> is the posterior variance
+from <span class="math inline">\(\boldsymbol{\beta}\)</span>. Because
+CAVI underestimates both quantities under the mean-field independence
+assumption, the resulting bands are visibly narrower than the actual
+data scatter, directly illustrating variance collapse.</p>
 <figure id="fig:likpost">
 <img src="hierarchical_linear_likelihood_posterior.png"
 style="width:92.0%" />
-<figcaption>Likelihood and CAVI posterior for the population-level
-regression. The red dashed line is the true population mean <span
-class="math inline">\(y=1.0+2.0x\)</span>; the tomato band is the 95%
-noise interval <span class="math inline">\(\pm 2\sigma_e = \pm
-1.0\)</span>, showing where individual observations fall around the
-population mean (ignoring group shifts). The blue band is the CAVI
-posterior 95% credible interval for the population regression mean;
-<span class="math inline">\(N=150\)</span> observations across <span
-class="math inline">\(J=5\)</span> groups pull the posterior slope close
-to the true value, but the intercept is visibly biased low (<span
-class="math inline">\(\hat{\beta}_0 \approx 0.46\)</span> versus <span
-class="math inline">\(\beta_{0,\mathrm{true}} = 1.0\)</span>). This
-downward bias is a direct consequence of variance collapse: the CAVI
-intercept absorbs less of the group-mean signal than the true posterior
-marginal would.</figcaption>
+<figcaption>Per-group CAVI posterior bands and population posterior for
+the hierarchical linear model. Each coloured dashed line is the CAVI
+posterior group mean <span class="math inline">\(\hat{\beta}_0 +
+\hat{\beta}_1 x + m_j\)</span> (same group colours as <a
+href="#fig:datascatter" data-reference-type="ref+label"
+data-reference="fig:datascatter">[fig:datascatter]</a>); the shaded band
+shows <span class="math inline">\(\pm 2\sqrt{v_{\beta}(x)+v_j}\)</span>,
+combining posterior uncertainty in <span
+class="math inline">\(\boldsymbol{\beta}\)</span> with posterior
+uncertainty in the group effect <span
+class="math inline">\(u_j\)</span>. The blue band is the corresponding
+population-level posterior <span class="math inline">\(\pm
+2\sqrt{v_{\beta}(x)}\)</span>, containing <span
+class="math inline">\(\boldsymbol{\beta}\)</span> uncertainty only. The
+black dashed line is the true population mean <span
+class="math inline">\(y=1.0+2.0x\)</span>. Two symptoms of variance
+collapse are immediately visible: (1) the posterior bands are far
+narrower than the data scatter warrants — many observations fall outside
+their group’s posterior band — indicating that <span
+class="math inline">\(\boldsymbol{\Sigma}_\beta\)</span> and <span
+class="math inline">\(v_j\)</span> are jointly underestimated; and
+(2) the population posterior mean (<span
+class="math inline">\(\hat{\beta}_0 \approx 0.46\)</span>) lies below
+the true population mean by <span class="math inline">\(\approx
+0.54\)</span> units, reflecting intercept bias induced by the mean-field
+independence assumption.</figcaption>
+</figure>
+<figure id="fig:likpost_gibbs">
+<img src="hierarchical_linear_likelihood_posterior_gibbs.png"
+style="width:92.0%" />
+<figcaption>Population-level 95 % credible intervals: CAVI (steelblue)
+vs Gibbs MCMC (tomato), overlaid on the per-group CAVI posterior bands.
+The Gibbs CI is substantially wider than the CAVI CI for the same
+population mean, directly demonstrating posterior variance collapse
+under the mean-field approximation.</figcaption>
 </figure>
 <h2 id="elbo-convergence">ELBO Convergence</h2>
 <p>Figure <a href="#fig:elbocv" data-reference-type="ref"
-data-reference="fig:elbocv">5</a> shows the ELBO history for all four
+data-reference="fig:elbocv">6</a> shows the ELBO history for all four
 methods. CAVI and BFGS converge to essentially the same final ELBO value
 (<span class="math inline">\(-132.08\)</span>). Gradient ascent
 converges but requires the full 2000-iteration budget, reflecting the
@@ -886,11 +960,11 @@ agree.</figcaption>
 <h2 id="step-size-and-condition-number-behaviour">Step-Size and
 Condition-Number Behaviour</h2>
 <p>Figure <a href="#fig:stepsize" data-reference-type="ref"
-data-reference="fig:stepsize">6</a> shows the Armijo step sizes for
+data-reference="fig:stepsize">7</a> shows the Armijo step sizes for
 gradient ascent. The step sizes remain small throughout, reflecting the
 relatively flat landscape in the 19-dimensional space. Figure <a
 href="#fig:cond" data-reference-type="ref"
-data-reference="fig:cond">7</a> shows the Hessian condition number for
+data-reference="fig:cond">8</a> shows the Hessian condition number for
 Newton’s method, which remains large throughout, explaining the
 suboptimal convergence.</p>
 <figure id="fig:stepsize">
@@ -908,17 +982,17 @@ Newton’s failure to find the CAVI optimum.</figcaption>
 </figure>
 <h2 id="gibbs-sampler-diagnostics">Gibbs Sampler Diagnostics</h2>
 <p>Figures <a href="#fig:trace_b0" data-reference-type="ref"
-data-reference="fig:trace_b0">8</a>–<a href="#fig:trace_tauu"
-data-reference-type="ref" data-reference="fig:trace_tauu">11</a> show
+data-reference="fig:trace_b0">9</a>–<a href="#fig:trace_tauu"
+data-reference-type="ref" data-reference="fig:trace_tauu">12</a> show
 trace plots for the four scalar parameters monitored (<span
 class="math inline">\(\beta_0\)</span>, <span
 class="math inline">\(\beta_1\)</span>, <span
 class="math inline">\(\tau_e\)</span>, <span
 class="math inline">\(\tau_u\)</span>). Figure <a href="#fig:acf"
-data-reference-type="ref" data-reference="fig:acf">12</a> shows the ACF
+data-reference-type="ref" data-reference="fig:acf">13</a> shows the ACF
 for each parameter; all drop inside the 95% confidence band within 5–10
 lags, indicating good mixing. Figure <a href="#fig:rhat"
-data-reference-type="ref" data-reference="fig:rhat">13</a> shows the
+data-reference-type="ref" data-reference="fig:rhat">14</a> shows the
 Gelman–Rubin <span class="math inline">\(\hat{R}\)</span> diagnostic;
 all values are below 1.01, confirming convergence of the 3 chains.</p>
 <figure id="fig:trace_b0">
@@ -973,7 +1047,7 @@ convergence.</figcaption>
 </figure>
 <h2 id="random-effects-recovery">Random Effects Recovery</h2>
 <p>Figure <a href="#fig:re" data-reference-type="ref"
-data-reference="fig:re">14</a> compares the CAVI posterior means for
+data-reference="fig:re">15</a> compares the CAVI posterior means for
 <span class="math inline">\(u_j\)</span> against the Gibbs reference and
 the true values. Both methods recover the group-specific shifts, with
 CAVI showing slightly tighter credible intervals consistent with its
@@ -988,8 +1062,8 @@ class="math inline">\(\pm 2\)</span> posterior SD.</figcaption>
 <h2 id="posterior-comparison-vi-versus-gibbs">Posterior Comparison: VI
 versus Gibbs</h2>
 <p>Figures <a href="#fig:vbgibbs_b0" data-reference-type="ref"
-data-reference="fig:vbgibbs_b0">15</a>–<a href="#fig:vbgibbs_tauu"
-data-reference-type="ref" data-reference="fig:vbgibbs_tauu">18</a>
+data-reference="fig:vbgibbs_b0">16</a>–<a href="#fig:vbgibbs_tauu"
+data-reference-type="ref" data-reference="fig:vbgibbs_tauu">19</a>
 overlay the VI approximations against the Gibbs histograms for the four
 scalar parameters.</p>
 <figure id="fig:vbgibbs_b0">
@@ -1018,7 +1092,7 @@ class="math inline">\(\tau_u\)</span>.</figcaption>
 <h2 id="posterior-standard-deviation-ratios">Posterior
 Standard-Deviation Ratios</h2>
 <p>Figure <a href="#fig:sdratios" data-reference-type="ref"
-data-reference="fig:sdratios">19</a> shows the ratio <span
+data-reference="fig:sdratios">20</a> shows the ratio <span
 class="math inline">\(\sigma_{\mathrm{VI}}/\sigma_{\mathrm{Gibbs}}\)</span>
 for each method and parameter. CAVI and BFGS exhibit severe collapse for
 <span class="math inline">\(\beta_0\)</span> (SD ratio <span
@@ -1042,7 +1116,7 @@ to its convergence to a suboptimal point.</p>
 </figure>
 <h2 id="posterior-mean-errors">Posterior Mean Errors</h2>
 <p>Figure <a href="#fig:meanerr" data-reference-type="ref"
-data-reference="fig:meanerr">20</a> shows the absolute error <span
+data-reference="fig:meanerr">21</a> shows the absolute error <span
 class="math inline">\(|\mu_{\mathrm{VI}} -
 \mu_{\mathrm{Gibbs}}|\)</span>. Despite severe variance collapse for
 <span class="math inline">\(\beta_0\)</span>, posterior means are well
@@ -1064,11 +1138,11 @@ summarises the posterior means and SD ratios.</p>
 hline<span>1,2,Z</span>=<span>solid</span></span> Method &amp;
 Iterations &amp; Runtime (ms) &amp; Speedup vs Gibbs &amp; Final
 ELBO<br />
-CAVI &amp; 102 &amp; 26.8 &amp; 134x &amp; -132.077<br />
-Gradient Ascent &amp; 2000 &amp; 8890.5 &amp; 0x &amp; -132.086<br />
-Newton’s Method &amp; 50 &amp; 3877.6 &amp; 0.9x &amp; -165.282<br />
-BFGS &amp; 34 &amp; 116.9 &amp; 31x &amp; -132.077<br />
-Gibbs (3 chains) &amp; 3x5000 &amp; 3587.7 &amp; 1x (reference) &amp;
+CAVI &amp; 102 &amp; 27.0 &amp; 121x &amp; -132.077<br />
+Gradient Ascent &amp; 2000 &amp; 8910.5 &amp; 0x &amp; -132.086<br />
+Newton’s Method &amp; 50 &amp; 3316.8 &amp; 1.0x &amp; -165.282<br />
+BFGS &amp; 34 &amp; 123.4 &amp; 26x &amp; -132.077<br />
+Gibbs (3 chains) &amp; 3x5000 &amp; 3254.6 &amp; 1x (reference) &amp;
 N/A<br />
 </p>
 </div>
@@ -1095,7 +1169,7 @@ Gibbs (ref) &amp; 0.4257 &amp; 1.9872 &amp; 3.7214 &amp; 2.8239 &amp;
 </div>
 <h2 id="computational-cost">Computational Cost</h2>
 <p>Figure <a href="#fig:timing" data-reference-type="ref"
-data-reference="fig:timing">21</a> compares the runtimes of all methods.
+data-reference="fig:timing">22</a> compares the runtimes of all methods.
 CAVI is the fastest converged method at 27 ms, 134<span
 class="math inline">\(\times\)</span> faster than the conjugate Gibbs
 sampler (3.6 s for 3 chains <span class="math inline">\(\times\)</span>
@@ -1158,7 +1232,7 @@ gradient-based method.</p>
 <p>First-order gradient ascent converges to the correct optimum but
 requires all 2000 iterations, making it the slowest converged method.
 The Armijo step sizes (Figure <a href="#fig:stepsize"
-data-reference-type="ref" data-reference="fig:stepsize">6</a>) show
+data-reference-type="ref" data-reference="fig:stepsize">7</a>) show
 consistently small values, indicating that the curvature of the ELBO
 surface is poorly aligned with the gradient direction in a
 19-dimensional space — the same limitation identified in the simpler

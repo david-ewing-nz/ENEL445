@@ -155,6 +155,11 @@ computational cost, and posterior quality.
 Of particular interest is whether the SD ratio
 $\sigma_{\mathrm{VI}}/\sigma_{\mathrm{Gibbs}}$ departs substantially from unity,
 signalling collapse, and which parameters are most affected.
+As a secondary investigation, the ELBO is augmented with an entropy regularisation term $\lambda H[q(\bm{\beta})]$,
+\begin{equation*}
+    \mathcal{L}_{\mathrm{reg}}(\bm{\theta}) = \mathcal{L}(\bm{\theta}) + \lambda H[q(\bm{\beta})],
+\end{equation*}
+to examine whether explicitly incentivising broader posteriors can mitigate variance collapse.
 
 Throughout all gradient-based methods, the variational covariance $\bm{\Sigma}_\beta$
 must remain symmetric positive definite at every iteration.%
@@ -190,6 +195,20 @@ Here $\bm{X}$ is the design matrix with rows $\mathbf{x}_{ij}^T = (1, x_{ij})$,
 $\mathbf{y}$ is the response vector, $\bm{\beta}$ is the fixed-effect coefficient
 vector, $u_j$ is the group-$j$ random effect, and $\tau_e$, $\tau_u$ are the
 noise and random-effect precisions respectively.
+
+Writing the likelihood scalar form makes the two-level structure explicit:
+\begin{equation}
+  y_{ij} = \underbrace{\beta_0 + \beta_1 x_{ij}}_{\text{population mean}}
+          + \underbrace{u_j}_{\text{group shift}}
+          + \varepsilon_{ij}, \qquad
+  \varepsilon_{ij} \sim \mathcal{N}(0,\,\tau_e^{-1}).
+\end{equation}
+The \emph{population mean} $\beta_0 + \beta_1 x_{ij}$ is shared across all groups;
+the \emph{group shift} $u_j$ is a group-specific offset drawn from
+$\mathcal{N}(0, \tau_u^{-1})$, inducing within-group correlation.
+Observations within the same group $j$ are therefore not independent --- they
+share the same realisation of $u_j$ --- which is the defining characteristic of
+clustered, hierarchical data.
 
 \subsection{Mean-Field Variational Approximation}
 
@@ -636,7 +655,7 @@ The surface is smooth with a clear maximum near the true values.
 \section{Results}
 %─────────────────────────────────────────────────────────────────────────────
 
-\subsection{Generated Data}
+\subsection{Test Case: Hierarchical Bayesian Linear Regression}
 
 Figure~\ref{fig:data} shows the 150 generated observations stratified by group.
 Group random effects $u_j$ visibly shift the regression lines upward or downward
@@ -645,25 +664,68 @@ relative to the population curve.
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.80\linewidth]{hierarchical_linear_data_scatter.png}
-  \caption{Generated hierarchical data ($N=150$, $J=5$).
-    Dotted lines show group-specific regressions; the solid line is the population mean.}
+  \caption{Prior and likelihood for the hierarchical linear model ($N=150$, $J=5$).
+    The grey band is the prior 95\% predictive interval (clipped) for the population mean
+    under $\bm{\beta}\sim\mathcal{N}(\mathbf{0},10\mathbf{I})$; the grey dashed line is
+    the prior mean $y=0$.
+    Coloured bands show the per-group likelihood 95\% noise interval
+    $\pm 2\sigma_e = \pm 1.0$ around each group's true regression line
+    $\beta_0 + \beta_1 x + u_j$; dotted lines are the group regression means.
+    The black dashed line is the population mean $\beta_0 + \beta_1 x$.}
   \label{fig:data}
 \end{figure}
+
+Figure~\ref{fig:likpost} shows the CAVI posterior bands for each group alongside the
+population posterior.
+Because each observation belongs to exactly one group, the observed $y_{ij}$ scatters
+around its \emph{group mean}:
+\begin{equation}
+  y_{ij} \mid \boldsymbol{\beta}, u_j, \tau_e
+    \;\sim\; \mathcal{N}\!\Bigl(
+      \underbrace{\beta_0 + \beta_1 x_{ij}}_{\text{population mean}}
+      +\underbrace{u_j}_{\text{group shift}},\;
+      \underbrace{\tau_e^{-1}}_{\text{within-group variance}}
+    \Bigr).
+\end{equation}
+Each coloured band in Figure~\ref{fig:likpost} shows the CAVI posterior uncertainty
+$\pm 2\sqrt{v_{\beta}(x)+v_j}$ around the fitted group mean, where $v_j$ is the
+posterior variance of $u_j$ and $v_{\beta}(x) = \mathbf{x}^\top \boldsymbol{\Sigma}_\beta \mathbf{x}$
+is the posterior variance from $\boldsymbol{\beta}$.
+Because CAVI underestimates both quantities under the mean-field independence assumption,
+the resulting bands are visibly narrower than the actual data scatter, directly
+illustrating variance collapse.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.92\linewidth]{hierarchical_linear_likelihood_posterior.png}
-  \caption{Likelihood and CAVI posterior for the population-level regression.
-    The red dashed line is the true population mean $y=1.0+2.0x$; the tomato band is the
-    95\% noise interval $\pm 2\sigma_e = \pm 1.0$, showing where individual observations
-    fall around the population mean (ignoring group shifts).
-    The blue band is the CAVI posterior 95\% credible interval for the population
-    regression mean; $N=150$ observations across $J=5$ groups pull the posterior
-    slope close to the true value, but the intercept is visibly biased low
-    ($\hat{\beta}_0 \approx 0.46$ versus $\beta_{0,\mathrm{true}} = 1.0$).
-    This downward bias is a direct consequence of variance collapse: the CAVI intercept
-    absorbs less of the group-mean signal than the true posterior marginal would.}
+  \caption{Per-group CAVI posterior bands and population posterior for the hierarchical
+    linear model.
+    Each coloured dashed line is the CAVI posterior group mean
+    $\hat{\beta}_0 + \hat{\beta}_1 x + m_j$ (same group colours as
+    \cref{fig:datascatter}); the shaded band shows $\pm 2\sqrt{v_{\beta}(x)+v_j}$,
+    combining posterior uncertainty in $\boldsymbol{\beta}$ with posterior uncertainty
+    in the group effect $u_j$.
+    The blue band is the corresponding population-level posterior
+    $\pm 2\sqrt{v_{\beta}(x)}$, containing $\boldsymbol{\beta}$ uncertainty only.
+    The black dashed line is the true population mean $y=1.0+2.0x$.
+    Two symptoms of variance collapse are immediately visible: (1)~the posterior bands
+    are far narrower than the data scatter warrants --- many observations fall outside
+    their group's posterior band --- indicating that $\boldsymbol{\Sigma}_\beta$ and
+    $v_j$ are jointly underestimated; and (2)~the population posterior mean
+    ($\hat{\beta}_0 \approx 0.46$) lies below the true population mean by
+    $\approx 0.54$ units, reflecting intercept bias induced by the mean-field
+    independence assumption.}
   \label{fig:likpost}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\linewidth]{hierarchical_linear_likelihood_posterior_gibbs.png}
+  \caption{Population-level 95\,\% credible intervals: CAVI (steelblue) vs Gibbs MCMC (tomato),
+    overlaid on the per-group CAVI posterior bands.
+    The Gibbs CI is substantially wider than the CAVI CI for the same population mean,
+    directly demonstrating posterior variance collapse under the mean-field approximation.}
+  \label{fig:likpost_gibbs}
 \end{figure}
 
 \subsection{ELBO Convergence}

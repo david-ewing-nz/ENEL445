@@ -390,6 +390,33 @@ the population curve $\sigmoid(\beta_0 + \beta_1 x)$.
   \label{fig:data}
 \end{figure}
 
+Figure~\ref{fig:likpost} overlays the CAVI posterior group-level curves on the data.
+The prior mean for $\boldsymbol{\beta}$ is $\mathbf{0}$, which predicts a flat
+sigmoid at $P(y=1)=0.5$ for all $x$.
+The likelihood shifts the posterior toward the group-specific data, pulling
+$\hat{\beta}_1 \approx 2.2$ away from the prior mean of zero and separating
+the group curves according to their random effects $\hat{u}_j$.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\linewidth]{hierarchical_logistic_likelihood_posterior.png}
+  \caption{CAVI group posterior logistic curves (coloured dashed) and population
+    posterior mean (steelblue, with 95\,\% CI on the linear-predictor scale).
+    Black dashed: true population curve.
+    Shaded bands show $\pm 2$ posterior SD propagated through the logistic link.}
+  \label{fig:likpost}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\linewidth]{hierarchical_logistic_likelihood_posterior_gibbs.png}
+  \caption{Population-level 95\,\% credible intervals: CAVI (steelblue) vs Gibbs MCMC (tomato),
+    overlaid on the per-group CAVI sigmoid bands.
+    The Gibbs CI is substantially wider than the CAVI CI for the same population mean,
+    directly demonstrating posterior variance collapse under the mean-field approximation.}
+  \label{fig:likpost_gibbs}
+\end{figure}
+
 \subsection{ELBO Convergence}
 
 Figure~\ref{fig:elbocv} shows the ELBO history for all methods.

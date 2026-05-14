@@ -913,7 +913,7 @@ x\)</span>; the shaded band is <span
 class="math inline">\(\pm\sigma_e\)</span>.</figcaption>
 </figure>
 <figure id="fig:prior_post">
-<img src="linear_prior_likelihood_posterior.png" style="width:92.0%" />
+<img src="linear_likelihood_posterior.png" style="width:92.0%" />
 <figcaption>Likelihood and CAVI posterior for the linear predictor. The
 red dashed line is the true regression mean <span
 class="math inline">\(y=2.0+1.5x\)</span> (the likelihood mean); the
@@ -1066,13 +1066,13 @@ finite-difference gradient overhead dominates on this small problem.</p>
 hline<span>1,2,Z</span>=<span>solid</span></span> Method &amp;
 Iterations &amp; Runtime (ms) &amp; Speedup vs Gibbs &amp; Final ELBO
 &amp; Converged<br />
-CAVI &amp; 9 &amp; 0.9 &amp; 1982x &amp; -0.014 &amp; Yes<br />
-Gradient Ascent &amp; 2000 &amp; 1941.1 &amp; 1x &amp; -27.012 &amp;
+CAVI &amp; 9 &amp; 1.3 &amp; 1427x &amp; -0.014 &amp; Yes<br />
+Gradient Ascent &amp; 2000 &amp; 1976.3 &amp; 1x &amp; -27.012 &amp;
 Yes<br />
-Newton’s Method &amp; 2 &amp; 10.3 &amp; 171.3x &amp; -44.950 &amp;
+Newton’s Method &amp; 2 &amp; 10.6 &amp; 170.0x &amp; -44.950 &amp;
 Yes<br />
-BFGS &amp; 25 &amp; 48.0 &amp; 37x &amp; -26.658 &amp; Yes<br />
-Gibbs (3 chains) &amp; 3 x 5000 &amp; 1756.6 &amp; 1x (reference) &amp;
+BFGS &amp; 25 &amp; 48.1 &amp; 37x &amp; -26.658 &amp; Yes<br />
+Gibbs (3 chains) &amp; 3 x 5000 &amp; 1798.0 &amp; 1x (reference) &amp;
 N/A (MCMC) &amp; Yes<br />
 </p>
 </div>
