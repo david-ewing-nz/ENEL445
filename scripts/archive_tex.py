@@ -27,10 +27,11 @@ from pathlib import Path
 MIKTEX_BIN = Path("D:/MiKTeX/miktex/bin/x64")
 
 REF_PATTERNS = [
-    (re.compile(r'(\\bibliography\{)([^}]+)(\})'),    ".bib"),
-    (re.compile(r'(\\addbibresource\{)([^}]+)(\})'),  ".bib"),
-    (re.compile(r'(\\input\{)([^}]+)(\})'),            ".tex"),
-    (re.compile(r'(\\include\{)([^}]+)(\})'),          ".tex"),
+    (re.compile(r'(\\bibliography\{)([^}]+)(\})'),      ".bib"),
+    (re.compile(r'(\\addbibresource\{)([^}]+)(\})'),    ".bib"),
+    (re.compile(r'(\\input\{)([^}]+)(\})'),              ".tex"),
+    (re.compile(r'(\\include\{)([^}]+)(\})'),            ".tex"),
+    (re.compile(r'(\\verbatiminput\{)([^}]+)(\})'),      ""),
 ]
 
 

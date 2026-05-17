@@ -20,6 +20,7 @@
 \usepackage{tikz}
 \usetikzlibrary{calc}
 \usepackage{xcolor}
+\usepackage{verbatim}
 
 \usepackage[backend=biber, style=apa, sorting=nyt]{biblatex}
 \addbibresource{D:/github/ENEL445/report/references.bib}
@@ -81,8 +82,8 @@ and hierarchical logistic regression).
 The quadratic (CS2) and logistic (CS3) cases are excluded from the correction
 analysis because their collapse is negligible
 ($\sigma_{\mathrm{VB}}/\sigma_{\mathrm{Gibbs}} > 0.97$ for all parameters), so the
-focus falls on \textbf{CS1} (Bayesian linear regression),
-\textbf{CS4} (hierarchical linear), and \textbf{CS5} (hierarchical logistic).
+focus falls on CS1 (Bayesian linear regression),
+CS4 (hierarchical linear), and CS5 (hierarchical logistic).
 
 In each retained case, four optimisation methods --- CAVI, gradient ascent, Newton,
 and BFGS --- are used to maximise the ELBO.
@@ -1060,7 +1061,10 @@ is behaving correctly.
 %─────────────────────────────────────────────────────────────────────────────
 
 The five individual case study reports contain full derivations, all figures, and
-complete code listings.
+complete code listings. All five individual case study reports are available online at:
+\begin{center}
+  \url{https://ENEL445.IndustrialOrigami.ai}
+\end{center}
 
 \begin{description}
   \item[CS1 --- Linear regression:] \texttt{report/20260514A-LINEAR-CASE-STUDY.tex}.
@@ -1115,10 +1119,7 @@ Hier.~Logistic  & \texttt{python/hierarchical\_logistic\_run.ipynb}  & \texttt{h
 Core algorithms are in \texttt{python/vb\_algorithms\_py.py};
 utilities (archive, plot, I/O) are in \texttt{python/vb\_utils\_py.py}.
 
-All five individual case study reports are available online at:
-\begin{center}
-  \url{https://ENEL445.IndustrialOrigami.ai}
-\end{center}
+
 
 %─────────────────────────────────────────────────────────────────────────────
 \section{Statement of AI Use}
@@ -1126,63 +1127,17 @@ All five individual case study reports are available online at:
 %─────────────────────────────────────────────────────────────────────────────
 
 \noindent\textbf{AI tool used:} GitHub Copilot (Claude Sonnet~4.6).
-
+This appendix contains all promptssubmitted to the AI tool during preparation of this report that could be reported.  Copilot had crashed on occasion and those prompts are unrecoverable. 
 \medskip
 \noindent All mathematical derivations, algorithm design, experimental structure,
 and intellectual content are the student's own work. AI was used for prose
-editing, tactical execution of compiling \LaTeX, spell-checking, running code,
-code debugging, and knowledge lookup as permitted by the ENEL445 course outline.
+editing, tactical execution of compiling xelatex, spell-checking, running code,
+code debugging, and knowledge lookup as permitted by the ENEL445 course outline. It was used to add the prompts themselves to this appediix. 
 
 \medskip
 \noindent The following prompts were submitted to the AI tool during preparation
 of this report.
 
-\begin{enumerate}
-  \item Compile \texttt{20260515A-COMBINED-REPORT.tex} and commit to git.
-  \item Are there any specific Python libraries relevant to what we are doing in these Python files?
-  \item Is \texttt{ggplot} an R library?
-  \item Is there any advantage to using \texttt{plotnine} --- is it prettier?
-  \item At the beginning of the project, would it have been useful to have \texttt{plotnine}?
-  \item Any other recommendations similar to the \texttt{polars} vs \texttt{pandas} choice?
-  \item What is needed to fix the NumPy RNG to use the modern Generator API?
-  \item In the course material, what is stated about the usage of LLMs and AI for the report?
-  \item Construct a set of prompts that were used in this chat.
-  \item Create an \texttt{.md} document labelled \texttt{prompts\_used.md} in the report folder and add these prompts to it.
-  \item Recompile CS1, CS4, CS5 \LaTeX\ reports after overlay figures were added.
-  \item These PDF files are in \texttt{results/pdf} --- confirm they exist.
-  \item Their timestamps are around 10:30 --- verify.
-  \item What does ``stuck in continuation mode'' mean?
-  \item Why do I need to do anything for this to run? Is it not supposed to complete on its own?
-  \item What is the $\sigma$ value used in the prior of CS1?
-  \item Can it be smaller to make it still a flat prior?
-  \item The Results and Discussion shows two images in the linear case --- prior and likelihood, then likelihood and posterior.
-  \item In the image before it has prior and likelihood --- these are the initial conditions, is this not true?
-  \item Are you saying that the prior should be in the second image as well?
-  \item So what does this mean? [referring to the ``single panel'' claim]
-  \item In the image the prior is seen as a straight line --- I don't see the reasoning that these densities have moved from the true value.
-  \item Let's talk about the order of the report itself --- what is the order of CS1?
-  \item Where CS1 is the baseline compared to CS4 and CS5.
-  \item Do they match?
-  \item Is there a good reason for the names of the sections in CS1 to be different?
-  \item The prior is shown as a more horizontal line --- isn't this a density and wouldn't it have a vertical line for the prior at its expected value of zero?
-  \item Where is the line in the Python code --- I want to convert it to a density.
-  \item I have had too many failures within a chat and the context is lost --- create a handoff file summarising work done and what is left to do.
-  \item Create a Markdown handoff file called \texttt{AGENT\_HANDOFF.md}.
-  \item Create a file named \texttt{CONTINUE\_FROM\_CHECKPOINT.prompt.md}.
-  \item Does it read the \texttt{.md} file you created for handoff?
-  \item \texttt{Continue from checkpoint} created an \texttt{.md} file named what?
-  \item I want to run a prompt to capture all pertinent information, then a new agent to read this information.
-  \item Steps 1 and 2 yes --- would \texttt{AGENT\_HANDOFF} effectively be within one of these two?
-  \item Please do [create \texttt{CAPTURE\_STATE.prompt.md} and rewrite \texttt{CONTINUE\_FROM\_CHECKPOINT.prompt.md}].
-  \item [Ran \texttt{\#CAPTURE\_STATE.prompt.md} to generate \texttt{SESSION\_STATE.md}]
-  \item What needs to be done about the terminals in \texttt{>>} state?
-  \item In the report folder do you see a \texttt{.md} file?
-  \item Add to it all prompts that were used in this chat.
-  \item Read the MD files.
-  \item What is Copilot's subscription cost for me?
-  \item I thought Claude Code cost was similar to Copilot costs.
-  \item This is the pricing I see. [screenshot: Claude Pro NZ\$34/month billed annually]
-  \item Add a new appendix to the report for prompts used and include the content of \texttt{prompts-combined} in the report folder.
-\end{enumerate}
+\verbatiminput{prompts-combined.md}
 
 \end{document}
