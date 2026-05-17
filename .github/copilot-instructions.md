@@ -48,16 +48,16 @@ The following user keybinding is stored at `D:\VSCode\data\user-data\User\keybin
 ```json
 {
     "key": "ctrl+alt+b",
-    "command": "latex-workshop.build",
+    "command": "workbench.action.tasks.build",
     "when": "editorTextFocus && resourceExtname == '.tex'"
 }
 ```
 
+This runs the default build task in `.vscode/tasks.json`, which calls `python scripts/archive_tex.py ${relativeFile}` — the correct compile path.
+
 **To restore after a VS Code update or on a new machine:**
 1. Open `D:\VSCode\data\user-data\User\keybindings.json` (or File → Preferences → Keyboard Shortcuts → open JSON)
 2. Add the entry above if it is missing
-
-The workspace also has `.vscode/tasks.json` defining a build task that calls `scripts/archive_tex.py` directly, as a fallback.
 
 ## File Execution Rules
 

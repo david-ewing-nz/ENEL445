@@ -1,8 +1,4 @@
 {
-  "window.restoreWindows": "all",
-  "workbench.startupEditor": "none"
-}
-{
     "python-envs.pythonProjects": [
         {
             "path": ".",
@@ -12,22 +8,21 @@
     ],
     "latex-workshop.latex.recipes": [
         {
-            "name": "archive-xelatex",
-            "tools": ["archive-xelatex"]
+            "name": "xelatex",
+            "tools": ["xelatex"]
         }
     ],
     "latex-workshop.latex.tools": [
         {
-            "name": "archive-xelatex",
-            "command": "D:\\PowerShell\\7.6.0\\pwsh.exe",
+            "name": "xelatex",
+            "command": "xelatex",
             "args": [
-                "-File",
-                "%WORKSPACE_FOLDER%/scripts/run_and_archive_tex.ps1",
-                "-TexFilePath",
-                "%DOC_EXT%"
+                "-synctex=1",
+                "-interaction=nonstopmode",
+                "-file-line-error",
+                "%DOC%"
             ]
         }
     ],
-    "latex-workshop.latex.recipe.default": "archive-xelatex",
-    "latex-workshop.latex.autoBuild.run": "never"
+    "latex-workshop.latex.recipe.default": "xelatex"
 }

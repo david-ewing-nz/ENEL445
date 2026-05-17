@@ -2,7 +2,6 @@
 
 \usepackage{amsmath,amssymb,mathtools,bm}
 \usepackage[margin=1in]{geometry}
-\usepackage{setspace}
 
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\R}{\mathbb{R}}
@@ -27,7 +26,7 @@ p(\bm\theta\mid\bm y)
 p(\bm y)
 &= \int p(\bm y,\bm\theta)\,d\bm\theta\\
 &= \int p(\bm y \mid \bm\theta) p(\bm\theta)\,d\bm\theta, \\[1em] 
-\intertext{{\setstretch{1.5}where $\displaystyle\int p(\bm y\mid\bm\theta)\,p(\bm\theta)\,d\bm\theta$ is potentially
+\intertext{where $\displaystyle\int p(\bm y\mid\bm\theta)\,p(\bm\theta)\,d\bm\theta$ is potentially
 intractable. To circumvent this, we introduce a tractable surrogate
 density $q(\bm\theta)$ from a family of distributions $\mathcal{Q}$,
 and shift our focus to reformulating $\log p(\bm y)$ as an expectation
@@ -39,7 +38,7 @@ contains no $\bm\theta$, so it is constant with respect to~$\bm\theta$
 and its value is unchanged by multiplication with any expression
 equal to~1. Since every probability density integrates to~1, both
 $\displaystyle\int p(\bm\theta)\,d\bm\theta$ and $\displaystyle\int q(\bm\theta)\,d\bm\theta$
-are valid choices, giving}}
+are valid choices, giving}
 \log p(\bm y)
 &= \log p(\bm y)\int p(\bm\theta)\,d\bm\theta \\
 &= \log p(\bm y)\int q(\bm\theta)\,d\bm\theta \\

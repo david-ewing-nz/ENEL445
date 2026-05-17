@@ -2,7 +2,6 @@
 Utility Functions for VI1 Python Implementation
 Provides: Archive management, Parquet I/O, Plotting helpers
 
-Author: Automated conversion from R
 Date: 2026-03-05
 """
 
